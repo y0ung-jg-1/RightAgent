@@ -52,7 +52,7 @@ Then sign and install:
 .\scripts\Install-DevPackage.ps1 -Configuration Release
 ```
 
-The PFX and CER are written beneath the gitignored `.local\signing` directory. Never commit or share the PFX. `Install-DevPackage.ps1` trusts the CER only for the current user and installs the package only when the user explicitly runs it.
+The PFX and CER are written beneath the gitignored `.local\signing` directory. Never commit or share the PFX. On first installation, `Install-DevPackage.ps1` requests administrator approval and imports only the public CER into `Local Computer\Trusted People`, as required by Windows MSIX deployment. It does not add the certificate to `Trusted Root Certification Authorities`. Machine-wide trust affects all users, so remove this development certificate when it is no longer needed.
 
 ## Behavior
 

@@ -24,6 +24,7 @@
     <DefaultLanguage>en-US</DefaultLanguage>
     <PlatformTarget>x64</PlatformTarget>
     <EntryPointProjectUniqueName>..\RightAgent.App\RightAgent.App.csproj</EntryPointProjectUniqueName>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <GenerateAppInstallerFile>false</GenerateAppInstallerFile>
     <AppxBundle>Never</AppxBundle>
