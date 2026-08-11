@@ -1,0 +1,7 @@
+#pragma once
+
+#include <guiddef.h>
+
+// {F7E08D6D-676E-4D4B-950A-5B4451E19E3C}
+inline constexpr GUID CLSID_RightAgentExplorerCommand =
+{0xf7e08d6d, 0x676e, 0x4d4b, {0x95, 0x0a, 0x5b, 0x44, 0x51, 0xe1, 0x9e, 0x3c}};

@@ -1,0 +1,4 @@
+LIBRARY "RightAgent.Shell.dll"
+EXPORTS
+    DllCanUnloadNow PRIVATE
+    DllGetClassObject PRIVATE
