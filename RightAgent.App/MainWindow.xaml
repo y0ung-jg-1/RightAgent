@@ -117,6 +117,7 @@
                                 Text="{x:Bind ViewModel.MasterSwitchLabel, Mode=OneWay}" />
                             <ToggleSwitch
                                 Grid.Column="2"
+                                MinWidth="0"
                                 MinHeight="44"
                                 VerticalAlignment="Center"
                                 AutomationProperties.Name="{x:Bind ViewModel.MasterSwitchLabel, Mode=OneWay}"
@@ -303,6 +304,7 @@
                                                         ToolTipService.ToolTip="{x:Bind Name, Mode=OneWay}" />
                                                     <ToggleSwitch
                                                         Grid.Column="2"
+                                                        MinWidth="0"
                                                         MinHeight="44"
                                                         AutomationProperties.Name="{x:Bind EnabledAutomationName, Mode=OneWay}"
                                                         IsOn="{x:Bind Enabled, Mode=TwoWay}"

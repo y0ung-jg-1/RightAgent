@@ -49,7 +49,7 @@ The public local contract is UTF-8 JSON named `settings.json`:
 - `id`: stable, case-insensitive ID containing lower-case letters, digits, `.`, `_`, or `-`. The UI generates unique IDs and does not change them when names change.
 - `name`: user-visible menu title.
 - `enabled`: disabled or invalid actions do not appear in Explorer.
-- `iconPath`: `builtin:rightagent`, `builtin:claude`, `builtin:codex`, `builtin:kimi`, or a safe `local:` relative path copied under LocalState.
+- `iconPath`: `builtin:rightagent`, `builtin:claude`, `builtin:codex`, `builtin:kimi`, `builtin:grok`, `builtin:opencode`, or a safe `local:` relative path copied under LocalState.
 - `action.type`: `terminalCommand` or `url`.
 - `action.value`: PowerShell command text for terminal actions, or an absolute `http`/`https` URL for web actions.
 

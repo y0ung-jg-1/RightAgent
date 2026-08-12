@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Glyph: opencode from @lobehub/icons (MIT), lobehub/lobe-icons static-svg -->
+  <rect width="64" height="64" rx="14" fill="#FFFFFF"/>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#000" stroke-opacity=".12"/>
+  <path d="M16 6H8v12h8V6zm4 16H4V2h16v20z" fill="#111111" fill-rule="evenodd" transform="translate(14,14) scale(1.5)"/>
+</svg>

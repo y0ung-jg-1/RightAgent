@@ -1,6 +1,14 @@
 # Brand asset policy
 
-The checked-in C/X/K monograms are neutral development placeholders. They are not the Claude, OpenAI/Codex, or Kimi logos and must not be described as official marks.
+The five built-in agent icons (Claude, Codex, Kimi, Grok, OpenCode) use the official brand glyphs from [@lobehub/icons](https://github.com/lobehub/lobe-icons) (MIT license; source package `@lobehub/icons-static-svg`, monochrome `currentColor` glyphs), retrieved 2026-08-12. Each glyph is presented unmodified on RightAgent's rounded tile background so both light and dark themes stay legible:
+
+- Claude: white glyph on the brand clay `#D97757`.
+- Codex: white glyph on near-black `#1A1A1A` (brand mark is monochrome).
+- Kimi: black glyph on white with a hairline border (brand color `#000`).
+- Grok: white glyph on near-black `#1A1A1A` (brand color `#000`).
+- OpenCode: black glyph on white with a hairline border (brand color `#000`).
+
+Before a public build, verify usage against each vendor's brand terms (Anthropic/Claude, OpenAI/Codex, Moonshot/Kimi, xAI/Grok, OpenCode) as required below.
 
 Before a public build:
 

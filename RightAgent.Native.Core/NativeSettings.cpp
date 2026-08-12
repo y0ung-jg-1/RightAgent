@@ -344,7 +344,9 @@ namespace rightagent
         {
             BuiltIn(L"claude-code", L"Claude Code", L"builtin:claude", L"claude", 0, CommandExists(L"claude")),
             BuiltIn(L"codex", L"Codex", L"builtin:codex", L"codex", 1, CommandExists(L"codex")),
-            BuiltIn(L"kimi-web", L"Kimi Web", L"builtin:kimi", L"kimi web", 2, CommandExists(L"kimi"))
+            BuiltIn(L"kimi-web", L"Kimi Web", L"builtin:kimi", L"kimi web", 2, CommandExists(L"kimi")),
+            BuiltIn(L"grok", L"Grok", L"builtin:grok", L"grok", 3, CommandExists(L"grok")),
+            BuiltIn(L"opencode", L"opencode", L"builtin:opencode", L"opencode", 4, CommandExists(L"opencode"))
         };
         for (const auto& agent : settings.agents)
         {
@@ -468,7 +470,7 @@ namespace rightagent
         }
 
         auto key = lower.substr(8);
-        if (key != L"claude" && key != L"codex" && key != L"kimi")
+        if (key != L"claude" && key != L"codex" && key != L"kimi" && key != L"grok" && key != L"opencode")
         {
             key = L"rightagent";
         }

@@ -64,7 +64,7 @@ The PFX and CER are written beneath the gitignored `.local\signing` directory. N
 - A simple missing executable is detected before Terminal opens; errors offer a button to open RightAgent settings.
 - Settings are atomically written to the package LocalState `settings.json`. A damaged file is backed up and replaced when the settings app next opens.
 
-The initial agent icons are local neutral placeholders, not vendor logos. See [brand asset policy](docs/BRAND_ASSETS.md).
+The built-in agent icons use official brand glyphs from [@lobehub/icons](https://github.com/lobehub/lobe-icons) on local tiles; nothing is fetched at runtime. See [brand asset policy](docs/BRAND_ASSETS.md).
 
 ## Repository map
 

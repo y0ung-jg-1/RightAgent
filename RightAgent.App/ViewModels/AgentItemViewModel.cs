@@ -88,7 +88,7 @@ public sealed class AgentItemViewModel : BindableBase
             var key = IconPath.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase)
                 ? IconPath["builtin:".Length..].ToLowerInvariant()
                 : "rightagent";
-            if (key is not ("claude" or "codex" or "kimi" or "rightagent"))
+            if (key is not ("claude" or "codex" or "kimi" or "grok" or "opencode" or "rightagent"))
             {
                 key = "rightagent";
             }
