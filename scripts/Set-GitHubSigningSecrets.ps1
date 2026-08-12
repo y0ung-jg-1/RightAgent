@@ -74,15 +74,42 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $releaseTagPolicy = 'v*.*.*'
-$configuredPolicies = @(& $gh.Source api --paginate "repos/$Repository/environments/$Environment/deployment-branch-policies" --jq '.branch_policies[].name')
+$policyResponseJson = & $gh.Source api "repos/$Repository/environments/$Environment/deployment-branch-policies?per_page=100"
 if ($LASTEXITCODE -ne 0) {
     throw "Could not read deployment policies for GitHub environment '$Environment'."
 }
-if ($configuredPolicies -notcontains $releaseTagPolicy) {
-    & $gh.Source api --method POST "repos/$Repository/environments/$Environment/deployment-branch-policies" -f "name=$releaseTagPolicy" --silent
+$policyResponse = ($policyResponseJson -join [Environment]::NewLine) | ConvertFrom-Json
+$configuredPolicies = @($policyResponse.branch_policies)
+$wrongTypePolicies = @($configuredPolicies | Where-Object {
+    $_.name -ceq $releaseTagPolicy -and $_.type -cne 'tag'
+})
+foreach ($wrongTypePolicy in $wrongTypePolicies) {
+    & $gh.Source api --method DELETE "repos/$Repository/environments/$Environment/deployment-branch-policies/$($wrongTypePolicy.id)" --silent
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not remove the incorrectly typed GitHub deployment policy '$releaseTagPolicy'."
+    }
+}
+
+$hasReleaseTagPolicy = @($configuredPolicies | Where-Object {
+    $_.name -ceq $releaseTagPolicy -and $_.type -ceq 'tag'
+}).Count -gt 0
+if (-not $hasReleaseTagPolicy) {
+    & $gh.Source api --method POST "repos/$Repository/environments/$Environment/deployment-branch-policies" -f "name=$releaseTagPolicy" -f 'type=tag' --silent
     if ($LASTEXITCODE -ne 0) {
         throw "Could not restrict GitHub environment '$Environment' to release tags."
     }
+}
+
+$verifiedPoliciesJson = & $gh.Source api "repos/$Repository/environments/$Environment/deployment-branch-policies?per_page=100"
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not verify deployment policies for GitHub environment '$Environment'."
+}
+$verifiedPolicyResponse = ($verifiedPoliciesJson -join [Environment]::NewLine) | ConvertFrom-Json
+$verifiedPolicies = @($verifiedPolicyResponse.branch_policies)
+if (@($verifiedPolicies | Where-Object {
+    $_.name -ceq $releaseTagPolicy -and $_.type -ceq 'tag'
+}).Count -ne 1) {
+    throw "GitHub did not confirm exactly one '$releaseTagPolicy' tag deployment policy."
 }
 
 function Set-EnvironmentSecret {
