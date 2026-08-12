@@ -272,10 +272,12 @@
                                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                             BorderThickness="1"
                                             CornerRadius="8"
-                                            IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
+                                            IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}"
+                                            SizeChanged="AgentExpander_SizeChanged">
                                             <Expander.Header>
                                                 <Grid
                                                     MinHeight="64"
+                                                    HorizontalAlignment="Stretch"
                                                     ColumnSpacing="12"
                                                     VerticalAlignment="Center">
                                                     <Grid.ColumnDefinitions>
@@ -302,10 +304,14 @@
                                                         Text="{x:Bind Name, Mode=OneWay}"
                                                         TextTrimming="CharacterEllipsis"
                                                         ToolTipService.ToolTip="{x:Bind Name, Mode=OneWay}" />
+                                                    <!-- Negative right margin absorbs the ToggleSwitch template's
+                                                         built-in trailing padding, so the pill ends flush with the
+                                                         content column edge measured in AgentExpander_SizeChanged. -->
                                                     <ToggleSwitch
                                                         Grid.Column="2"
                                                         MinWidth="0"
                                                         MinHeight="44"
+                                                        Margin="0,0,-8,0"
                                                         AutomationProperties.Name="{x:Bind EnabledAutomationName, Mode=OneWay}"
                                                         IsOn="{x:Bind Enabled, Mode=TwoWay}"
                                                         OffContent=""
