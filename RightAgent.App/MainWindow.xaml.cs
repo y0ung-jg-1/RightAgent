@@ -19,8 +19,9 @@ public sealed partial class MainWindow : Window
     {
         ViewModel = new MainViewModel(App.LocalStateDirectory);
         InitializeComponent();
-        AppWindow.Resize(new SizeInt32(1040, 860));
+        AppWindow.Resize(new SizeInt32(1200, 880));
         TryApplyMicaBackdrop();
+        ExtendIntoTitleBar();
         Title = ViewModel.WindowTitle;
         Activated += (_, _) => Title = ViewModel.WindowTitle;
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
@@ -153,15 +154,13 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void MenuModeRadio_Checked(object sender, RoutedEventArgs e)
+    private void MenuMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (synchronizing)
+        if (synchronizing || sender is not ComboBox { SelectedValue: string value })
         {
             return;
         }
-        ViewModel.MenuMode = DirectModeRadio.IsChecked == true
-            ? RightAgent.Core.SettingsContract.DirectMenu
-            : RightAgent.Core.SettingsContract.GroupedMenu;
+        ViewModel.MenuMode = value;
     }
 
     private void DirectAgent_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -200,9 +199,8 @@ public sealed partial class MainWindow : Window
         try
         {
             LanguageComboBox.SelectedValue = ViewModel.Language;
+            MenuModeComboBox.SelectedValue = ViewModel.MenuMode;
             DirectAgentComboBox.SelectedValue = ViewModel.DirectAgentId;
-            GroupedModeRadio.IsChecked = !ViewModel.IsDirectMode;
-            DirectModeRadio.IsChecked = ViewModel.IsDirectMode;
         }
         finally
         {
@@ -247,6 +245,21 @@ public sealed partial class MainWindow : Window
 
         SystemBackdrop = new MicaBackdrop { Kind = MicaKind.BaseAlt };
         RootGrid.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+    }
+
+    private void ExtendIntoTitleBar()
+    {
+        // Draw the title area ourselves (icon + name) over the Mica backdrop and keep
+        // only the system caption buttons, with theme-neutral hover feedback.
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+        var titleBar = AppWindow.TitleBar;
+        titleBar.IconShowOptions = Microsoft.UI.Windowing.IconShowOptions.HideIconAndSystemMenu;
+        var transparent = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+        titleBar.ButtonBackgroundColor = transparent;
+        titleBar.ButtonInactiveBackgroundColor = transparent;
+        titleBar.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(0x26, 0x80, 0x80, 0x80);
+        titleBar.ButtonPressedBackgroundColor = Windows.UI.Color.FromArgb(0x40, 0x80, 0x80, 0x80);
     }
 
     private static async Task NormalizeIconAsync(StorageFile source, string destination)

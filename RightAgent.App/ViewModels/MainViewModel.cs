@@ -38,6 +38,8 @@ public sealed class MainViewModel : BindableBase
 
     public IReadOnlyList<OptionItem> LanguageOptions { get; private set; } = [];
 
+    public IReadOnlyList<OptionItem> MenuModeOptions { get; private set; } = [];
+
     public bool IsLoaded
     {
         get => isLoaded;
@@ -71,6 +73,12 @@ public sealed class MainViewModel : BindableBase
         get => menuMode;
         set
         {
+            // The ComboBox pushes null while its ItemsSource is being swapped during a
+            // language change; ignore it so the swap cannot reset the mode.
+            if (value is null)
+            {
+                return;
+            }
             var normalized = value == SettingsContract.DirectMenu ? SettingsContract.DirectMenu : SettingsContract.GroupedMenu;
             if (SetProperty(ref menuMode, normalized))
             {
@@ -177,8 +185,6 @@ public sealed class MainViewModel : BindableBase
     public string SaveFailedLabel => localization["SaveFailed"];
     public string MenuSectionLabel => localization["MenuSection"];
     public string MenuModeLabel => localization["MenuMode"];
-    public string GroupedLabel => localization["Grouped"];
-    public string DirectLabel => localization["Direct"];
     public string DirectAgentLabel => localization["DirectAgent"];
     public string TerminalProfileLabel => localization["TerminalProfile"];
     public string TerminalProfileHint => localization["TerminalProfileHint"];
@@ -396,6 +402,11 @@ public sealed class MainViewModel : BindableBase
             new OptionItem(SettingsContract.ChineseLanguage, localization["Chinese"]),
             new OptionItem(SettingsContract.EnglishLanguage, localization["English"])
         ];
+        MenuModeOptions =
+        [
+            new OptionItem(SettingsContract.GroupedMenu, localization["Grouped"]),
+            new OptionItem(SettingsContract.DirectMenu, localization["Direct"])
+        ];
         foreach (var agent in Agents)
         {
             agent.RefreshLanguage();
@@ -408,6 +419,7 @@ public sealed class MainViewModel : BindableBase
     private void NotifyLocalizedProperties()
     {
         OnPropertyChanged(nameof(LanguageOptions));
+        OnPropertyChanged(nameof(MenuModeOptions));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HeaderTitle));
         OnPropertyChanged(nameof(MasterSwitchLabel));
@@ -416,8 +428,6 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(SaveFailedLabel));
         OnPropertyChanged(nameof(MenuSectionLabel));
         OnPropertyChanged(nameof(MenuModeLabel));
-        OnPropertyChanged(nameof(GroupedLabel));
-        OnPropertyChanged(nameof(DirectLabel));
         OnPropertyChanged(nameof(DirectAgentLabel));
         OnPropertyChanged(nameof(TerminalProfileLabel));
         OnPropertyChanged(nameof(TerminalProfileHint));
