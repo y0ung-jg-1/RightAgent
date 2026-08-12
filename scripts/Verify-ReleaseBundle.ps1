@@ -50,6 +50,7 @@ try {
         'Install-RightAgent.ps1',
         'LICENSE',
         'README.md',
+        'README.en.md',
         'RightAgent.cer',
         'SHA256SUMS.txt',
         'THIRD_PARTY_NOTICES.md'

@@ -95,6 +95,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-Release.ps1') -Destinat
 Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENSE') -Destination $stagingDirectory
 Copy-Item -LiteralPath (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md') -Destination $stagingDirectory
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\SIDELOAD_INSTALL.md') -Destination (Join-Path $stagingDirectory 'README.md')
+Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\SIDELOAD_INSTALL.en.md') -Destination (Join-Path $stagingDirectory 'README.en.md')
 
 $sourceDependencyDirectory = Join-Path (Split-Path -Parent $PackagePath) 'Dependencies\x64'
 if (Test-Path -LiteralPath $sourceDependencyDirectory -PathType Container) {

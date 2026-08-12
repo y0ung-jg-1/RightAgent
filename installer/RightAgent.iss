@@ -5,7 +5,7 @@
   #error OutputDir must point to the installer output directory.
 #endif
 #ifndef AppVersion
-  #error AppVersion must be the display version, for example 1.0.1.
+  #error AppVersion must be the display version, for example 1.2.3.
 #endif
 #ifndef PackageVersion
   #error PackageVersion must be the four-part MSIX version.

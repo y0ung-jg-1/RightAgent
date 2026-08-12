@@ -40,8 +40,14 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
 
 ## Release checklist
 
-1. Update `Version` in both package manifests. The build rejects any drift
-   between the manifests outside their intentional Name and Publisher fields.
+1. Update `Version` in both package manifests, `assemblyIdentity` in
+   `RightAgent.App/app.manifest`, and the numeric and string versions in
+   `RightAgent.Launcher/Launcher.rc` and `RightAgent.Shell/Shell.rc`. The build
+   rejects drift between the package manifests outside their intentional Name
+   and Publisher fields. Copy `docs/releases/TEMPLATE.md` to
+   `docs/releases/vX.Y.Z.md`, replace every placeholder, and write one complete
+   Chinese section followed by one complete English section. The tag workflow
+   rejects a release without that exact file.
 2. Run the full local gate:
 
        .\scripts\Build.ps1 -Configuration Release -PackageIdentity Release
@@ -59,7 +65,8 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
 4. Create and push the exact matching tag, for example `v1.0.0` for package
    version `1.0.0.0`.
 5. Approve the `release` environment job if protection rules require it.
-6. Inspect the draft Release and Actions log. Confirm it contains exactly one
+6. Inspect the draft Release and Actions log. Confirm the release body keeps the
+   Chinese and English notes in separate sections, contains exactly one
    `RightAgent-version-x64-Setup.exe` and its `.sha256`, and verify the Setup
    signature, timestamp, certificate thumbprint, and SHA-256.
 7. Run Setup on a clean Windows 11 x64 standard-user account. Confirm UAC is

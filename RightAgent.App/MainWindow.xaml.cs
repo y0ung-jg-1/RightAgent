@@ -14,8 +14,13 @@ namespace RightAgent.App;
 
 public sealed partial class MainWindow : Window
 {
+    private const double MinimumWindowWidth = 640;
+    private const double MinimumWindowHeight = 540;
+    private const double PreviewBreakpointWidth = 900;
     private static readonly Uri WindowsTerminalStoreUri = new("ms-windows-store://pdp/?ProductId=9N0DX20HK701");
     private static readonly Uri WindowsTerminalStoreWebUri = new("https://apps.microsoft.com/detail/9n0dx20hk701");
+    private bool enforcingMinimumWindowSize;
+    private bool? narrowLayoutActive;
     private bool synchronizing;
     private bool terminalRequirementChecked;
 
@@ -24,6 +29,7 @@ public sealed partial class MainWindow : Window
         ViewModel = new MainViewModel(App.LocalStateDirectory);
         InitializeComponent();
         AppWindow.Resize(new SizeInt32(1200, 880));
+        AppWindow.Changed += AppWindow_Changed;
         TryApplyMicaBackdrop();
         ExtendIntoTitleBar();
         Title = ViewModel.WindowTitle;
@@ -41,6 +47,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            EnsureMinimumWindowSize(AppWindow);
             await ViewModel.LoadAsync();
             Bindings.Update();
             SynchronizeSelectors();
@@ -102,6 +109,63 @@ public sealed partial class MainWindow : Window
         catch
         {
             ShowStatus(InfoBarSeverity.Error, ViewModel.TerminalStoreOpenFailedMessage);
+        }
+    }
+
+    private void AppWindow_Changed(
+        Microsoft.UI.Windowing.AppWindow sender,
+        Microsoft.UI.Windowing.AppWindowChangedEventArgs args)
+    {
+        if (args.DidSizeChange)
+        {
+            EnsureMinimumWindowSize(sender);
+        }
+    }
+
+    private void RootGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var useNarrowLayout = e.NewSize.Width < PreviewBreakpointWidth;
+        if (narrowLayoutActive == useNarrowLayout)
+        {
+            return;
+        }
+
+        narrowLayoutActive = useNarrowLayout;
+        PreviewCard.Visibility = useNarrowLayout ? Visibility.Collapsed : Visibility.Visible;
+        PreviewColumn.Width = new GridLength(useNarrowLayout ? 0 : 320);
+        MainContentGrid.ColumnSpacing = useNarrowLayout ? 0 : 24;
+        MainContentGrid.Padding = useNarrowLayout
+            ? new Thickness(24, 8, 24, 32)
+            : new Thickness(40, 8, 40, 32);
+    }
+
+    private void EnsureMinimumWindowSize(Microsoft.UI.Windowing.AppWindow appWindow)
+    {
+        if (enforcingMinimumWindowSize)
+        {
+            return;
+        }
+
+        var scale = RootGrid.XamlRoot?.RasterizationScale ?? 1d;
+        var minimumWidth = (int)Math.Ceiling(MinimumWindowWidth * scale);
+        var minimumHeight = (int)Math.Ceiling(MinimumWindowHeight * scale);
+        var currentSize = appWindow.Size;
+        var constrainedSize = new SizeInt32(
+            Math.Max(currentSize.Width, minimumWidth),
+            Math.Max(currentSize.Height, minimumHeight));
+        if (constrainedSize == currentSize)
+        {
+            return;
+        }
+
+        enforcingMinimumWindowSize = true;
+        try
+        {
+            appWindow.Resize(constrainedSize);
+        }
+        finally
+        {
+            enforcingMinimumWindowSize = false;
         }
     }
 

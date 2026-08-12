@@ -8,7 +8,10 @@
     xmlns:viewModels="using:RightAgent.App.ViewModels"
     mc:Ignorable="d">
 
-    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid
+        x:Name="RootGrid"
+        Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+        SizeChanged="RootGrid_SizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -34,18 +37,19 @@
         </Grid>
 
         <Grid
+            x:Name="MainContentGrid"
             Grid.Row="1"
             MaxWidth="1180"
             Padding="40,8,40,32"
-            HorizontalAlignment="Center"
+            HorizontalAlignment="Stretch"
             ColumnSpacing="24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MinWidth="480" />
-                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="PreviewColumn" Width="320" />
             </Grid.ColumnDefinitions>
 
             <StackPanel
@@ -553,6 +557,7 @@
             </ScrollViewer>
 
             <Border
+                x:Name="PreviewCard"
                 Grid.Row="1"
                 Grid.Column="1"
                 Padding="20,16"

@@ -85,6 +85,11 @@ jobs:
           if ($env:GITHUB_REF_NAME -cne $expectedTag) {
               throw "Tag '$env:GITHUB_REF_NAME' does not match package version '$expectedTag'."
           }
+          $releaseNotesPath = Join-Path $env:GITHUB_WORKSPACE "docs\releases\$($env:GITHUB_REF_NAME).md"
+          if (-not (Test-Path -LiteralPath $releaseNotesPath -PathType Leaf)) {
+              throw "Release notes are missing: $releaseNotesPath. Copy docs\releases\TEMPLATE.md and write complete Chinese and English sections before tagging."
+          }
+          "RIGHTAGENT_RELEASE_NOTES=$releaseNotesPath" >> $env:GITHUB_ENV
           & git merge-base --is-ancestor $env:GITHUB_SHA origin/main
           if ($LASTEXITCODE -ne 0) {
               throw "Tagged commit '$env:GITHUB_SHA' is not reachable from origin/main."
@@ -199,11 +204,18 @@ jobs:
           & gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
               & gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
+              if ($LASTEXITCODE -ne 0) {
+                  throw 'GitHub Release asset upload failed.'
+              }
           } else {
-              & gh release create $tag @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --generate-notes --title "RightAgent $tag"
+              & gh release create $tag @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --notes-file $env:RIGHTAGENT_RELEASE_NOTES --title "RightAgent $tag"
+              if ($LASTEXITCODE -ne 0) {
+                  throw 'GitHub Release creation failed.'
+              }
           }
+          & gh release edit $tag --repo $env:GITHUB_REPOSITORY --notes-file $env:RIGHTAGENT_RELEASE_NOTES --title "RightAgent $tag"
           if ($LASTEXITCODE -ne 0) {
-              throw 'GitHub Release creation or upload failed.'
+              throw 'GitHub Release notes update failed.'
           }
 
       - name: Remove temporary signing material
