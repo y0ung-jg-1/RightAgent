@@ -44,9 +44,45 @@ if (-not $PSCmdlet.ShouldProcess(
     return
 }
 
-& $gh.Source api --method PUT "repos/$Repository/environments/$Environment" -F wait_timer=0 -F prevent_self_review=false --silent
+$reviewerJson = & $gh.Source api user
+if ($LASTEXITCODE -ne 0) {
+    throw 'Could not resolve the authenticated GitHub user for the release-environment reviewer.'
+}
+$reviewer = $reviewerJson | ConvertFrom-Json
+if (-not $reviewer.id -or [string]::IsNullOrWhiteSpace([string]$reviewer.login)) {
+    throw 'GitHub returned an invalid authenticated-user record.'
+}
+
+$environmentPayload = @{
+    wait_timer = 0
+    prevent_self_review = $false
+    reviewers = @(
+        @{
+            type = 'User'
+            id = [long]$reviewer.id
+        }
+    )
+    deployment_branch_policy = @{
+        protected_branches = $false
+        custom_branch_policies = $true
+    }
+} | ConvertTo-Json -Depth 5 -Compress
+
+$environmentPayload | & $gh.Source api --method PUT "repos/$Repository/environments/$Environment" --input - --silent
 if ($LASTEXITCODE -ne 0) {
     throw "Could not create or update GitHub environment '$Environment'."
+}
+
+$releaseTagPolicy = 'v*.*.*'
+$configuredPolicies = @(& $gh.Source api --paginate "repos/$Repository/environments/$Environment/deployment-branch-policies" --jq '.branch_policies[].name')
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not read deployment policies for GitHub environment '$Environment'."
+}
+if ($configuredPolicies -notcontains $releaseTagPolicy) {
+    & $gh.Source api --method POST "repos/$Repository/environments/$Environment/deployment-branch-policies" -f "name=$releaseTagPolicy" --silent
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not restrict GitHub environment '$Environment' to release tags."
+    }
 }
 
 function Set-EnvironmentSecret {
@@ -107,4 +143,4 @@ if ($LASTEXITCODE -ne 0 -or
     throw 'GitHub did not confirm both RightAgent release signing secrets.'
 }
 
-Write-Host "Configured RightAgent signing secrets for $Repository environment '$Environment'."
+Write-Host "Configured RightAgent signing secrets for $Repository environment '$Environment'; reviewer: $($reviewer.login); deployment tags: $releaseTagPolicy."
