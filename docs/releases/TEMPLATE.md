@@ -12,7 +12,7 @@
 ### 安装方法
 
 1. 下载 `RightAgent-X.Y.Z-x64-Setup.exe` 和同名 `.sha256` 文件。
-2. 核对 SHA-256 后双击安装器，并批准用户账户控制提示。
+2. 核对 SHA-256 后双击安装器；首次安装时按提示批准用户账户控制请求。
 
 ### 安全信息
 
@@ -33,7 +33,7 @@ Describe the purpose and user value of this release in complete English prose.
 ### Installation
 
 1. Download `RightAgent-X.Y.Z-x64-Setup.exe` and its matching `.sha256` file.
-2. Verify the SHA-256, run Setup, and approve the User Account Control prompt.
+2. Verify the SHA-256 and run Setup. Approve the User Account Control prompt on first installation.
 
 ### Security information
 

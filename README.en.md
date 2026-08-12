@@ -45,7 +45,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 
 ## Installation
 
-Download `RightAgent-1.0.2-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer requests administrator approval at startup. Its elevated phase only validates and imports the bundled public certificate into Local Computer\Trusted People; MSIX deployment then runs as the Windows user who started Setup. The private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
+Download `RightAgent-1.0.2-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer remains under the current Windows user. On the first installation, if the bundled public certificate is not trusted yet, Setup requests administrator approval only for importing that certificate into Local Computer\Trusted People, then installs the MSIX for the current user. Upgrades do not request elevation again while the certificate remains trusted, and the private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
 
 ### Build and install from source
 
@@ -107,7 +107,7 @@ GitHub Actions continuous integration runs the full test suite and builds an uns
 - `RightAgent.Launcher`: short-lived native process that opens Terminal or a URL.
 - `RightAgent.Native.Core`: shared native settings, icon, quoting, and process helpers.
 - `RightAgent.Package`: WAP/MSIX identity and File Explorer registration.
-- `installer`: single-file Setup definition with elevated trust and original-user deployment.
+- `installer`: single-file Setup definition that stays under the current user and elevates only to trust the public certificate when required.
 
 Details: [architecture](docs/ARCHITECTURE.md) · [settings schema](docs/SETTINGS_SCHEMA.md) · [test matrix](docs/TEST_MATRIX.md) · [release guide](docs/RELEASING.md) · [v1 release decisions](docs/RELEASE_DECISIONS.md).
 

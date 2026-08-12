@@ -22,9 +22,14 @@ There is no service, tray app, startup task, scheduled task, watcher, or residen
 
 The GitHub Release `Setup.exe` is a distribution-only bootstrapper, not a
 RightAgent runtime process. It embeds the signed MSIX, x64 dependencies, and
-public release certificate. Setup requires elevation at startup, uses the
-elevated phase only to validate and trust the public certificate in Local
-Machine\Trusted People, and executes the MSIX deployment as the original user.
+public release certificate. Setup remains under the Windows user who started
+it, validates the package, and requests elevation only when a first-install
+helper must trust the public certificate in Local Machine\Trusted People. The
+helper exits before the original user process deploys the MSIX. Fixed Setup and
+package-installation mutexes reject concurrent installation attempts. During
+deployment, the PowerShell host forwards Windows `DeploymentProgress`
+percentages to Setup, which replaces its initial indeterminate animation with a
+determinate progress bar.
 
 ## Explorer contract
 

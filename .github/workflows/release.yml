@@ -177,7 +177,65 @@ jobs:
           $expectedLine = (Get-Content -LiteralPath $checksumPath -Raw).Trim()
           $expectedChecksumLine = "$actualHash  $($setupFiles[0].Name)"
           if ($expectedLine -cne $expectedChecksumLine) {
-              throw 'The setup executable does not match its SHA-256 file.'
+            throw 'The setup executable does not match its SHA-256 file.'
+          }
+
+      - name: Smoke-test Setup installation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setupFiles = @(Get-ChildItem -LiteralPath './artifacts/installer' -Filter 'RightAgent-*-x64-Setup.exe' -File -ErrorAction Stop)
+          if ($setupFiles.Count -ne 1) {
+            throw "Expected exactly one setup executable, but found $($setupFiles.Count)."
+          }
+
+          $setupLog = Join-Path $env:RUNNER_TEMP 'RightAgent-Setup-smoke.log'
+          $setupProcess = Start-Process -FilePath $setupFiles[0].FullName -ArgumentList @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            "/LOG=$setupLog"
+          ) -WindowStyle Hidden -PassThru
+          if (-not $setupProcess.WaitForExit(300000)) {
+            throw 'Setup did not finish within five minutes.'
+          }
+          if (-not (Test-Path -LiteralPath $setupLog -PathType Leaf)) {
+            throw 'Setup did not create its diagnostic log.'
+          }
+
+          $setupLogText = Get-Content -LiteralPath $setupLog -Raw
+          Write-Host $setupLogText
+          if ($setupProcess.ExitCode -ne 0) {
+            throw "Setup exited with code $($setupProcess.ExitCode)."
+          }
+          if ($setupLogText -match 'raised an exception|QuerySpawnServer|Unexpected response') {
+            throw 'Setup logged an installation exception.'
+          }
+          if ($setupLogText -notmatch 'Administrative install mode: No') {
+            throw 'Setup did not retain per-user installation mode.'
+          }
+          if ($setupLogText -notmatch 'RightAgent installer output: RIGHTAGENT_PROGRESS:100') {
+            throw 'Setup did not report completed package deployment progress.'
+          }
+          if ($setupLogText -notmatch 'RightAgent installer output: RightAgent installed\.') {
+            throw 'Setup did not report a completed RightAgent installation.'
+          }
+
+          [xml]$manifest = Get-Content -LiteralPath './RightAgent.Package/Package.Release.appxmanifest' -Raw
+          $expectedVersion = [version]([string]$manifest.Package.Identity.Version)
+          $installedPackage = Get-AppxPackage -Name 'RightAgent' -ErrorAction Stop |
+            Where-Object { $_.Publisher -ceq 'CN=RightAgent' } |
+            Select-Object -First 1
+          if (-not $installedPackage -or [version]$installedPackage.Version -ne $expectedVersion) {
+            throw "Setup did not register the expected RightAgent package version $expectedVersion."
+          }
+
+          $publicCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new('${{ steps.certificate.outputs.cer_path }}')
+          if (-not (Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$($publicCertificate.Thumbprint)")) {
+            throw 'Setup did not trust the RightAgent public certificate in Local Machine\\Trusted People.'
+          }
+          if (Test-Path -LiteralPath "Cert:\LocalMachine\Root\$($publicCertificate.Thumbprint)") {
+            throw 'Setup incorrectly trusted the RightAgent certificate as a root certificate.'
           }
 
       - name: Upload signed workflow artifact

@@ -21,16 +21,29 @@ release. It is an engineering release record, not legal advice.
 - Build service: use GitHub-hosted windows-2025 runners. Pull requests and
   ordinary pushes build unsigned packages; only the release
   environment may access the PFX and password used by the tag release job.
-- Release format: publish a single administrator-gated x64 Setup EXE plus its
-  SHA-256 file. The installer embeds the signed MSIX, x64 dependencies, public
-  certificate, license, and notices. Its elevated phase trusts only the public
-  certificate; per-user MSIX deployment runs as the user who started Setup.
+- Initial v1.0.2 release format (superseded on 2026-08-13): publish a single
+  administrator-gated x64 Setup EXE plus its SHA-256 file. The installer embeds
+  the signed MSIX, x64 dependencies, public certificate, license, and notices.
 - Installer toolchain: use the official Inno Setup 6.7.3 compiler downloaded
   from its pinned upstream release and accepted only after an exact SHA-256
   match. Sign and timestamp both the embedded MSIX and the final Setup EXE.
 - Repository visibility: publish the RightAgent source repository and its GitHub
   Releases publicly. The project owner explicitly authorized the private-to-public
   change and the GitHub release-environment configuration on 2026-08-12.
+
+## Decision revised 2026-08-13
+
+- Installer privilege boundary: keep the single-file x64 Setup EXE, but run the
+  bootstrapper as the initiating Windows user. On first installation it requests
+  elevation only for the helper that imports the verified public certificate into
+  Local Machine\Trusted People; the original user process performs MSIX deployment.
+  Setup and script-level mutexes reject concurrent installation attempts. This
+  replaces the v1.0.2 `ExecAsOriginalUser` handoff after that mechanism failed in
+  a real installation while the AppX deployment continued in the background.
+- Installer progress: keep the indeterminate animation while Setup validates the
+  payload or waits for first-install certificate approval. Once MSIX deployment
+  begins, stream the percentage reported by Windows `DeploymentProgress` into a
+  determinate 0–100% progress bar; do not estimate elapsed time.
 
 ## Publication gate
 

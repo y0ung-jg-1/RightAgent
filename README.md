@@ -45,7 +45,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 
 ## 安装
 
-请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.0.2-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。安装器启动时会请求管理员批准；管理员阶段只验证并导入随包公共证书到“本地计算机\受信任的人”，随后切回最初发起安装的 Windows 用户完成 MSIX 安装。发布包不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
+请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.0.2-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。安装器始终以当前 Windows 用户运行；首次安装若尚未信任随包公共证书，会单独请求一次管理员批准，只把该证书导入“本地计算机\受信任的人”，然后继续为当前用户安装 MSIX。证书已经受信任的升级不会重复请求管理员权限，发布包也不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
 
 ### 从源码开发
 
@@ -107,7 +107,7 @@ GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完�
 - `RightAgent.Launcher`：负责打开终端或网址的短生命周期原生进程。
 - `RightAgent.Native.Core`：共享的原生设置、图标、引号转义和进程辅助代码。
 - `RightAgent.Package`：WAP/MSIX 身份与资源管理器注册。
-- `installer`：管理员启动、原用户安装的单文件安装器定义。
+- `installer`：以当前用户运行、仅在首次信任公共证书时请求管理员批准的单文件安装器定义。
 
 实现细节见[架构文档](docs/ARCHITECTURE.md)，数据约定见[设置结构说明](docs/SETTINGS_SCHEMA.md)，人工验收范围见[测试矩阵](docs/TEST_MATRIX.md)，发布操作见[发版指南](docs/RELEASING.md)，v1 发布取舍见[发布决策记录](docs/RELEASE_DECISIONS.md)。
 

@@ -6,12 +6,12 @@
 - Native tests: Windows argument round-trip covers spaces, Chinese, parentheses, single quotes, ampersands, quotes, and trailing backslashes.
 - Native COM smoke test: loads `RightAgent.Shell.dll` without registration, creates its class factory, checks the grouped title/flag, and enumerates agent subcommands.
 - Release build: x64 Launcher and Shell compile with warnings as errors; WAP produces one unsigned package before signing.
-- Release installer: the pinned Inno Setup compiler hash is verified; the final Setup EXE and embedded MSIX use the expected certificate and RFC 3161 timestamps; the external SHA-256 covers the exact EXE.
+- Release installer: the pinned Inno Setup compiler hash is verified; the final Setup EXE and embedded MSIX use the expected certificate and RFC 3161 timestamps; the external SHA-256 covers the exact EXE. The tag workflow runs the final Setup on its clean hosted runner and rejects installer exceptions, elevated install mode, missing completed deployment progress, a wrong package version, or an incorrect certificate store.
 
 ## Manual Windows 11 acceptance
 
-1. On a clean standard-user account, double-click Setup and confirm UAC appears before the wizard. Supply administrator approval, then confirm RightAgent is installed for the initiating user rather than the administrator account. Confirm the certificate exists only in Local Machine\Trusted People, not Trusted Root; cancelling UAC must install nothing.
-2. Run the same Setup version again and confirm it succeeds without resetting `LocalState/settings.json`.
+1. On a clean standard-user account, double-click Setup and confirm the wizard remains under the initiating user. Start installation, supply administrator approval for the certificate helper, then confirm the indeterminate animation changes to a real 0–100% indicator during MSIX deployment and RightAgent is installed for the initiating user rather than the administrator account. Confirm the certificate exists only in Local Machine\Trusted People, not Trusted Root; cancelling UAC must leave the MSIX uninstalled.
+2. While installation is active, start the same Setup again and confirm the second instance is rejected. After installation, run the same Setup version again and confirm it succeeds without another UAC prompt or resetting `LocalState/settings.json`.
 3. Open RightAgent once. With Windows Terminal installed, confirm no dependency prompt appears. With `wt.exe` unavailable, confirm a localized prompt offers **Open Microsoft Store** and **Later**; Later keeps the settings app usable and the prompt returns after reopening.
 4. Resize the settings window from its default size down to the enforced minimum at 100%, 150%, and 200% display scaling. Confirm the main content never moves beyond either window edge, the preview disappears below the narrow-layout breakpoint, all setting cards remain usable, and vertical scrolling still reaches the final field.
 5. Right-click a folder background and confirm the command is in the modern menu, not only under `Show more options`.

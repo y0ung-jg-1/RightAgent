@@ -3,7 +3,8 @@
 RightAgent uses GitHub Actions to build and test every change. A version tag
 starts a separate release job that imports the project-owned signing key from
 the GitHub `release` environment, signs and timestamps the MSIX, builds and
-signs a single-file administrator-gated Setup EXE, verifies its checksum, and
+signs a single-file per-user Setup EXE whose first-install certificate helper
+requests administrator approval, verifies its checksum, and
 creates a draft GitHub Release containing only the EXE and `.sha256` file.
 
 ## One-time setup
@@ -69,11 +70,21 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
    version tag (for example `v1.0.2`) without the product name, the release body
    keeps the Chinese and English notes in separate sections, and it contains
    exactly one `RightAgent-version-x64-Setup.exe` and its `.sha256`. Verify the
-   Setup signature, timestamp, certificate thumbprint, and SHA-256.
-7. Run Setup on a clean Windows 11 x64 standard-user account. Confirm UAC is
-   required before the wizard, the public certificate is added only to Local
-   Machine\Trusted People, and the MSIX is installed for the user who started
-   Setup rather than the administrator account used for UAC approval.
+   Setup signature, timestamp, certificate thumbprint, and SHA-256. The release
+   job also runs the final Setup silently on its clean hosted runner, rejects any
+   installer exception or elevated install mode, requires the package-deployment
+   progress protocol to reach 100%, and verifies the installed package version
+   and certificate-store boundary before uploading assets.
+7. Run Setup on a clean Windows 11 x64 standard-user account. Confirm Setup
+   stays under that user, requests UAC only when the first installation needs
+   to trust the public certificate, adds the certificate only to Local
+   Machine\Trusted People, and installs the MSIX for the user who started
+   Setup rather than the administrator account used for UAC approval. Start a
+   second Setup while installation is active and confirm it is rejected. Run
+   Setup again after the certificate is trusted and confirm no second UAC
+   prompt appears and package `LocalState` is preserved. During the first MSIX
+   deployment, confirm the progress bar switches from an indeterminate animation
+   to the real Windows-reported percentage and reaches 100%.
 8. Publish the draft only after that clean-machine acceptance passes.
 
 The workflow deliberately creates a draft. Pushing a tag does not make the

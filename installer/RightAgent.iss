@@ -27,7 +27,7 @@ DisableDirPage=yes
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
 Uninstallable=no
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.22000
@@ -41,6 +41,7 @@ CloseApplications=no
 RestartApplications=no
 UsePreviousAppDir=no
 SetupLogging=yes
+SetupMutex=RightAgent.Setup.Installation
 VersionInfoVersion={#PackageVersion}
 VersionInfoCompany=RightAgent
 VersionInfoDescription=RightAgent installer
@@ -53,14 +54,16 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "chinesesimplified"; MessagesFile: "{#ChineseLanguageFile}"
 
 [CustomMessages]
-english.InstallingRightAgent=Installing the signed RightAgent package for the current Windows user...
+english.InstallingRightAgent=Installing RightAgent for the current user. The first installation may take several minutes...
+english.InstallingRightAgentProgress=Installing RightAgent for the current user... %1%%
 english.InstallFailed=RightAgent installation failed with exit code %1. Review the Setup log for details.
-english.TrustFailed=The RightAgent signing certificate could not be trusted. The elevated step exited with code %1.
+english.AnotherInstall=Another RightAgent installation is already running. Wait for it to finish before starting Setup again.
 english.MissingInstaller=The embedded RightAgent installation script is missing.
 english.InstallComplete=RightAgent was installed successfully. If File Explorer cached the old menu, close all File Explorer windows or sign out once.
-chinesesimplified.InstallingRightAgent=正在为当前 Windows 用户安装已签名的 RightAgent 包…
+chinesesimplified.InstallingRightAgent=正在为当前用户安装 RightAgent。首次安装可能需要几分钟，请耐心等待…
+chinesesimplified.InstallingRightAgentProgress=正在为当前用户安装 RightAgent… %1%%
 chinesesimplified.InstallFailed=RightAgent 安装失败，退出代码为 %1。请查看安装日志了解详情。
-chinesesimplified.TrustFailed=无法信任 RightAgent 签名证书，管理员阶段退出代码为 %1。
+chinesesimplified.AnotherInstall=另一个 RightAgent 安装过程正在运行，请等待它结束后再重新启动安装器。
 chinesesimplified.MissingInstaller=内嵌的 RightAgent 安装脚本缺失。
 chinesesimplified.InstallComplete=RightAgent 已安装成功。如果资源管理器仍缓存旧菜单，请关闭全部资源管理器窗口或注销一次。
 
@@ -68,55 +71,95 @@ chinesesimplified.InstallComplete=RightAgent 已安装成功。如果资源管�
 Source: "{#PayloadDir}\*"; DestDir: "{tmp}\RightAgentPayload"; Flags: recursesubdirs createallsubdirs deleteafterinstall
 
 [Code]
+const
+  InstallerProgressPrefix = 'RIGHTAGENT_PROGRESS:';
+
+var
+  InstallerOutputError: Boolean;
+
+procedure HandleInstallerOutput(const OutputLine: String; const Error, FirstLine: Boolean);
+var
+  PercentComplete: Integer;
+begin
+  if Error then
+  begin
+    InstallerOutputError := True;
+    Log('RightAgent installer output error: ' + OutputLine);
+    exit;
+  end;
+
+  Log('RightAgent installer output: ' + OutputLine);
+  if Pos(InstallerProgressPrefix, OutputLine) <> 1 then
+    exit;
+
+  PercentComplete := StrToIntDef(
+    Copy(OutputLine, Length(InstallerProgressPrefix) + 1, MaxInt),
+    -1);
+  if (PercentComplete < 0) or (PercentComplete > 100) then
+  begin
+    Log('RightAgent installer returned an invalid progress value: ' + OutputLine);
+    exit;
+  end;
+
+  WizardForm.ProgressGauge.Style := npbstNormal;
+  WizardForm.ProgressGauge.Min := 0;
+  WizardForm.ProgressGauge.Max := 100;
+  WizardForm.ProgressGauge.Position := PercentComplete;
+  WizardForm.StatusLabel.Caption := FmtMessage(CustomMessage('InstallingRightAgentProgress'), [IntToStr(PercentComplete)]);
+  WizardForm.ProgressGauge.Update;
+  WizardForm.StatusLabel.Update;
+end;
+
 procedure InstallRightAgentPackage;
 var
   PowerShellPath: String;
   InstallerScriptPath: String;
+  InstallerResultPath: String;
   PowerShellArguments: String;
+  FailureDetail: AnsiString;
   ResultCode: Integer;
 begin
   PowerShellPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
   InstallerScriptPath := ExpandConstant('{tmp}\RightAgentPayload\Install-RightAgent.ps1');
+  InstallerResultPath := ExpandConstant('{tmp}\RightAgent-install-result.txt');
 
   if not FileExists(InstallerScriptPath) then
     RaiseException(CustomMessage('MissingInstaller'));
 
   WizardForm.StatusLabel.Caption := CustomMessage('InstallingRightAgent');
+  WizardForm.ProgressGauge.Style := npbstMarquee;
+  InstallerOutputError := False;
   PowerShellArguments :=
     '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
-    InstallerScriptPath + '" -TrustCertificateOnly';
+    InstallerScriptPath + '" -ResultPath "' + InstallerResultPath + '"';
 
-  if not Exec(
+  if not ExecAndLogOutput(
     PowerShellPath,
     PowerShellArguments,
     ExpandConstant('{tmp}\RightAgentPayload'),
-    SW_HIDE,
+    SW_SHOWNORMAL,
     ewWaitUntilTerminated,
-    ResultCode) then
+    ResultCode,
+    @HandleInstallerOutput) then
   begin
-    RaiseException(FmtMessage(CustomMessage('TrustFailed'), ['not started']));
-  end;
-
-  if ResultCode <> 0 then
-    RaiseException(FmtMessage(CustomMessage('TrustFailed'), [IntToStr(ResultCode)]));
-
-  PowerShellArguments :=
-    '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
-    InstallerScriptPath + '"';
-
-  if not ExecAsOriginalUser(
-    PowerShellPath,
-    PowerShellArguments,
-    ExpandConstant('{tmp}\RightAgentPayload'),
-    SW_HIDE,
-    ewWaitUntilTerminated,
-    ResultCode) then
-  begin
+    WizardForm.ProgressGauge.Style := npbstNormal;
     RaiseException(FmtMessage(CustomMessage('InstallFailed'), ['not started']));
   end;
 
-  if ResultCode <> 0 then
+  WizardForm.ProgressGauge.Style := npbstNormal;
+  if InstallerOutputError then
+    Log('RightAgent installer output could not be captured completely.');
+
+  if ResultCode = 1618 then
+    RaiseException(CustomMessage('AnotherInstall'))
+  else if ResultCode <> 0 then
+  begin
+    if LoadStringFromFile(InstallerResultPath, FailureDetail) then
+      Log('RightAgent PowerShell installer failure: ' + FailureDetail);
     RaiseException(FmtMessage(CustomMessage('InstallFailed'), [IntToStr(ResultCode)]));
+  end
+  else
+    WizardForm.ProgressGauge.Position := 100;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
