@@ -65,10 +65,11 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
 4. Create and push the exact matching tag, for example `v1.0.0` for package
    version `1.0.0.0`.
 5. Approve the `release` environment job if protection rules require it.
-6. Inspect the draft Release and Actions log. Confirm the release body keeps the
-   Chinese and English notes in separate sections, contains exactly one
-   `RightAgent-version-x64-Setup.exe` and its `.sha256`, and verify the Setup
-   signature, timestamp, certificate thumbprint, and SHA-256.
+6. Inspect the draft Release and Actions log. Confirm its title is exactly the
+   version tag (for example `v1.0.2`) without the product name, the release body
+   keeps the Chinese and English notes in separate sections, and it contains
+   exactly one `RightAgent-version-x64-Setup.exe` and its `.sha256`. Verify the
+   Setup signature, timestamp, certificate thumbprint, and SHA-256.
 7. Run Setup on a clean Windows 11 x64 standard-user account. Confirm UAC is
    required before the wizard, the public certificate is added only to Local
    Machine\Trusted People, and the MSIX is installed for the user who started

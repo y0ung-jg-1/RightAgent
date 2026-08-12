@@ -208,12 +208,12 @@ jobs:
                   throw 'GitHub Release asset upload failed.'
               }
           } else {
-              & gh release create $tag @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --notes-file $env:RIGHTAGENT_RELEASE_NOTES --title "RightAgent $tag"
+              & gh release create $tag @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --notes-file $env:RIGHTAGENT_RELEASE_NOTES --title "$tag"
               if ($LASTEXITCODE -ne 0) {
                   throw 'GitHub Release creation failed.'
               }
           }
-          & gh release edit $tag --repo $env:GITHUB_REPOSITORY --notes-file $env:RIGHTAGENT_RELEASE_NOTES --title "RightAgent $tag"
+          & gh release edit $tag --repo $env:GITHUB_REPOSITORY --notes-file $env:RIGHTAGENT_RELEASE_NOTES --title "$tag"
           if ($LASTEXITCODE -ne 0) {
               throw 'GitHub Release notes update failed.'
           }
