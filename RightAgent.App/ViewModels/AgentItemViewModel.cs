@@ -1,3 +1,4 @@
+using System.Globalization;
 using RightAgent.Core;
 
 namespace RightAgent.App.ViewModels;
@@ -11,6 +12,9 @@ public sealed class AgentItemViewModel : BindableBase
     private string iconPath;
     private string actionType;
     private string actionValue;
+    private bool isExpanded;
+    private string? nameError;
+    private string? actionError;
 
     public AgentItemViewModel(AgentDefinition definition, Localization localization)
     {
@@ -30,13 +34,26 @@ public sealed class AgentItemViewModel : BindableBase
     public string Name
     {
         get => name;
-        set => SetProperty(ref name, value);
+        set
+        {
+            if (SetProperty(ref name, value))
+            {
+                RefreshValidation();
+                NotifyAutomationNames();
+            }
+        }
     }
 
     public bool Enabled
     {
         get => enabled;
-        set => SetProperty(ref enabled, value);
+        set
+        {
+            if (SetProperty(ref enabled, value))
+            {
+                RefreshValidation();
+            }
+        }
     }
 
     public int Sort
@@ -53,6 +70,7 @@ public sealed class AgentItemViewModel : BindableBase
             if (SetProperty(ref iconPath, value))
             {
                 OnPropertyChanged(nameof(IconDisplayPath));
+                OnPropertyChanged(nameof(IconSourceDescription));
             }
         }
     }
@@ -79,19 +97,82 @@ public sealed class AgentItemViewModel : BindableBase
         }
     }
 
+    public string IconSourceDescription
+    {
+        get
+        {
+            if (IconPath.StartsWith("local:", StringComparison.OrdinalIgnoreCase))
+            {
+                var relative = IconPath["local:".Length..].Replace('\\', '/');
+                var fileName = relative.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? relative;
+                return string.Format(CultureInfo.CurrentCulture, localization["CustomIcon"], fileName);
+            }
+
+            return localization["BuiltinIcon"];
+        }
+    }
+
     public string ActionType
     {
         get => actionType;
-        set => SetProperty(ref actionType, value == SettingsContract.Url ? SettingsContract.Url : SettingsContract.TerminalCommand);
+        set
+        {
+            if (SetProperty(ref actionType, value == SettingsContract.Url ? SettingsContract.Url : SettingsContract.TerminalCommand))
+            {
+                RefreshValidation();
+            }
+        }
     }
 
     public string ActionValue
     {
         get => actionValue;
-        set => SetProperty(ref actionValue, value);
+        set
+        {
+            if (SetProperty(ref actionValue, value))
+            {
+                RefreshValidation();
+            }
+        }
     }
 
+    public bool IsExpanded
+    {
+        get => isExpanded;
+        set => SetProperty(ref isExpanded, value);
+    }
+
+    public string? NameError
+    {
+        get => nameError;
+        private set
+        {
+            if (SetProperty(ref nameError, value))
+            {
+                OnPropertyChanged(nameof(HasNameError));
+            }
+        }
+    }
+
+    public bool HasNameError => NameError is not null;
+
+    public string? ActionError
+    {
+        get => actionError;
+        private set
+        {
+            if (SetProperty(ref actionError, value))
+            {
+                OnPropertyChanged(nameof(HasActionError));
+            }
+        }
+    }
+
+    public bool HasActionError => ActionError is not null;
+
     public IReadOnlyList<OptionItem> ActionTypeOptions { get; private set; } = [];
+
+    public string DisplayName => string.IsNullOrWhiteSpace(Name) ? localization["UnnamedAgent"] : Name;
 
     public string NameLabel => localization["Name"];
     public string ActionTypeLabel => localization["ActionType"];
@@ -102,6 +183,14 @@ public sealed class AgentItemViewModel : BindableBase
     public string MoveUpLabel => localization["MoveUp"];
     public string MoveDownLabel => localization["MoveDown"];
     public string DeleteLabel => localization["Delete"];
+    public string IconLabel => localization["IconLabel"];
+
+    public string EnabledAutomationName => Format("EnableFor");
+    public string MoveUpAutomationName => Format("MoveUpFor");
+    public string MoveDownAutomationName => Format("MoveDownFor");
+    public string DeleteAutomationName => Format("DeleteFor");
+    public string ChooseIconAutomationName => Format("ChooseIconFor");
+    public string IconPreviewAutomationName => Format("IconFor");
 
     public AgentDefinition ToDefinition() => new()
     {
@@ -134,5 +223,39 @@ public sealed class AgentItemViewModel : BindableBase
         OnPropertyChanged(nameof(MoveUpLabel));
         OnPropertyChanged(nameof(MoveDownLabel));
         OnPropertyChanged(nameof(DeleteLabel));
+        OnPropertyChanged(nameof(IconLabel));
+        OnPropertyChanged(nameof(IconSourceDescription));
+        RefreshValidation();
+        NotifyAutomationNames();
     }
+
+    private void RefreshValidation()
+    {
+        NameError = string.IsNullOrWhiteSpace(Name) ? localization["ErrorNameRequired"] : null;
+        if (!Enabled)
+        {
+            ActionError = null;
+        }
+        else if (string.IsNullOrWhiteSpace(ActionValue))
+        {
+            ActionError = localization["ErrorActionRequired"];
+        }
+        else
+        {
+            ActionError = SettingsValidator.IsActionValid(ActionType, ActionValue) ? null : localization["ErrorUrlInvalid"];
+        }
+    }
+
+    private void NotifyAutomationNames()
+    {
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(EnabledAutomationName));
+        OnPropertyChanged(nameof(MoveUpAutomationName));
+        OnPropertyChanged(nameof(MoveDownAutomationName));
+        OnPropertyChanged(nameof(DeleteAutomationName));
+        OnPropertyChanged(nameof(ChooseIconAutomationName));
+        OnPropertyChanged(nameof(IconPreviewAutomationName));
+    }
+
+    private string Format(string key) => string.Format(CultureInfo.CurrentCulture, localization[key], DisplayName);
 }

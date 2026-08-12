@@ -1,11 +1,14 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using RightAgent.Core;
 
 namespace RightAgent.App.ViewModels;
 
 public sealed class MainViewModel : BindableBase
 {
+    private const string AppIconPath = "ms-appx:///Assets/Agents/rightagent.svg";
+
     private readonly SettingsStore store;
     private readonly Localization localization = new();
     private string language = SettingsContract.SystemLanguage;
@@ -13,6 +16,13 @@ public sealed class MainViewModel : BindableBase
     private string? directAgentId;
     private string? terminalProfile;
     private bool isLoaded;
+    private string previewRootTitle = string.Empty;
+    private string previewRootIconPath = AppIconPath;
+    private bool previewIsGrouped = true;
+    private bool previewHasEntries;
+    private bool previewShowRootHint;
+    private string validationSummary = string.Empty;
+    private bool hasValidationErrors;
 
     public MainViewModel(string localStateDirectory)
     {
@@ -22,9 +32,9 @@ public sealed class MainViewModel : BindableBase
 
     public ObservableCollection<AgentItemViewModel> Agents { get; } = [];
 
-    public IReadOnlyList<OptionItem> LanguageOptions { get; private set; } = [];
+    public ObservableCollection<AgentItemViewModel> PreviewEntries { get; } = [];
 
-    public IReadOnlyList<OptionItem> MenuModeOptions { get; private set; } = [];
+    public IReadOnlyList<OptionItem> LanguageOptions { get; private set; } = [];
 
     public bool IsLoaded
     {
@@ -37,6 +47,12 @@ public sealed class MainViewModel : BindableBase
         get => language;
         set
         {
+            // The ComboBox pushes null while its ItemsSource is being swapped during a
+            // language change; ignore it so the swap cannot re-enter RefreshLocalization.
+            if (value is null)
+            {
+                return;
+            }
             var normalized = value is SettingsContract.ChineseLanguage or SettingsContract.EnglishLanguage
                 ? value
                 : SettingsContract.SystemLanguage;
@@ -57,7 +73,8 @@ public sealed class MainViewModel : BindableBase
             if (SetProperty(ref menuMode, normalized))
             {
                 OnPropertyChanged(nameof(IsDirectMode));
-                OnPropertyChanged(nameof(Preview));
+                RefreshPreview();
+                RefreshValidation();
             }
         }
     }
@@ -71,7 +88,8 @@ public sealed class MainViewModel : BindableBase
         {
             if (SetProperty(ref directAgentId, value))
             {
-                OnPropertyChanged(nameof(Preview));
+                RefreshPreview();
+                RefreshValidation();
             }
         }
     }
@@ -84,27 +102,48 @@ public sealed class MainViewModel : BindableBase
 
     public bool IsEmpty => Agents.Count == 0;
 
-    public string Preview
+    public string PreviewRootTitle
     {
-        get
-        {
-            var enabled = Agents.Where(agent => agent.Enabled).OrderBy(agent => agent.Sort).ToList();
-            if (MenuMode == SettingsContract.DirectMenu)
-            {
-                var selected = enabled.FirstOrDefault(agent => agent.Id.Equals(DirectAgentId, StringComparison.OrdinalIgnoreCase))
-                               ?? enabled.FirstOrDefault();
-                return selected is null
-                    ? "—"
-                    : localization.IsChinese ? $"使用 {selected.Name} 打开" : $"Open with {selected.Name}";
-            }
+        get => previewRootTitle;
+        private set => SetProperty(ref previewRootTitle, value);
+    }
 
-            if (enabled.Count == 0)
-            {
-                return localization.IsChinese ? "使用 RightAgent 打开  >\n    （没有已启用的 Agent）" : "Open with RightAgent  >\n    (No enabled agents)";
-            }
-            var header = localization.IsChinese ? "使用 RightAgent 打开  >" : "Open with RightAgent  >";
-            return header + "\n" + string.Join("\n", enabled.Select(agent => "    " + agent.Name));
-        }
+    public string PreviewRootIconPath
+    {
+        get => previewRootIconPath;
+        private set => SetProperty(ref previewRootIconPath, value);
+    }
+
+    public bool PreviewIsGrouped
+    {
+        get => previewIsGrouped;
+        private set => SetProperty(ref previewIsGrouped, value);
+    }
+
+    public bool PreviewHasEntries
+    {
+        get => previewHasEntries;
+        private set => SetProperty(ref previewHasEntries, value);
+    }
+
+    public bool PreviewShowRootHint
+    {
+        get => previewShowRootHint;
+        private set => SetProperty(ref previewShowRootHint, value);
+    }
+
+    public string PreviewEmptyLabel => localization["PreviewEmpty"];
+
+    public string ValidationSummary
+    {
+        get => validationSummary;
+        private set => SetProperty(ref validationSummary, value);
+    }
+
+    public bool HasValidationErrors
+    {
+        get => hasValidationErrors;
+        private set => SetProperty(ref hasValidationErrors, value);
     }
 
     public string WindowTitle => localization["WindowTitle"];
@@ -116,6 +155,8 @@ public sealed class MainViewModel : BindableBase
     public string MenuSectionLabel => localization["MenuSection"];
     public string MenuDescription => localization["MenuDescription"];
     public string MenuModeLabel => localization["MenuMode"];
+    public string GroupedLabel => localization["Grouped"];
+    public string DirectLabel => localization["Direct"];
     public string DirectAgentLabel => localization["DirectAgent"];
     public string TerminalProfileLabel => localization["TerminalProfile"];
     public string TerminalProfileHint => localization["TerminalProfileHint"];
@@ -130,6 +171,7 @@ public sealed class MainViewModel : BindableBase
     public string DeleteBody => localization["DeleteBody"];
     public string DeleteLabel => localization["Delete"];
     public string CancelLabel => localization["Cancel"];
+    public string ValidationTitle => localization["ValidationTitle"];
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -154,25 +196,6 @@ public sealed class MainViewModel : BindableBase
         RefreshLocalization();
         IsLoaded = true;
         NotifyState();
-    }
-
-    public IReadOnlyList<string> Validate()
-    {
-        var errors = new List<string>();
-        if (Agents.Any(agent => string.IsNullOrWhiteSpace(agent.Name)))
-        {
-            errors.Add(localization["ValidationName"]);
-        }
-        if (Agents.Any(agent => agent.Enabled && !SettingsValidator.IsActionValid(agent.ActionType, agent.ActionValue)))
-        {
-            errors.Add(localization["ValidationAction"]);
-        }
-        if (MenuMode == SettingsContract.DirectMenu
-            && !Agents.Any(agent => agent.Enabled && agent.Id.Equals(DirectAgentId, StringComparison.OrdinalIgnoreCase)))
-        {
-            errors.Add(localization["ValidationDirect"]);
-        }
-        return errors;
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken = default)
@@ -202,7 +225,10 @@ public sealed class MainViewModel : BindableBase
             Sort = Agents.Count,
             IconPath = "builtin:rightagent",
             Action = new AgentAction { Type = SettingsContract.TerminalCommand, Value = string.Empty }
-        }, localization));
+        }, localization)
+        {
+            IsExpanded = true
+        });
         NotifyState();
     }
 
@@ -231,7 +257,7 @@ public sealed class MainViewModel : BindableBase
         }
         Agents.Move(current, target);
         RefreshSort();
-        OnPropertyChanged(nameof(Preview));
+        RefreshPreview();
     }
 
     public void SetAgentIcon(AgentItemViewModel agent, string relativePath)
@@ -249,8 +275,19 @@ public sealed class MainViewModel : BindableBase
     {
         if (args.PropertyName is nameof(AgentItemViewModel.Name) or nameof(AgentItemViewModel.Enabled))
         {
-            OnPropertyChanged(nameof(Preview));
             OnPropertyChanged(nameof(Agents));
+        }
+
+        if (args.PropertyName is nameof(AgentItemViewModel.Name)
+            or nameof(AgentItemViewModel.Enabled)
+            or nameof(AgentItemViewModel.IconPath)
+            or nameof(AgentItemViewModel.ActionType)
+            or nameof(AgentItemViewModel.ActionValue)
+            or nameof(AgentItemViewModel.HasNameError)
+            or nameof(AgentItemViewModel.HasActionError))
+        {
+            RefreshPreview();
+            RefreshValidation();
         }
     }
 
@@ -262,6 +299,56 @@ public sealed class MainViewModel : BindableBase
         }
     }
 
+    private void RefreshPreview()
+    {
+        var enabled = Agents.Where(agent => agent.Enabled).OrderBy(agent => agent.Sort).ToList();
+        PreviewEntries.Clear();
+        foreach (var agent in enabled)
+        {
+            PreviewEntries.Add(agent);
+        }
+
+        PreviewHasEntries = enabled.Count > 0;
+        PreviewIsGrouped = MenuMode == SettingsContract.GroupedMenu;
+        if (PreviewIsGrouped)
+        {
+            PreviewRootTitle = localization["OpenWithRightAgent"];
+            PreviewRootIconPath = AppIconPath;
+        }
+        else
+        {
+            var selected = enabled.FirstOrDefault(agent => agent.Id.Equals(DirectAgentId, StringComparison.OrdinalIgnoreCase))
+                           ?? enabled.FirstOrDefault();
+            PreviewRootTitle = selected is null
+                ? string.Empty
+                : string.Format(CultureInfo.CurrentCulture, localization["OpenWithAgent"], selected.Name);
+            PreviewRootIconPath = selected?.IconDisplayPath ?? AppIconPath;
+        }
+        PreviewShowRootHint = !PreviewIsGrouped && !PreviewHasEntries;
+    }
+
+    private void RefreshValidation()
+    {
+        var lines = new List<string>();
+        foreach (var agent in Agents)
+        {
+            var error = agent.NameError ?? (agent.Enabled ? agent.ActionError : null);
+            if (error is not null)
+            {
+                lines.Add($"· {agent.DisplayName}: {error}");
+            }
+        }
+
+        if (MenuMode == SettingsContract.DirectMenu
+            && !Agents.Any(agent => agent.Enabled && agent.Id.Equals(DirectAgentId, StringComparison.OrdinalIgnoreCase)))
+        {
+            lines.Add("· " + localization["ValidationDirect"]);
+        }
+
+        ValidationSummary = string.Join(Environment.NewLine, lines);
+        HasValidationErrors = lines.Count > 0;
+    }
+
     private void RefreshLocalization()
     {
         localization.ConfiguredLanguage = language;
@@ -271,22 +358,18 @@ public sealed class MainViewModel : BindableBase
             new OptionItem(SettingsContract.ChineseLanguage, localization["Chinese"]),
             new OptionItem(SettingsContract.EnglishLanguage, localization["English"])
         ];
-        MenuModeOptions =
-        [
-            new OptionItem(SettingsContract.GroupedMenu, localization["Grouped"]),
-            new OptionItem(SettingsContract.DirectMenu, localization["Direct"])
-        ];
         foreach (var agent in Agents)
         {
             agent.RefreshLanguage();
         }
         NotifyLocalizedProperties();
+        RefreshPreview();
+        RefreshValidation();
     }
 
     private void NotifyLocalizedProperties()
     {
         OnPropertyChanged(nameof(LanguageOptions));
-        OnPropertyChanged(nameof(MenuModeOptions));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HeaderTitle));
         OnPropertyChanged(nameof(Subtitle));
@@ -296,10 +379,13 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(MenuSectionLabel));
         OnPropertyChanged(nameof(MenuDescription));
         OnPropertyChanged(nameof(MenuModeLabel));
+        OnPropertyChanged(nameof(GroupedLabel));
+        OnPropertyChanged(nameof(DirectLabel));
         OnPropertyChanged(nameof(DirectAgentLabel));
         OnPropertyChanged(nameof(TerminalProfileLabel));
         OnPropertyChanged(nameof(TerminalProfileHint));
         OnPropertyChanged(nameof(PreviewLabel));
+        OnPropertyChanged(nameof(PreviewEmptyLabel));
         OnPropertyChanged(nameof(AgentsSectionLabel));
         OnPropertyChanged(nameof(AgentsDescription));
         OnPropertyChanged(nameof(AddAgentLabel));
@@ -310,14 +396,15 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(DeleteBody));
         OnPropertyChanged(nameof(DeleteLabel));
         OnPropertyChanged(nameof(CancelLabel));
-        OnPropertyChanged(nameof(Preview));
+        OnPropertyChanged(nameof(ValidationTitle));
     }
 
     private void NotifyState()
     {
         OnPropertyChanged(nameof(Agents));
         OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(Preview));
         OnPropertyChanged(nameof(IsDirectMode));
+        RefreshPreview();
+        RefreshValidation();
     }
 }

@@ -1,5 +1,7 @@
+using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using RightAgent.App.ViewModels;
 using Windows.Graphics;
 using Windows.Graphics.Imaging;
@@ -17,9 +19,11 @@ public sealed partial class MainWindow : Window
     {
         ViewModel = new MainViewModel(App.LocalStateDirectory);
         InitializeComponent();
-        AppWindow.Resize(new SizeInt32(1040, 820));
+        AppWindow.Resize(new SizeInt32(1040, 860));
+        TryApplyMicaBackdrop();
         Title = ViewModel.WindowTitle;
         Activated += (_, _) => Title = ViewModel.WindowTitle;
+        ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         if (Content is FrameworkElement root)
         {
             root.Loaded += MainWindow_Loaded;
@@ -34,7 +38,7 @@ public sealed partial class MainWindow : Window
         {
             await ViewModel.LoadAsync();
             SynchronizeSelectors();
-            UpdateEmptyState();
+            UpdateStatusInfoBar();
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception)
@@ -45,10 +49,9 @@ public sealed partial class MainWindow : Window
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        var errors = ViewModel.Validate();
-        if (errors.Count > 0)
+        if (ViewModel.HasValidationErrors)
         {
-            ShowStatus(InfoBarSeverity.Warning, string.Join(Environment.NewLine, errors));
+            UpdateStatusInfoBar();
             return;
         }
 
@@ -72,7 +75,6 @@ public sealed partial class MainWindow : Window
     private void AddAgent_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.AddAgent();
-        UpdateEmptyState();
     }
 
     private void MoveUp_Click(object sender, RoutedEventArgs e)
@@ -110,7 +112,6 @@ public sealed partial class MainWindow : Window
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
             ViewModel.RemoveAgent(agent);
-            UpdateEmptyState();
             SynchronizeSelectors();
         }
     }
@@ -151,13 +152,15 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void MenuMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void MenuModeRadio_Checked(object sender, RoutedEventArgs e)
     {
-        if (synchronizing || sender is not ComboBox { SelectedValue: string value })
+        if (synchronizing)
         {
             return;
         }
-        ViewModel.MenuMode = value;
+        ViewModel.MenuMode = DirectModeRadio.IsChecked == true
+            ? RightAgent.Core.SettingsContract.DirectMenu
+            : RightAgent.Core.SettingsContract.GroupedMenu;
     }
 
     private void DirectAgent_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -179,6 +182,15 @@ public sealed partial class MainWindow : Window
         Title = ViewModel.WindowTitle;
         Bindings.Update();
         SynchronizeSelectors();
+        UpdateStatusInfoBar();
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(MainViewModel.ValidationSummary) or nameof(MainViewModel.HasValidationErrors))
+        {
+            UpdateStatusInfoBar();
+        }
     }
 
     private void SynchronizeSelectors()
@@ -187,8 +199,9 @@ public sealed partial class MainWindow : Window
         try
         {
             LanguageComboBox.SelectedValue = ViewModel.Language;
-            MenuModeComboBox.SelectedValue = ViewModel.MenuMode;
             DirectAgentComboBox.SelectedValue = ViewModel.DirectAgentId;
+            GroupedModeRadio.IsChecked = !ViewModel.IsDirectMode;
+            DirectModeRadio.IsChecked = ViewModel.IsDirectMode;
         }
         finally
         {
@@ -196,16 +209,43 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void UpdateEmptyState()
+    private void UpdateStatusInfoBar()
     {
-        EmptyAgentsText.Visibility = ViewModel.IsEmpty ? Visibility.Visible : Visibility.Collapsed;
+        if (ViewModel.HasValidationErrors)
+        {
+            StatusInfoBar.Severity = InfoBarSeverity.Warning;
+            StatusInfoBar.Title = ViewModel.ValidationTitle;
+            StatusInfoBar.Message = ViewModel.ValidationSummary;
+            StatusInfoBar.IsClosable = false;
+            StatusInfoBar.IsOpen = true;
+        }
+        else if (!StatusInfoBar.IsClosable)
+        {
+            // The live validation banner is showing and the problems are gone.
+            StatusInfoBar.IsOpen = false;
+            StatusInfoBar.Title = string.Empty;
+            StatusInfoBar.Message = string.Empty;
+        }
     }
 
     private void ShowStatus(InfoBarSeverity severity, string message)
     {
         StatusInfoBar.Severity = severity;
+        StatusInfoBar.Title = string.Empty;
         StatusInfoBar.Message = message;
+        StatusInfoBar.IsClosable = true;
         StatusInfoBar.IsOpen = true;
+    }
+
+    private void TryApplyMicaBackdrop()
+    {
+        if (!MicaController.IsSupported())
+        {
+            return;
+        }
+
+        SystemBackdrop = new MicaBackdrop { Kind = MicaKind.BaseAlt };
+        RootGrid.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
     }
 
     private static async Task NormalizeIconAsync(StorageFile source, string destination)
