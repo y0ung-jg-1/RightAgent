@@ -22,6 +22,14 @@ namespace rightagent
         Url
     };
 
+    enum class TerminalShell
+    {
+        Automatic,
+        PowerShell7,
+        WindowsPowerShell,
+        CommandPrompt
+    };
+
     struct AgentDefinition
     {
         std::wstring id;
@@ -40,6 +48,7 @@ namespace rightagent
         std::wstring language{L"system"};
         MenuMode menuMode{MenuMode::Grouped};
         std::wstring directAgentId;
+        TerminalShell terminalShell{TerminalShell::Automatic};
         std::wstring terminalProfile;
         std::vector<AgentDefinition> agents;
     };

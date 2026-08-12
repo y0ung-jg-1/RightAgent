@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <cstdint>
 #include <cwctype>
 #include <system_error>
 
@@ -54,6 +55,30 @@ namespace rightagent
             result.append(QuoteCommandLineArgument(argument));
         }
         return result;
+    }
+
+    std::wstring EncodePowerShellCommand(const std::wstring_view command)
+    {
+        static_assert(sizeof(wchar_t) == 2, "PowerShell encoded commands require UTF-16LE input on Windows.");
+        constexpr wchar_t alphabet[] = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const auto* bytes = reinterpret_cast<const unsigned char*>(command.data());
+        const std::size_t byteCount = command.size() * sizeof(wchar_t);
+        std::wstring encoded;
+        encoded.reserve(((byteCount + 2) / 3) * 4);
+
+        for (std::size_t index = 0; index < byteCount; index += 3)
+        {
+            const std::uint32_t first = bytes[index];
+            const std::uint32_t second = index + 1 < byteCount ? bytes[index + 1] : 0;
+            const std::uint32_t third = index + 2 < byteCount ? bytes[index + 2] : 0;
+            const std::uint32_t value = (first << 16) | (second << 8) | third;
+
+            encoded.push_back(alphabet[(value >> 18) & 0x3f]);
+            encoded.push_back(alphabet[(value >> 12) & 0x3f]);
+            encoded.push_back(index + 1 < byteCount ? alphabet[(value >> 6) & 0x3f] : L'=');
+            encoded.push_back(index + 2 < byteCount ? alphabet[value & 0x3f] : L'=');
+        }
+        return encoded;
     }
 
     std::filesystem::path GetModuleDirectory(void* moduleHandle)

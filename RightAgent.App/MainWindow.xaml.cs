@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using RightAgent.App.ViewModels;
+using RightAgent.Core;
 using Windows.Graphics;
 using Windows.Graphics.Imaging;
 using Windows.Storage;
@@ -13,7 +14,10 @@ namespace RightAgent.App;
 
 public sealed partial class MainWindow : Window
 {
+    private static readonly Uri WindowsTerminalStoreUri = new("ms-windows-store://pdp/?ProductId=9N0DX20HK701");
+    private static readonly Uri WindowsTerminalStoreWebUri = new("https://apps.microsoft.com/detail/9n0dx20hk701");
     private bool synchronizing;
+    private bool terminalRequirementChecked;
 
     public MainWindow()
     {
@@ -42,10 +46,62 @@ public sealed partial class MainWindow : Window
             SynchronizeSelectors();
             UpdateStatusInfoBar();
             Title = ViewModel.WindowTitle;
+            await PromptForWindowsTerminalAsync();
         }
         catch (Exception exception)
         {
             ShowStatus(InfoBarSeverity.Error, $"{ViewModel.SaveFailedLabel}: {exception.Message}");
+        }
+    }
+
+    private async Task PromptForWindowsTerminalAsync()
+    {
+        if (terminalRequirementChecked)
+        {
+            return;
+        }
+        terminalRequirementChecked = true;
+
+        if (WindowsTerminalLocator.IsAvailable())
+        {
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = ViewModel.TerminalRequiredTitle,
+            Content = new TextBlock
+            {
+                MaxWidth = 420,
+                Text = ViewModel.TerminalRequiredBody,
+                TextWrapping = TextWrapping.Wrap
+            },
+            PrimaryButtonText = ViewModel.InstallFromStoreLabel,
+            CloseButtonText = ViewModel.InstallLaterLabel,
+            DefaultButton = ContentDialogButton.Primary
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        try
+        {
+            var launched = await Windows.System.Launcher.LaunchUriAsync(WindowsTerminalStoreUri);
+            if (!launched)
+            {
+                launched = await Windows.System.Launcher.LaunchUriAsync(WindowsTerminalStoreWebUri);
+            }
+            if (!launched)
+            {
+                ShowStatus(InfoBarSeverity.Error, ViewModel.TerminalStoreOpenFailedMessage);
+            }
+        }
+        catch
+        {
+            ShowStatus(InfoBarSeverity.Error, ViewModel.TerminalStoreOpenFailedMessage);
         }
     }
 

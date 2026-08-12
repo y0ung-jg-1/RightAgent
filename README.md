@@ -4,7 +4,7 @@
 
 **把 AI 编程 Agent 装进 Windows 11 的右键菜单。**
 
-当前版本：v1.0.0 · [MIT License](LICENSE) · [English](#english) below
+当前版本：v1.0.1 · [MIT License](LICENSE) · [English](#english) below
 
 ```text
 使用 RightAgent 打开  >
@@ -15,7 +15,7 @@
     opencode
 ```
 
-在文件夹空白处（或选中一个文件夹）点右键，就能用你喜欢的 AI agent 打开当前目录。支持分组菜单「使用 RightAgent 打开」，也支持「使用 Claude Code 打开」这样的直达命令。模式、启用的 Agent、顺序、命令、URL、图标、语言、Windows Terminal 配置文件，全部在 WinUI 3 设置应用里配置。
+在文件夹空白处（或选中一个文件夹）点右键，就能用你喜欢的 AI agent 打开当前目录。支持分组菜单「使用 RightAgent 打开」，也支持「使用 Claude Code 打开」这样的直达命令。模式、启用的 Agent、顺序、命令、URL、图标、语言、命令 Shell、Windows Terminal 配置文件，全部在 WinUI 3 设置应用里配置。
 
 RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口关闭即完全退出。
 
@@ -28,6 +28,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 - **完全可定制**：添加、重命名、启停、排序任意 Agent；动作支持终端命令（terminalCommand）或 http/https URL。
 - **自定义图标**：本地 PNG/JPG/BMP/ICO 自动规范化为 ICO。
 - **双语界面**：跟随系统、简体中文或 English，一键切换。
+- **Shell 可选**：自动优先 PowerShell 7、回退 Windows PowerShell 5.1，也可明确选择 PowerShell 7、Windows PowerShell 5.1 或 CMD。
 - **总开关**：一键停用/启用整个右键菜单。
 - **实时预览**：右侧即时展示菜单最终效果；设置原子写入，损坏自动备份重建。
 
@@ -79,7 +80,8 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 
 - 右键文件夹空白处使用该文件夹；右键选中的单个文件夹使用被选文件夹。
 - 文件、多选、虚拟文件夹、非文件系统位置会自动隐藏/禁用菜单。
-- 终端动作会打开新的 Windows Terminal 窗口，agent 退出后保持 PowerShell 不关闭。
+- 终端动作会打开新的 Windows Terminal 窗口，并使用所选命令 Shell；自动模式优先 PowerShell 7，找不到时回退 Windows PowerShell 5.1。Agent 退出后窗口保持打开。
+- 设置应用启动时会检测 `wt.exe`；未检测到 Windows Terminal 时，会提示用户并提供 Microsoft Store 安装入口。
 - URL 动作仅允许 `http` 和 `https`。
 - 可执行文件缺失时在打开终端前检测，错误中提供打开 RightAgent 设置的按钮。
 - 设置原子写入包 LocalState 的 `settings.json`。
@@ -128,9 +130,9 @@ RightAgent 以 [MIT License](LICENSE) 开源。随包第三方组件与图标的
 
 <img src="docs/screenshots/rightagent-logo.png" width="96" alt="RightAgent logo">
 
-**AI coding agents in your Windows 11 right-click menu.** Current version: v1.0.0.
+**AI coding agents in your Windows 11 right-click menu.** Current version: v1.0.1.
 
-Right-click a folder background (or a single selected folder) and open it with your favorite AI agent — either through a grouped `Open with RightAgent` submenu or a direct command such as `Open with Claude Code`. Mode, enabled agents, order, commands, URLs, icons, language, and the Windows Terminal profile are all configured in the WinUI 3 settings app.
+Right-click a folder background (or a single selected folder) and open it with your favorite AI agent — either through a grouped `Open with RightAgent` submenu or a direct command such as `Open with Claude Code`. Mode, enabled agents, order, commands, URLs, icons, language, command shell, and Windows Terminal profile are all configured in the WinUI 3 settings app.
 
 RightAgent has no tray process, service, telemetry, automatic updater, or resident background process — closing the window exits completely.
 
@@ -143,6 +145,7 @@ RightAgent has no tray process, service, telemetry, automatic updater, or reside
 - **Fully customizable**: add, rename, enable/disable, and reorder arbitrary agents; actions are either a terminal command or an http/https URL.
 - **Custom icons**: local PNG/JPG/BMP/ICO, normalized to ICO.
 - **Bilingual UI**: follow system, 简体中文， or English.
+- **Selectable shell**: automatically prefer PowerShell 7 and fall back to Windows PowerShell 5.1, or explicitly choose PowerShell 7, Windows PowerShell 5.1, or CMD.
 - **Master switch**: turn the whole context menu on or off.
 - **Live preview** and atomic settings writes with backup-and-replace on corruption.
 
@@ -183,7 +186,8 @@ Certificates are written beneath the gitignored `.local\signing` directory — n
 
 - Right-clicking a folder background uses that folder; right-clicking one selected folder uses the selection.
 - Files, multiple selections, virtual folders, and non-file-system locations are hidden/disabled.
-- Terminal actions open a new Windows Terminal window and keep PowerShell open after the agent exits.
+- Terminal actions open a new Windows Terminal window with the selected command shell. Automatic mode prefers PowerShell 7 and falls back to Windows PowerShell 5.1; the window remains open after the agent exits.
+- On settings-app startup, RightAgent checks for `wt.exe`; if Windows Terminal is unavailable, it offers an official Microsoft Store installation link.
 - URL actions permit only `http` and `https`.
 - A missing executable is detected before Terminal opens; errors offer a button to open RightAgent settings.
 - Settings are atomically written to the package LocalState `settings.json`.
@@ -229,4 +233,4 @@ RightAgent is open source under the [MIT License](LICENSE). See the [third-party
 - [Windows Terminal command-line arguments](https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments)
 - [Set up the Windows App SDK development environment](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/set-up-your-development-environment)
 
-> Note: v1.0.0 registers only the modern Windows 11 menu. Classic "Show more options" verbs are planned for a later phase, reusing the same settings and launcher.
+> Note: v1.0.1 registers only the modern Windows 11 menu. Classic "Show more options" verbs are planned for a later phase, reusing the same settings and launcher.

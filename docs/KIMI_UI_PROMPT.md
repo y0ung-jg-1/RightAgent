@@ -30,7 +30,7 @@ Product behavior that must remain:
 2. Enable, rename, add, delete, and reorder arbitrary agents.
 3. Edit terminalCommand and http/https URL actions.
 4. Choose a custom local PNG/JPG/BMP/ICO that is normalized to ICO under LocalState/Icons.
-5. Choose system, zh-CN, or en-US language and an optional Windows Terminal profile.
+5. Choose system, zh-CN, or en-US language, a command shell, and an optional Windows Terminal profile. Keep the command-shell and Terminal-profile concepts visibly distinct.
 6. Show a live context-menu preview and save settings atomically through RightAgent.Core.
 
 Design direction:

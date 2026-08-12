@@ -9,6 +9,7 @@ namespace rightagent
 {
     [[nodiscard]] std::wstring QuoteCommandLineArgument(std::wstring_view argument);
     [[nodiscard]] std::wstring BuildCommandLine(const std::vector<std::wstring>& arguments);
+    [[nodiscard]] std::wstring EncodePowerShellCommand(std::wstring_view command);
     [[nodiscard]] std::filesystem::path GetModuleDirectory(void* moduleHandle);
     [[nodiscard]] std::wstring FirstSimpleCommandToken(std::wstring_view command);
     [[nodiscard]] bool LaunchProcess(

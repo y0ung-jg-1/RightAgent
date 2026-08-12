@@ -145,6 +145,24 @@ namespace
         return lower.starts_with(L"https://") || lower.starts_with(L"http://");
     }
 
+    TerminalShell ParseTerminalShell(std::wstring value)
+    {
+        value = ToLower(Trim(std::move(value)));
+        if (value == L"pwsh")
+        {
+            return TerminalShell::PowerShell7;
+        }
+        if (value == L"windowspowershell")
+        {
+            return TerminalShell::WindowsPowerShell;
+        }
+        if (value == L"cmd")
+        {
+            return TerminalShell::CommandPrompt;
+        }
+        return TerminalShell::Automatic;
+    }
+
     std::wstring NormalizeIcon(std::wstring value)
     {
         value = Trim(std::move(value));
@@ -300,6 +318,7 @@ namespace rightagent
             settings.language = GetString(root, L"language", L"system");
             settings.menuMode = GetString(root, L"menuMode", L"grouped") == L"direct" ? MenuMode::Direct : MenuMode::Grouped;
             settings.directAgentId = GetString(root, L"directAgentId");
+            settings.terminalShell = ParseTerminalShell(GetString(root, L"terminalShell", L"auto"));
             settings.terminalProfile = GetString(root, L"terminalProfile");
 
             if (root.HasKey(L"agents") && root.GetNamedValue(L"agents").ValueType() == JsonValueType::Array)

@@ -14,6 +14,7 @@ public sealed class MainViewModel : BindableBase
     private string language = SettingsContract.SystemLanguage;
     private string menuMode = SettingsContract.GroupedMenu;
     private string? directAgentId;
+    private string terminalShell = SettingsContract.AutomaticTerminalShell;
     private string? terminalProfile;
     private bool menuEnabled = true;
     private bool isLoaded;
@@ -47,6 +48,14 @@ public sealed class MainViewModel : BindableBase
     [
         new OptionItem(SettingsContract.GroupedMenu, string.Empty),
         new OptionItem(SettingsContract.DirectMenu, string.Empty)
+    ];
+
+    public IReadOnlyList<OptionItem> TerminalShellOptions { get; } =
+    [
+        new OptionItem(SettingsContract.AutomaticTerminalShell, string.Empty),
+        new OptionItem(SettingsContract.PowerShell7TerminalShell, string.Empty),
+        new OptionItem(SettingsContract.WindowsPowerShellTerminalShell, string.Empty),
+        new OptionItem(SettingsContract.CommandPromptTerminalShell, string.Empty)
     ];
 
     public bool IsLoaded
@@ -132,6 +141,24 @@ public sealed class MainViewModel : BindableBase
         }
     }
 
+    public string TerminalShell
+    {
+        get => terminalShell;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+            var normalized = value is SettingsContract.PowerShell7TerminalShell
+                or SettingsContract.WindowsPowerShellTerminalShell
+                or SettingsContract.CommandPromptTerminalShell
+                ? value
+                : SettingsContract.AutomaticTerminalShell;
+            SetProperty(ref terminalShell, normalized);
+        }
+    }
+
     public string? TerminalProfile
     {
         get => terminalProfile;
@@ -209,8 +236,16 @@ public sealed class MainViewModel : BindableBase
     public string MenuSectionLabel => localization["MenuSection"];
     public string MenuModeLabel => localization["MenuMode"];
     public string DirectAgentLabel => localization["DirectAgent"];
+    public string TerminalShellLabel => localization["TerminalShell"];
+    public string TerminalShellHint => localization["TerminalShellHint"];
     public string TerminalProfileLabel => localization["TerminalProfile"];
     public string TerminalProfileHint => localization["TerminalProfileHint"];
+    public string TerminalProfileHelp => localization["TerminalProfileHelp"];
+    public string TerminalRequiredTitle => localization["TerminalRequiredTitle"];
+    public string TerminalRequiredBody => localization["TerminalRequiredBody"];
+    public string InstallFromStoreLabel => localization["InstallFromStore"];
+    public string InstallLaterLabel => localization["InstallLater"];
+    public string TerminalStoreOpenFailedMessage => localization["TerminalStoreOpenFailed"];
     public string PreviewLabel => localization["Preview"];
     public string AgentsSectionLabel => localization["AgentsSection"];
     public string AddAgentLabel => localization["AddAgent"];
@@ -230,6 +265,7 @@ public sealed class MainViewModel : BindableBase
         localization.ConfiguredLanguage = language;
         menuMode = settings.MenuMode;
         directAgentId = settings.DirectAgentId;
+        terminalShell = settings.TerminalShell;
         terminalProfile = settings.TerminalProfile;
         menuEnabled = settings.MenuEnabled;
 
@@ -267,6 +303,7 @@ public sealed class MainViewModel : BindableBase
             Language = Language,
             MenuMode = MenuMode,
             DirectAgentId = DirectAgentId,
+            TerminalShell = TerminalShell,
             TerminalProfile = TerminalProfile,
             MenuEnabled = MenuEnabled,
             Agents = Agents.Select(agent => agent.ToDefinition()).ToList()
@@ -434,6 +471,10 @@ public sealed class MainViewModel : BindableBase
         LanguageOptions[2].UpdateLabel(localization["English"]);
         MenuModeOptions[0].UpdateLabel(localization["Grouped"]);
         MenuModeOptions[1].UpdateLabel(localization["Direct"]);
+        TerminalShellOptions[0].UpdateLabel(localization["TerminalShellAuto"]);
+        TerminalShellOptions[1].UpdateLabel(localization["PowerShell7"]);
+        TerminalShellOptions[2].UpdateLabel(localization["WindowsPowerShell"]);
+        TerminalShellOptions[3].UpdateLabel(localization["CommandPrompt"]);
         foreach (var agent in Agents)
         {
             agent.RefreshLanguage();
@@ -454,8 +495,16 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(MenuSectionLabel));
         OnPropertyChanged(nameof(MenuModeLabel));
         OnPropertyChanged(nameof(DirectAgentLabel));
+        OnPropertyChanged(nameof(TerminalShellLabel));
+        OnPropertyChanged(nameof(TerminalShellHint));
         OnPropertyChanged(nameof(TerminalProfileLabel));
         OnPropertyChanged(nameof(TerminalProfileHint));
+        OnPropertyChanged(nameof(TerminalProfileHelp));
+        OnPropertyChanged(nameof(TerminalRequiredTitle));
+        OnPropertyChanged(nameof(TerminalRequiredBody));
+        OnPropertyChanged(nameof(InstallFromStoreLabel));
+        OnPropertyChanged(nameof(InstallLaterLabel));
+        OnPropertyChanged(nameof(TerminalStoreOpenFailedMessage));
         OnPropertyChanged(nameof(PreviewLabel));
         OnPropertyChanged(nameof(PreviewEmptyLabel));
         OnPropertyChanged(nameof(PreviewHintText));

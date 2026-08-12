@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #pragma comment(linker, "/manifestdependency:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
@@ -122,35 +123,80 @@ namespace
         return request;
     }
 
-    std::filesystem::path FindWindowsTerminal()
+    std::filesystem::path FindOnPath(const wchar_t* executable)
     {
-        constexpr const wchar_t* names[] = {L"wt.exe", L"wt"};
-        for (const auto* name : names)
+        const DWORD required = SearchPathW(nullptr, executable, nullptr, 0, nullptr, nullptr);
+        if (required == 0)
         {
-            const DWORD required = SearchPathW(nullptr, name, nullptr, 0, nullptr, nullptr);
-            if (required == 0)
-            {
-                continue;
-            }
-
-            std::wstring path(required + 1, L'\0');
-            const DWORD written = SearchPathW(nullptr, name, nullptr, static_cast<DWORD>(path.size()), path.data(), nullptr);
-            if (written > 0 && written < path.size())
-            {
-                path.resize(written);
-                return path;
-            }
+            return {};
         }
 
-        wchar_t localAppData[32768]{};
-        const DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, ARRAYSIZE(localAppData));
-        if (length > 0 && length < ARRAYSIZE(localAppData))
+        std::wstring path(required + 1, L'\0');
+        const DWORD written = SearchPathW(nullptr, executable, nullptr, static_cast<DWORD>(path.size()), path.data(), nullptr);
+        if (written == 0 || written >= path.size())
         {
-            const auto alias = std::filesystem::path(localAppData) / L"Microsoft" / L"WindowsApps" / L"wt.exe";
-            std::error_code error;
-            if (std::filesystem::exists(alias, error))
+            return {};
+        }
+        path.resize(written);
+        return path;
+    }
+
+    std::filesystem::path GetEnvironmentPath(const wchar_t* name)
+    {
+        const DWORD required = GetEnvironmentVariableW(name, nullptr, 0);
+        if (required == 0)
+        {
+            return {};
+        }
+
+        std::wstring value(required, L'\0');
+        const DWORD written = GetEnvironmentVariableW(name, value.data(), required);
+        if (written == 0 || written >= required)
+        {
+            return {};
+        }
+        value.resize(written);
+        return value;
+    }
+
+    bool FileExists(const std::filesystem::path& path)
+    {
+        std::error_code error;
+        return !path.empty() && std::filesystem::exists(path, error);
+    }
+
+    std::filesystem::path FindWindowsTerminal()
+    {
+        if (const auto terminal = FindOnPath(L"wt.exe"); !terminal.empty())
+        {
+            return terminal;
+        }
+        if (const auto terminal = FindOnPath(L"wt"); !terminal.empty())
+        {
+            return terminal;
+        }
+
+        const auto alias = GetEnvironmentPath(L"LOCALAPPDATA") / L"Microsoft" / L"WindowsApps" / L"wt.exe";
+        return FileExists(alias) ? alias : std::filesystem::path{};
+    }
+
+    std::filesystem::path FindPowerShell7()
+    {
+        if (const auto executable = FindOnPath(L"pwsh.exe"); !executable.empty())
+        {
+            return executable;
+        }
+
+        const std::filesystem::path candidates[] =
+        {
+            GetEnvironmentPath(L"ProgramFiles") / L"PowerShell" / L"7" / L"pwsh.exe",
+            GetEnvironmentPath(L"LOCALAPPDATA") / L"Microsoft" / L"WindowsApps" / L"pwsh.exe"
+        };
+        for (const auto& candidate : candidates)
+        {
+            if (FileExists(candidate))
             {
-                return alias;
+                return candidate;
             }
         }
         return {};
@@ -160,11 +206,76 @@ namespace
     {
         wchar_t windowsDirectory[MAX_PATH]{};
         const UINT length = GetWindowsDirectoryW(windowsDirectory, ARRAYSIZE(windowsDirectory));
-        if (length == 0 || length >= ARRAYSIZE(windowsDirectory))
+        if (length > 0 && length < ARRAYSIZE(windowsDirectory))
         {
-            return L"powershell.exe";
+            const auto executable = std::filesystem::path(windowsDirectory) / L"System32" / L"WindowsPowerShell" / L"v1.0" / L"powershell.exe";
+            if (FileExists(executable))
+            {
+                return executable;
+            }
         }
-        return std::filesystem::path(windowsDirectory) / L"System32" / L"WindowsPowerShell" / L"v1.0" / L"powershell.exe";
+        return FindOnPath(L"powershell.exe");
+    }
+
+    std::filesystem::path FindCommandPrompt()
+    {
+        wchar_t systemDirectory[MAX_PATH]{};
+        const UINT length = GetSystemDirectoryW(systemDirectory, ARRAYSIZE(systemDirectory));
+        if (length > 0 && length < ARRAYSIZE(systemDirectory))
+        {
+            const auto executable = std::filesystem::path(systemDirectory) / L"cmd.exe";
+            if (FileExists(executable))
+            {
+                return executable;
+            }
+        }
+        return FindOnPath(L"cmd.exe");
+    }
+
+    struct ShellLaunch
+    {
+        std::filesystem::path executable;
+        std::vector<std::wstring> arguments;
+    };
+
+    std::optional<ShellLaunch> ResolveShellLaunch(
+        const rightagent::TerminalShell configuredShell,
+        const std::wstring& command)
+    {
+        std::filesystem::path executable;
+        switch (configuredShell)
+        {
+        case rightagent::TerminalShell::Automatic:
+            executable = FindPowerShell7();
+            if (executable.empty())
+            {
+                executable = FindWindowsPowerShell();
+            }
+            break;
+        case rightagent::TerminalShell::PowerShell7:
+            executable = FindPowerShell7();
+            break;
+        case rightagent::TerminalShell::WindowsPowerShell:
+            executable = FindWindowsPowerShell();
+            break;
+        case rightagent::TerminalShell::CommandPrompt:
+            executable = FindCommandPrompt();
+            break;
+        }
+
+        if (executable.empty())
+        {
+            return std::nullopt;
+        }
+        if (configuredShell == rightagent::TerminalShell::CommandPrompt)
+        {
+            return ShellLaunch{std::move(executable), {L"/D", L"/K", command}};
+        }
+        // Windows Terminal treats semicolons as its own command separators. Base64 keeps
+        // the PowerShell script opaque until the selected shell receives and decodes it.
+        return ShellLaunch{
+            std::move(executable),
+            {L"-NoLogo", L"-NoExit", L"-EncodedCommand", rightagent::EncodePowerShellCommand(command)}};
     }
 
     int LaunchTerminalAgent(
@@ -191,6 +302,16 @@ namespace
             return 4;
         }
 
+        const auto shell = ResolveShellLaunch(settings.terminalShell, agent.actionValue);
+        if (!shell)
+        {
+            const auto message = rightagent::IsChinese(settings)
+                ? L"找不到所选的命令 Shell。请安装该 Shell，或在 RightAgent 设置中选择其他选项。"
+                : L"The selected command shell was not found. Install it or choose another shell in RightAgent settings.";
+            ShowError(settings, message);
+            return 5;
+        }
+
         std::vector<std::wstring> arguments = {L"-w", L"new", L"new-tab"};
         if (!settings.terminalProfile.empty())
         {
@@ -199,11 +320,8 @@ namespace
         }
         arguments.emplace_back(L"-d");
         arguments.push_back(workingDirectory.wstring());
-        arguments.push_back(FindWindowsPowerShell().wstring());
-        arguments.emplace_back(L"-NoLogo");
-        arguments.emplace_back(L"-NoExit");
-        arguments.emplace_back(L"-Command");
-        arguments.push_back(agent.actionValue);
+        arguments.push_back(shell->executable.wstring());
+        arguments.insert(arguments.end(), shell->arguments.begin(), shell->arguments.end());
 
         DWORD error = ERROR_SUCCESS;
         if (!rightagent::LaunchProcess(terminal, arguments, workingDirectory, CREATE_NEW_PROCESS_GROUP, &error))

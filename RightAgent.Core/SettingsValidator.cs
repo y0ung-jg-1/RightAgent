@@ -14,6 +14,11 @@ public static partial class SettingsValidator
         input.MenuMode = input.MenuMode == SettingsContract.DirectMenu
             ? SettingsContract.DirectMenu
             : SettingsContract.GroupedMenu;
+        input.TerminalShell = input.TerminalShell is SettingsContract.PowerShell7TerminalShell
+            or SettingsContract.WindowsPowerShellTerminalShell
+            or SettingsContract.CommandPromptTerminalShell
+            ? input.TerminalShell
+            : SettingsContract.AutomaticTerminalShell;
         input.TerminalProfile = CleanOptional(input.TerminalProfile);
         input.Agents ??= [];
 
