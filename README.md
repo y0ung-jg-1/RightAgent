@@ -1,32 +1,163 @@
 # RightAgent
 
-RightAgent adds a native Windows 11 context-menu command for opening coding agents from a folder. It supports both:
+<img src="docs/screenshots/rightagent-logo.png" width="96" alt="RightAgent logo">
+
+**把 AI 编程 Agent 装进 Windows 11 的右键菜单。**
+
+当前版本：v1.0.0 ·[English](#english) below
 
 ```text
-Open with RightAgent  >
+使用 RightAgent 打开  >
     Claude Code
     Codex
     Kimi Web
+    Grok
+    opencode
 ```
 
-and a direct command such as `Open with Claude Code`. The mode, enabled agents, order, commands, URLs, icons, language, and Windows Terminal profile are configured in the WinUI 3 settings app.
+在文件夹空白处（或选中一个文件夹）点右键，就能用你喜欢的 AI agent 打开当前目录。支持分组菜单「使用 RightAgent 打开」，也支持「使用 Claude Code 打开」这样的直达命令。模式、启用的 Agent、顺序、命令、URL、图标、语言、Windows Terminal 配置文件，全部在 WinUI 3 设置应用里配置。
 
-RightAgent has no tray process, service, telemetry, automatic updater, or resident background process.
+RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口关闭即完全退出。
+
+![RightAgent 设置界面](docs/screenshots/after-brands.png)
+
+## 功能特性
+
+- **两种菜单模式**：分组子菜单，或单个 Agent 直达命令。
+- **内置五个 Agent**:Claude Code、Codex、Kimi Web、Grok、opencode，开箱即用。
+- **完全可定制**：添加、重命名、启停、排序任意 Agent；动作支持终端命令（terminalCommand）或 http/https URL。
+- **自定义图标**：本地 PNG/JPG/BMP/ICO 自动规范化为 ICO。
+- **双语界面**：跟随系统、简体中文或 English，一键切换。
+- **总开关**：一键停用/启用整个右键菜单。
+- **实时预览**：右侧即时展示菜单最终效果；设置原子写入，损坏自动备份重建。
+
+| 直达模式 | English UI |
+| --- | --- |
+| ![直达模式](docs/screenshots/after-direct.png) | ![English UI](docs/screenshots/after-english.png) |
+
+## 运行环境
+
+- Windows 11 build 22000 或更新，x64。
+- Windows Terminal(`wt.exe`)。
+
+## 安装（内部开发版）
+
+创建与包清单匹配的 per-user 开发证书，然后构建、签名、安装：
+
+```powershell
+.\scripts\New-DevCertificate.ps1
+.\scripts\Build.ps1 -Configuration Release
+.\scripts\Sign-Package.ps1 -Configuration Release
+.\scripts\Install-DevPackage.ps1 -Configuration Release
+```
+
+也可以一键完成构建+签名+安装（自动移除旧版本）:
+
+```powershell
+.\scripts\Install-DevBuild.ps1
+```
+
+证书文件写入已被 gitignore 的 `.local\signing` 目录，请勿提交或分享 PFX。首次安装时 `Install-DevPackage.ps1` 会请求管理员批准，仅将公共 CER 导入「本地计算机\受信任的人」（Windows MSIX 部署要求），不会加入「受信任的根证书颁发机构」。不再需要时请移除该开发证书。
+
+只想调试设置界面、不碰资源管理器菜单：
+
+```powershell
+.\scripts\Run-SettingsApp.ps1
+```
+
+## 行为说明
+
+- 右键文件夹空白处使用该文件夹；右键选中的单个文件夹使用被选文件夹。
+- 文件、多选、虚拟文件夹、非文件系统位置会自动隐藏/禁用菜单。
+- 终端动作会打开新的 Windows Terminal 窗口，agent 退出后保持 PowerShell 不关闭。
+- URL 动作仅允许 `http` 和 `https`。
+- 可执行文件缺失时在打开终端前检测，错误中提供打开 RightAgent 设置的按钮。
+- 设置原子写入包 LocalState 的 `settings.json`。
+
+内置 Agent 图标使用 [@lobehub/icons](https://github.com/lobehub/lobe-icons)(MIT）官方品牌字形，全部本地打包，运行时不联网取图。详见[品牌资产策略](docs/BRAND_ASSETS.md)。
+
+## 构建与测试
+
+```powershell
+.\scripts\Test.ps1 -Configuration Debug
+.\scripts\Build.ps1 -Configuration Release
+```
+
+构建产物为 `artifacts\package\Release` 下的 x64 MSIX。解决方案包含原生 Core、Launcher、Shell DLL、COM 表面测试和托管设置测试。
+
+开发环境：Visual Studio 2026 Community(WinUI 应用开发、C++ 桌面开发、C++ WinUI 工具、MSIX/WAP 工具、Windows 11 SDK 10.0.26100+)与 .NET 10 SDK。安装完先跑 `.\scripts\Validate-Environment.ps1` 体检。本仓库不需要 Node.js、Electron、Tauri、Rust、数据库或后台服务。
+
+## 仓库结构
+
+- `RightAgent.App`:C# WinUI 3 设置应用。
+- `RightAgent.Core`：托管 schema、默认值、校验、命令探测与原子持久化。
+- `RightAgent.Shell`：原生 `IExplorerCommand` COM DLL,Windows 11 菜单。
+- `RightAgent.Launcher`：短命原生进程，负责打开终端或 URL。
+- `RightAgent.Native.Core`：共享的原生设置、图标、引号转义与进程辅助。
+- `RightAgent.Package`:WAP/MSIX 标识与资源管理器注册。
+
+实现细节见[架构文档](docs/ARCHITECTURE.md)，数据契约见[设置 schema](docs/SETTINGS_SCHEMA.md)，人工验收覆盖见[测试矩阵](docs/TEST_MATRIX.md)。
+
+> 注：当前版本只在 Windows 11 新右键菜单注册；经典「显示更多选项」菜单的动词计划在下一阶段复用同一套设置与启动器加入。
+
+---
+
+<a id="english"></a>
+
+# RightAgent (English)
+
+<img src="docs/screenshots/rightagent-logo.png" width="96" alt="RightAgent logo">
+
+**AI coding agents in your Windows 11 right-click menu.** Current version: v1.0.0.
+
+Right-click a folder background (or a single selected folder) and open it with your favorite AI agent — either through a grouped `Open with RightAgent` submenu or a direct command such as `Open with Claude Code`. Mode, enabled agents, order, commands, URLs, icons, language, and the Windows Terminal profile are all configured in the WinUI 3 settings app.
+
+RightAgent has no tray process, service, telemetry, automatic updater, or resident background process — closing the window exits completely.
+
+![RightAgent settings](docs/screenshots/after-brands.png)
+
+## Features
+
+- **Two menu modes**: grouped submenu or a single direct agent command.
+- **Five built-in agents**: Claude Code, Codex, Kimi Web, Grok, and opencode.
+- **Fully customizable**: add, rename, enable/disable, and reorder arbitrary agents; actions are either a terminal command or an http/https URL.
+- **Custom icons**: local PNG/JPG/BMP/ICO, normalized to ICO.
+- **Bilingual UI**: follow system, 简体中文， or English.
+- **Master switch**: turn the whole context menu on or off.
+- **Live preview** and atomic settings writes with backup-and-replace on corruption.
 
 ## Requirements
 
 - Windows 11 build 22000 or newer, x64.
-- Visual Studio 2026 Community with WinUI application development, Desktop development with C++, C++ WinUI tools, MSIX/WAP tools, and Windows 11 SDK 10.0.26100 or newer.
-- .NET 10 SDK.
 - Windows Terminal (`wt.exe`).
 
-Validate the machine after installing the prerequisites:
+## Install (internal dev build)
 
 ```powershell
-.\scripts\Validate-Environment.ps1
+.\scripts\New-DevCertificate.ps1
+.\scripts\Build.ps1 -Configuration Release
+.\scripts\Sign-Package.ps1 -Configuration Release
+.\scripts\Install-DevPackage.ps1 -Configuration Release
 ```
 
-The repository does not require Node.js, Electron, Tauri, Rust, a database, or a background service.
+Or build + sign + install in one step (removes the old version automatically):
+
+```powershell
+.\scripts\Install-DevBuild.ps1
+```
+
+Certificates are written beneath the gitignored `.local\signing` directory — never commit or share the PFX. To hack on the settings UI only, run `.\scripts\Run-SettingsApp.ps1`.
+
+## Behavior
+
+- Right-clicking a folder background uses that folder; right-clicking one selected folder uses the selection.
+- Files, multiple selections, virtual folders, and non-file-system locations are hidden/disabled.
+- Terminal actions open a new Windows Terminal window and keep PowerShell open after the agent exits.
+- URL actions permit only `http` and `https`.
+- A missing executable is detected before Terminal opens; errors offer a button to open RightAgent settings.
+- Settings are atomically written to the package LocalState `settings.json`.
+
+Built-in agent icons use official brand glyphs from [@lobehub/icons](https://github.com/lobehub/lobe-icons) (MIT), packaged locally — nothing is fetched at runtime. See the [brand asset policy](docs/BRAND_ASSETS.md).
 
 ## Build and test
 
@@ -35,36 +166,7 @@ The repository does not require Node.js, Electron, Tauri, Rust, a database, or a
 .\scripts\Build.ps1 -Configuration Release
 ```
 
-The build produces an unsigned x64 MSIX/AppX under `artifacts\package\Release`. Native Core, Launcher, Shell DLL, COM-surface tests, and managed settings tests are all part of the solution.
-
-## Sign and install an internal build
-
-Create a per-user development certificate whose subject matches the package manifest:
-
-```powershell
-.\scripts\New-DevCertificate.ps1
-```
-
-Then sign and install:
-
-```powershell
-.\scripts\Sign-Package.ps1 -Configuration Release
-.\scripts\Install-DevPackage.ps1 -Configuration Release
-```
-
-The PFX and CER are written beneath the gitignored `.local\signing` directory. Never commit or share the PFX. On first installation, `Install-DevPackage.ps1` requests administrator approval and imports only the public CER into `Local Computer\Trusted People`, as required by Windows MSIX deployment. It does not add the certificate to `Trusted Root Certification Authorities`. Machine-wide trust affects all users, so remove this development certificate when it is no longer needed.
-
-## Behavior
-
-- Right-clicking a folder background uses that folder.
-- Right-clicking one selected file-system folder uses the selected folder.
-- Files, multiple selections, virtual folders, and non-file-system locations are hidden/disabled.
-- Terminal actions open a new Windows Terminal window and keep PowerShell open after the agent exits.
-- URL actions permit only `http` and `https` URLs.
-- A simple missing executable is detected before Terminal opens; errors offer a button to open RightAgent settings.
-- Settings are atomically written to the package LocalState `settings.json`. A damaged file is backed up and replaced when the settings app next opens.
-
-The built-in agent icons use official brand glyphs from [@lobehub/icons](https://github.com/lobehub/lobe-icons) on local tiles; nothing is fetched at runtime. See [brand asset policy](docs/BRAND_ASSETS.md).
+Toolchain: Visual Studio 2026 Community (WinUI, C++ desktop, C++ WinUI tools, MSIX/WAP, Windows 11 SDK 10.0.26100+) and .NET 10 SDK. Run `.\scripts\Validate-Environment.ps1` after setup. No Node.js, Electron, Tauri, Rust, database, or background service required.
 
 ## Repository map
 
@@ -75,7 +177,7 @@ The built-in agent icons use official brand glyphs from [@lobehub/icons](https:/
 - `RightAgent.Native.Core`: shared native settings, icon, quoting, and process helpers.
 - `RightAgent.Package`: WAP/MSIX identity and Explorer registration.
 
-Implementation details are in [architecture](docs/ARCHITECTURE.md), the exact data contract is in [settings schema](docs/SETTINGS_SCHEMA.md), and manual acceptance coverage is in [test matrix](docs/TEST_MATRIX.md).
+Details: [architecture](docs/ARCHITECTURE.md) · [settings schema](docs/SETTINGS_SCHEMA.md) · [test matrix](docs/TEST_MATRIX.md).
 
 ## Platform references
 
@@ -84,4 +186,4 @@ Implementation details are in [architecture](docs/ARCHITECTURE.md), the exact da
 - [Windows Terminal command-line arguments](https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments)
 - [Set up the Windows App SDK development environment](https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/set-up-your-development-environment)
 
-Phase two will add classic `Show more options` verbs while reusing the same settings and launcher. It is intentionally not registered in this first phase.
+> Note: v1.0.0 registers only the modern Windows 11 menu. Classic "Show more options" verbs are planned for a later phase, reusing the same settings and launcher.

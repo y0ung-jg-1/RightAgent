@@ -2,6 +2,9 @@
 
 These are intentionally not vendor logos. Replace them only with approved official
 assets after reviewing each vendor's brand terms.
+
+Note: the RightAgent app logo ("rightagent") is a designed release asset and is NOT
+regenerated here — see docs/BRAND_ASSETS.md for its source of truth.
 """
 
 from pathlib import Path
@@ -53,28 +56,12 @@ def main() -> None:
     AGENT_ASSETS.mkdir(parents=True, exist_ok=True)
 
     identities = {
-        "rightagent": ("#2563EB", "R"),
         "claude": ("#B45309", "C"),
         "codex": ("#0F766E", "X"),
         "kimi": ("#6D28D9", "K"),
     }
     for name, (color, letter) in identities.items():
         save_ico(AGENT_ASSETS / f"{name}.ico", color, letter)
-
-    app_color, app_letter = identities["rightagent"]
-    for name, size in {
-        "Square44x44Logo.png": 44,
-        "Square150x150Logo.png": 150,
-        "StoreLogo.png": 50,
-    }.items():
-        rounded_icon(size, app_color, app_letter).save(PACKAGE_ASSETS / name)
-
-    wide = Image.new("RGBA", (310, 150), (0, 0, 0, 0))
-    icon = rounded_icon(112, app_color, app_letter)
-    wide.alpha_composite(icon, (20, 19))
-    draw = ImageDraw.Draw(wide)
-    draw.text((150, 52), "RightAgent", fill="#FFFFFF", font=font(30))
-    wide.save(PACKAGE_ASSETS / "Wide310x150Logo.png")
 
 
 if __name__ == "__main__":

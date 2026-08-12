@@ -1,5 +1,19 @@
 # Brand asset policy
 
+## RightAgent app logo
+
+The app logo is an original RightAgent design, created 2026-08-12: a white context-menu
+card whose first item is an AI sparkle, opened by a mouse pointer — "AI agents in the
+right-click menu" — on a blue gradient tile (`#58A6F2` → `#2563EB`). It is not derived
+from any vendor mark.
+
+Source of truth: `RightAgent.App/Assets/Agents/rightagent.svg` (64px grid, `rx=14` tile
+matching the agent icon family). Derived release assets live in `RightAgent.Package/Assets/`
+(`Agents/rightagent.ico` with the same 4% inset as the agent tiles, `Square44x44Logo.png`,
+`Square150x150Logo.png`, `StoreLogo.png`, `Wide310x150Logo.png`).
+
+## Built-in agent icons
+
 The five built-in agent icons (Claude, Codex, Kimi, Grok, OpenCode) use the official brand glyphs from [@lobehub/icons](https://github.com/lobehub/lobe-icons) (MIT license; source package `@lobehub/icons-static-svg`), retrieved 2026-08-12. Glyphs are presented unmodified on a rounded tile so both light and dark themes stay legible:
 
 - Claude: Claude Code glyph in brand clay `#D97757` on a white tile with a hairline border.
@@ -20,7 +34,7 @@ Before a public build:
 
 OpenAI assets and terms should be reviewed from the [official OpenAI brand page](https://openai.com/brand/). Equivalent official sources are required for Claude and Kimi before replacing their placeholders.
 
-Regenerate the neutral development assets with:
+Regenerate the neutral development agent placeholders (never the app logo) with:
 
 ```powershell
 python .\scripts\Generate-PlaceholderAssets.py
