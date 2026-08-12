@@ -2,8 +2,9 @@
 
 RightAgent uses GitHub Actions to build and test every change. A version tag
 starts a separate release job that imports the project-owned signing key from
-the GitHub `release` environment, signs and timestamps the MSIX, verifies the
-bundle, and creates a draft GitHub Release.
+the GitHub `release` environment, signs and timestamps the MSIX, builds and
+signs a single-file administrator-gated Setup EXE, verifies its checksum, and
+creates a draft GitHub Release containing only the EXE and `.sha256` file.
 
 ## One-time setup
 
@@ -31,6 +32,12 @@ bundle, and creates a draft GitHub Release.
    `RIGHTAGENT_SIGNING_PFX_PASSWORD`. Never use them in the ordinary CI
    workflow.
 
+4. The release workflow installs the exact Inno Setup 6.7.3 compiler from its
+   pinned upstream URL after checking its SHA-256. For equivalent local release
+   builds, install the same version with Windows Package Manager:
+
+       winget install --exact --id JRSoftware.InnoSetup --version 6.7.3 --scope user
+
 ## Release checklist
 
 1. Update `Version` in both package manifests. The build rejects any drift
@@ -40,13 +47,26 @@ bundle, and creates a draft GitHub Release.
        .\scripts\Build.ps1 -Configuration Release -PackageIdentity Release
        .\scripts\Sign-Package.ps1 -Configuration Release -PackageIdentity Release
 
+   Then create the same verified payload and signed Setup executable used by
+   GitHub Actions:
+
+       . .\scripts\PackageHelpers.ps1
+       $package = Get-RightAgentPackagePath -RepoRoot $PWD -Configuration Release -PackageIdentity Release
+       .\scripts\New-ReleaseBundle.ps1 -PackagePath $package -CertificatePath .\.local\signing\RightAgent.cer
+       .\scripts\New-SetupExecutable.ps1
+
 3. Commit and push the reviewed source to `main`, then wait for CI to pass.
 4. Create and push the exact matching tag, for example `v1.0.0` for package
    version `1.0.0.0`.
 5. Approve the `release` environment job if protection rules require it.
-6. Inspect the draft Release, its Actions log, ZIP contents, certificate
-   thumbprint, and SHA-256. Install the ZIP on a clean Windows 11 x64 machine.
-7. Publish the draft only after that clean-machine acceptance passes.
+6. Inspect the draft Release and Actions log. Confirm it contains exactly one
+   `RightAgent-version-x64-Setup.exe` and its `.sha256`, and verify the Setup
+   signature, timestamp, certificate thumbprint, and SHA-256.
+7. Run Setup on a clean Windows 11 x64 standard-user account. Confirm UAC is
+   required before the wizard, the public certificate is added only to Local
+   Machine\Trusted People, and the MSIX is installed for the user who started
+   Setup rather than the administrator account used for UAC approval.
+8. Publish the draft only after that clean-machine acceptance passes.
 
 The workflow deliberately creates a draft. Pushing a tag does not make the
 release public by itself.

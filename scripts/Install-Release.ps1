@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$PackagePath,
-    [string]$CertificatePath
+    [string]$CertificatePath,
+    [switch]$TrustCertificateOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -128,6 +129,23 @@ $trustedCertificate = Get-ChildItem -LiteralPath $trustedPeopleStore |
     Select-Object -First 1
 if (-not $trustedCertificate) {
     throw 'The RightAgent release certificate is still not present in Local Computer\Trusted People.'
+}
+
+if ($TrustCertificateOnly) {
+    Write-Host 'The RightAgent release certificate is trusted in Local Computer\Trusted People.'
+    exit 0
+}
+
+$packageVersion = [version]([string]$manifest.Package.Identity.Version)
+$sameVersionPackage = Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.Publisher -ceq 'CN=RightAgent' -and
+        [version]$_.Version -eq $packageVersion
+    } |
+    Select-Object -First 1
+if ($sameVersionPackage) {
+    Write-Host "RightAgent $packageVersion is already installed for the current user."
+    exit 0
 }
 
 $dependencyDirectory = Join-Path $PSScriptRoot 'Dependencies\x64'

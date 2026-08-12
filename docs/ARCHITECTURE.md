@@ -20,6 +20,12 @@ flowchart LR
 
 There is no service, tray app, startup task, scheduled task, watcher, or resident broker.
 
+The GitHub Release `Setup.exe` is a distribution-only bootstrapper, not a
+RightAgent runtime process. It embeds the signed MSIX, x64 dependencies, and
+public release certificate. Setup requires elevation at startup, uses the
+elevated phase only to validate and trust the public certificate in Local
+Machine\Trusted People, and executes the MSIX deployment as the original user.
+
 ## Explorer contract
 
 The MSIX manifest registers one CLSID for `Directory` and `Directory\Background` through `windows.fileExplorerContextMenus` and registers the DLL as a `windows.comServer` surrogate class.

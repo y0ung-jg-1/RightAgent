@@ -23,6 +23,15 @@ Those files include the notices for transitive native and managed components
 distributed by the corresponding packages. They must be reviewed and refreshed
 whenever one of the versions above changes.
 
+## Installer technology
+
+The GitHub Release Setup executable is generated with Inno Setup 6.7.3.
+Inno Setup is Copyright (C) 1997-2026 Jordan Russell, with portions Copyright
+(C) 2000-2026 Martijn Laan, and is available from
+[jrsoftware.org](https://jrsoftware.org/isinfo.php) under the Inno Setup License.
+This acknowledgment is included for clarity; Inno Setup is a build tool and is
+not a resident RightAgent runtime dependency.
+
 ## Lobe Icons
 
 The following checked-in agent glyphs were adapted from the

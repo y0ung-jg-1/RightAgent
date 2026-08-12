@@ -43,10 +43,10 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 
 ## 安装（GitHub Release 侧载）
 
-从官方 GitHub Release 下载 RightAgent-版本-x64.zip 与同名 .sha256，
-核对 SHA-256 后完整解压，并检查、运行包内的 Install-RightAgent.ps1。
-首次安装会请求管理员批准，只把随包公共证书导入“本地计算机\受信任的人”；
-发布包不包含私钥。完整步骤与安全说明见
+从官方 GitHub Release 下载 `RightAgent-版本-x64-Setup.exe` 与同名
+`.sha256`，核对 SHA-256 后双击安装。安装器启动时会请求管理员批准；管理员
+阶段只验证并导入随包公共证书到“本地计算机\受信任的人”，随后切回发起安装的
+Windows 用户完成 MSIX 安装。发布包不包含私钥。完整步骤与安全说明见
 [侧载安装说明](docs/SIDELOAD_INSTALL.md)。
 
 ### 从源码开发
@@ -101,7 +101,9 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 
 GitHub Actions 的 CI 在 windows-2025 托管 runner 上运行完整测试并构建不带签名的
 Release 身份 MSIX；标签发布工作流再从专用的 release environment 读取
-签名 Secrets，签名、生成侧载 ZIP 和 SHA-256，并创建草稿 GitHub Release。
+签名 Secrets，签名 MSIX，使用固定版本的 Inno Setup 生成并签名单文件
+`Setup.exe`，随后生成 SHA-256 并创建草稿 GitHub Release。公开 Release 只包含
+安装器和对应校验文件；内部 MSIX、依赖与证书由安装器携带。
 发布私钥不会进入普通 push/PR 构建。工作流见
 [CI](.github/workflows/ci.yml) 与 [Release](.github/workflows/release.yml)。
 
@@ -113,6 +115,7 @@ Release 身份 MSIX；标签发布工作流再从专用的 release environment �
 - `RightAgent.Launcher`：短命原生进程，负责打开终端或 URL。
 - `RightAgent.Native.Core`：共享的原生设置、图标、引号转义与进程辅助。
 - `RightAgent.Package`:WAP/MSIX 标识与资源管理器注册。
+- `installer`：管理员启动、原用户安装的单文件 Setup EXE 定义。
 
 实现细节见[架构文档](docs/ARCHITECTURE.md)，数据契约见[设置 schema](docs/SETTINGS_SCHEMA.md)，人工验收覆盖见[测试矩阵](docs/TEST_MATRIX.md)，发布操作见[发版指南](docs/RELEASING.md)，v1 发布取舍见[发布决策记录](docs/RELEASE_DECISIONS.md)。
 
@@ -156,11 +159,12 @@ RightAgent has no tray process, service, telemetry, automatic updater, or reside
 
 ## Install (GitHub Release sideload)
 
-Download RightAgent-version-x64.zip and its matching .sha256 from the official
-GitHub Release, verify the SHA-256, extract the whole ZIP, then review and run
-Install-RightAgent.ps1. The first install requests administrator approval to
-trust only the bundled public certificate in Local Computer\Trusted People;
-the private key is never distributed. See the
+Download `RightAgent-version-x64-Setup.exe` and its matching `.sha256` from the
+official GitHub Release, verify the SHA-256, then double-click the installer.
+Setup requests administrator approval at startup. Its elevated phase only
+validates and imports the bundled public certificate into Local Computer\Trusted
+People; MSIX installation then runs as the Windows user who started Setup. The
+private key is never distributed. See the
 [sideload installation guide](docs/SIDELOAD_INSTALL.md).
 
 ### Build and install from source
@@ -206,9 +210,11 @@ Toolchain: Visual Studio 2026 Community (WinUI, C++ desktop, C++ WinUI tools, MS
 GitHub Actions CI runs the full test suite and builds an unsigned release-
 identity MSIX on the windows-2025 hosted runner. The tag workflow then reads
 the dedicated signing secrets only from the release environment,
-signs the package, creates the sideload ZIP and SHA-256, and opens a draft
-GitHub Release. The signing key is never exposed to ordinary push or pull-
-request builds. See [CI](.github/workflows/ci.yml) and
+signs the MSIX, uses a pinned Inno Setup compiler to build and sign a single-file
+`Setup.exe`, creates its SHA-256 file, and opens a draft GitHub Release. Public
+Releases contain only the installer and checksum; the installer carries the
+MSIX, dependencies, and public certificate. The signing key is never exposed to
+ordinary push or pull-request builds. See [CI](.github/workflows/ci.yml) and
 [Release](.github/workflows/release.yml).
 
 ## Repository map
@@ -219,6 +225,7 @@ request builds. See [CI](.github/workflows/ci.yml) and
 - `RightAgent.Launcher`: short-lived native process that opens Terminal or a URL.
 - `RightAgent.Native.Core`: shared native settings, icon, quoting, and process helpers.
 - `RightAgent.Package`: WAP/MSIX identity and Explorer registration.
+- `installer`: single-file Setup definition with elevated trust and original-user deployment.
 
 Details: [architecture](docs/ARCHITECTURE.md) · [settings schema](docs/SETTINGS_SCHEMA.md) · [test matrix](docs/TEST_MATRIX.md) · [release guide](docs/RELEASING.md) · [v1 release decisions](docs/RELEASE_DECISIONS.md).
 
