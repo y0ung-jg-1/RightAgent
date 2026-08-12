@@ -154,7 +154,11 @@ public sealed class AgentItemViewModel : BindableBase
 
     public bool HasActionError => ActionError is not null;
 
-    public IReadOnlyList<OptionItem> ActionTypeOptions { get; private set; } = [];
+    public IReadOnlyList<OptionItem> ActionTypeOptions { get; } =
+    [
+        new OptionItem(SettingsContract.TerminalCommand, string.Empty),
+        new OptionItem(SettingsContract.Url, string.Empty)
+    ];
 
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? localization["UnnamedAgent"] : Name;
 
@@ -189,12 +193,8 @@ public sealed class AgentItemViewModel : BindableBase
 
     public void RefreshLanguage()
     {
-        ActionTypeOptions =
-        [
-            new OptionItem(SettingsContract.TerminalCommand, localization["TerminalCommand"]),
-            new OptionItem(SettingsContract.Url, localization["Url"])
-        ];
-        OnPropertyChanged(nameof(ActionTypeOptions));
+        ActionTypeOptions[0].UpdateLabel(localization["TerminalCommand"]);
+        ActionTypeOptions[1].UpdateLabel(localization["Url"]);
         OnPropertyChanged(nameof(NameLabel));
         OnPropertyChanged(nameof(ActionTypeLabel));
         OnPropertyChanged(nameof(ActionValueLabel));

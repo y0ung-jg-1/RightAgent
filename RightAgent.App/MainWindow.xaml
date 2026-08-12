@@ -71,7 +71,7 @@
                         AutomationProperties.Name="{x:Bind ViewModel.SaveLabel, Mode=OneWay}"
                         Click="Save_Click"
                         Content="{x:Bind ViewModel.SaveLabel, Mode=OneWay}"
-                        IsEnabled="{x:Bind ViewModel.IsLoaded, Mode=OneWay}"
+                        IsEnabled="{x:Bind ViewModel.CanSave, Mode=OneWay}"
                         Style="{StaticResource AccentButtonStyle}" />
                 </Grid>
                 <InfoBar

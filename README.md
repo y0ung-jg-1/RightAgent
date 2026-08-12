@@ -4,7 +4,7 @@
 
 **把 AI 编程 Agent 装进 Windows 11 的右键菜单。**
 
-当前版本：v1.0.0 ·[English](#english) below
+当前版本：v1.0.0 · [MIT License](LICENSE) · [English](#english) below
 
 ```text
 使用 RightAgent 打开  >
@@ -40,7 +40,15 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 - Windows 11 build 22000 或更新，x64。
 - Windows Terminal(`wt.exe`)。
 
-## 安装（内部开发版）
+## 安装（GitHub Release 侧载）
+
+从官方 GitHub Release 下载 RightAgent-版本-x64.zip 与同名 .sha256，
+核对 SHA-256 后完整解压，并检查、运行包内的 Install-RightAgent.ps1。
+首次安装会请求管理员批准，只把随包公共证书导入“本地计算机\受信任的人”；
+发布包不包含私钥。完整步骤与安全说明见
+[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
+
+### 从源码开发
 
 创建与包清单匹配的 per-user 开发证书，然后构建、签名、安装：
 
@@ -51,10 +59,12 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 .\scripts\Install-DevPackage.ps1 -Configuration Release
 ```
 
-也可以一键完成构建+签名+安装（自动移除旧版本）:
+也可以一键完成构建、签名和安装。正常升降级会保留包的 LocalState；如果已经安装相同版本，脚本默认拒绝覆盖，请先提升清单版本。只有明确接受清空当前开发包设置时，才传入 `-ResetInstalledPackage`：
 
 ```powershell
 .\scripts\Install-DevBuild.ps1
+# 明确重置同版本开发安装（会清空该包设置）：
+.\scripts\Install-DevBuild.ps1 -ResetInstalledPackage
 ```
 
 证书文件写入已被 gitignore 的 `.local\signing` 目录，请勿提交或分享 PFX。首次安装时 `Install-DevPackage.ps1` 会请求管理员批准，仅将公共 CER 导入「本地计算机\受信任的人」（Windows MSIX 部署要求），不会加入「受信任的根证书颁发机构」。不再需要时请移除该开发证书。
@@ -74,7 +84,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 - 可执行文件缺失时在打开终端前检测，错误中提供打开 RightAgent 设置的按钮。
 - 设置原子写入包 LocalState 的 `settings.json`。
 
-内置 Agent 图标使用 [@lobehub/icons](https://github.com/lobehub/lobe-icons)(MIT）官方品牌字形，全部本地打包，运行时不联网取图。详见[品牌资产策略](docs/BRAND_ASSETS.md)。
+内置 Agent 图标使用 [@lobehub/icons](https://github.com/lobehub/lobe-icons)（MIT）字形，全部本地打包，运行时不联网取图。版权声明见[第三方声明](THIRD_PARTY_NOTICES.md)，商标与公开发版要求见[品牌资产策略](docs/BRAND_ASSETS.md)。
 
 ## 构建与测试
 
@@ -87,6 +97,12 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 
 开发环境：Visual Studio 2026 Community(WinUI 应用开发、C++ 桌面开发、C++ WinUI 工具、MSIX/WAP 工具、Windows 11 SDK 10.0.26100+)与 .NET 10 SDK。安装完先跑 `.\scripts\Validate-Environment.ps1` 体检。本仓库不需要 Node.js、Electron、Tauri、Rust、数据库或后台服务。
 
+GitHub Actions 的 CI 在 windows-2025 托管 runner 上运行完整测试并构建不带签名的
+Release 身份 MSIX；标签发布工作流再从专用的 release environment 读取
+签名 Secrets，签名、生成侧载 ZIP 和 SHA-256，并创建草稿 GitHub Release。
+发布私钥不会进入普通 push/PR 构建。工作流见
+[CI](.github/workflows/ci.yml) 与 [Release](.github/workflows/release.yml)。
+
 ## 仓库结构
 
 - `RightAgent.App`:C# WinUI 3 设置应用。
@@ -96,7 +112,11 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新——窗口
 - `RightAgent.Native.Core`：共享的原生设置、图标、引号转义与进程辅助。
 - `RightAgent.Package`:WAP/MSIX 标识与资源管理器注册。
 
-实现细节见[架构文档](docs/ARCHITECTURE.md)，数据契约见[设置 schema](docs/SETTINGS_SCHEMA.md)，人工验收覆盖见[测试矩阵](docs/TEST_MATRIX.md)。
+实现细节见[架构文档](docs/ARCHITECTURE.md)，数据契约见[设置 schema](docs/SETTINGS_SCHEMA.md)，人工验收覆盖见[测试矩阵](docs/TEST_MATRIX.md)，发布操作见[发版指南](docs/RELEASING.md)，v1 发布取舍见[发布决策记录](docs/RELEASE_DECISIONS.md)。
+
+## 许可证
+
+RightAgent 以 [MIT License](LICENSE) 开源。随包第三方组件与图标的版权声明见[第三方声明](THIRD_PARTY_NOTICES.md)；第三方商标仍归各自权利人所有。
 
 > 注：当前版本只在 Windows 11 新右键菜单注册；经典「显示更多选项」菜单的动词计划在下一阶段复用同一套设置与启动器加入。
 
@@ -131,7 +151,16 @@ RightAgent has no tray process, service, telemetry, automatic updater, or reside
 - Windows 11 build 22000 or newer, x64.
 - Windows Terminal (`wt.exe`).
 
-## Install (internal dev build)
+## Install (GitHub Release sideload)
+
+Download RightAgent-version-x64.zip and its matching .sha256 from the official
+GitHub Release, verify the SHA-256, extract the whole ZIP, then review and run
+Install-RightAgent.ps1. The first install requests administrator approval to
+trust only the bundled public certificate in Local Computer\Trusted People;
+the private key is never distributed. See the
+[sideload installation guide](docs/SIDELOAD_INSTALL.md).
+
+### Build and install from source
 
 ```powershell
 .\scripts\New-DevCertificate.ps1
@@ -140,10 +169,12 @@ RightAgent has no tray process, service, telemetry, automatic updater, or reside
 .\scripts\Install-DevPackage.ps1 -Configuration Release
 ```
 
-Or build + sign + install in one step (removes the old version automatically):
+Or build, sign, and install in one step. Normal upgrades and downgrades preserve package LocalState. A same-version replacement is rejected by default; increment the manifest version, or explicitly opt into erasing that development package's settings:
 
 ```powershell
 .\scripts\Install-DevBuild.ps1
+# Explicitly reset a same-version development install:
+.\scripts\Install-DevBuild.ps1 -ResetInstalledPackage
 ```
 
 Certificates are written beneath the gitignored `.local\signing` directory — never commit or share the PFX. To hack on the settings UI only, run `.\scripts\Run-SettingsApp.ps1`.
@@ -157,7 +188,7 @@ Certificates are written beneath the gitignored `.local\signing` directory — n
 - A missing executable is detected before Terminal opens; errors offer a button to open RightAgent settings.
 - Settings are atomically written to the package LocalState `settings.json`.
 
-Built-in agent icons use official brand glyphs from [@lobehub/icons](https://github.com/lobehub/lobe-icons) (MIT), packaged locally — nothing is fetched at runtime. See the [brand asset policy](docs/BRAND_ASSETS.md).
+Built-in agent icons use glyphs from [@lobehub/icons](https://github.com/lobehub/lobe-icons) (MIT), packaged locally — nothing is fetched at runtime. See the [third-party notices](THIRD_PARTY_NOTICES.md) and [brand asset policy](docs/BRAND_ASSETS.md).
 
 ## Build and test
 
@@ -168,6 +199,14 @@ Built-in agent icons use official brand glyphs from [@lobehub/icons](https://git
 
 Toolchain: Visual Studio 2026 Community (WinUI, C++ desktop, C++ WinUI tools, MSIX/WAP, Windows 11 SDK 10.0.26100+) and .NET 10 SDK. Run `.\scripts\Validate-Environment.ps1` after setup. No Node.js, Electron, Tauri, Rust, database, or background service required.
 
+GitHub Actions CI runs the full test suite and builds an unsigned release-
+identity MSIX on the windows-2025 hosted runner. The tag workflow then reads
+the dedicated signing secrets only from the release environment,
+signs the package, creates the sideload ZIP and SHA-256, and opens a draft
+GitHub Release. The signing key is never exposed to ordinary push or pull-
+request builds. See [CI](.github/workflows/ci.yml) and
+[Release](.github/workflows/release.yml).
+
 ## Repository map
 
 - `RightAgent.App`: C# WinUI 3 settings application.
@@ -177,7 +216,11 @@ Toolchain: Visual Studio 2026 Community (WinUI, C++ desktop, C++ WinUI tools, MS
 - `RightAgent.Native.Core`: shared native settings, icon, quoting, and process helpers.
 - `RightAgent.Package`: WAP/MSIX identity and Explorer registration.
 
-Details: [architecture](docs/ARCHITECTURE.md) · [settings schema](docs/SETTINGS_SCHEMA.md) · [test matrix](docs/TEST_MATRIX.md).
+Details: [architecture](docs/ARCHITECTURE.md) · [settings schema](docs/SETTINGS_SCHEMA.md) · [test matrix](docs/TEST_MATRIX.md) · [release guide](docs/RELEASING.md) · [v1 release decisions](docs/RELEASE_DECISIONS.md).
+
+## License
+
+RightAgent is open source under the [MIT License](LICENSE). See the [third-party notices](THIRD_PARTY_NOTICES.md) for bundled components and icon copyright notices; third-party trademarks remain the property of their respective owners.
 
 ## Platform references
 

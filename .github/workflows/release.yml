@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, sign, and draft GitHub Release
+    runs-on: windows-2025
+    environment: release
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Validate tag and manifest version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -ne 'tag') {
+              throw 'The release workflow must run from a tag.'
+          }
+          [xml]$manifest = Get-Content -LiteralPath './RightAgent.Package/Package.Release.appxmanifest' -Raw
+          $version = [version]([string]$manifest.Package.Identity.Version)
+          $expectedTag = "v$($version.Major).$($version.Minor).$($version.Build)"
+          if ($version.Revision -gt 0) {
+              $expectedTag += ".$($version.Revision)"
+          }
+          if ($env:GITHUB_REF_NAME -cne $expectedTag) {
+              throw "Tag '$env:GITHUB_REF_NAME' does not match package version '$expectedTag'."
+          }
+          & git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) {
+              throw "Tagged commit '$env:GITHUB_SHA' is not reachable from origin/main."
+          }
+
+      - name: Test and build release identity
+        shell: pwsh
+        run: ./scripts/Build.ps1 -Configuration Release -PackageIdentity Release
+
+      - name: Import protected signing certificate
+        id: certificate
+        shell: pwsh
+        env:
+          PFX_BASE64: ${{ secrets.RIGHTAGENT_SIGNING_PFX_BASE64 }}
+          PFX_PASSWORD: ${{ secrets.RIGHTAGENT_SIGNING_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:PFX_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:PFX_PASSWORD)) {
+              throw 'RightAgent release signing secrets are not configured.'
+          }
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'RightAgent.release.pfx'
+          try {
+              $pfxBytes = [Convert]::FromBase64String($env:PFX_BASE64)
+          }
+          catch {
+              throw 'RIGHTAGENT_SIGNING_PFX_BASE64 is not valid base64.'
+          }
+          [IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
+          [Array]::Clear($pfxBytes, 0, $pfxBytes.Length)
+          $password = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
+          $imported = @(Import-PfxCertificate -FilePath $pfxPath -Password $password -CertStoreLocation 'Cert:\CurrentUser\My' -Exportable)
+          $certificate = $imported |
+              Where-Object { $_.Subject -eq 'CN=RightAgent' -and $_.HasPrivateKey } |
+              Sort-Object NotAfter -Descending |
+              Select-Object -First 1
+          if (-not $certificate) {
+              throw 'The PFX does not contain a RightAgent release certificate with a private key.'
+          }
+          $cerPath = Join-Path $env:RUNNER_TEMP 'RightAgent.cer'
+          Export-Certificate -Cert $certificate -FilePath $cerPath -Type CERT | Out-Null
+          "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
+          "cer_path=$cerPath" >> $env:GITHUB_OUTPUT
+          "RIGHTAGENT_IMPORTED_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
+          "RIGHTAGENT_TEMP_PFX=$pfxPath" >> $env:GITHUB_ENV
+
+      - name: Sign package
+        shell: pwsh
+        run: ./scripts/Sign-Package.ps1 -Configuration Release -PackageIdentity Release -CertificateThumbprint '${{ steps.certificate.outputs.thumbprint }}'
+
+      - name: Create sideload bundle
+        shell: pwsh
+        run: |
+          . ./scripts/PackageHelpers.ps1
+          $package = Get-RightAgentPackagePath -RepoRoot $env:GITHUB_WORKSPACE -Configuration Release -PackageIdentity Release
+          ./scripts/New-ReleaseBundle.ps1 -PackagePath $package -CertificatePath '${{ steps.certificate.outputs.cer_path }}'
+          $releaseZip = Get-ChildItem -LiteralPath './artifacts/release' -Filter '*.zip' -File -ErrorAction Stop
+          if (@($releaseZip).Count -ne 1) {
+              throw 'Expected exactly one release ZIP.'
+          }
+          ./scripts/Verify-ReleaseBundle.ps1 -ZipPath $releaseZip.FullName
+
+      - name: Upload signed workflow artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RightAgent-${{ github.ref_name }}
+          path: artifacts/release/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create or update draft GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $assets = @(Get-ChildItem -LiteralPath './artifacts/release' -File | Select-Object -ExpandProperty FullName)
+          if ($assets.Count -eq 0) {
+              throw 'No release assets were produced.'
+          }
+          & gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+              & gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
+          } else {
+              & gh release create $tag @assets --repo $env:GITHUB_REPOSITORY --draft --verify-tag --generate-notes --title "RightAgent $tag"
+          }
+          if ($LASTEXITCODE -ne 0) {
+              throw 'GitHub Release creation or upload failed.'
+          }
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:RIGHTAGENT_TEMP_PFX -and (Test-Path -LiteralPath $env:RIGHTAGENT_TEMP_PFX)) {
+              Remove-Item -LiteralPath $env:RIGHTAGENT_TEMP_PFX -Force
+          }
+          if ($env:RIGHTAGENT_IMPORTED_THUMBPRINT) {
+              $certificatePath = "Cert:\CurrentUser\My\$env:RIGHTAGENT_IMPORTED_THUMBPRINT"
+              if (Test-Path -LiteralPath $certificatePath) {
+                  Remove-Item -LiteralPath $certificatePath -Force
+              }
+          }

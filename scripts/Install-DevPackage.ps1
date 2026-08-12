@@ -7,16 +7,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'PackageHelpers.ps1')
 $cerPath = Join-Path $repoRoot '.local\signing\RightAgent.Dev.cer'
 if (-not (Test-Path -LiteralPath $cerPath -PathType Leaf)) {
     throw 'Development certificate not found. Run scripts\New-DevCertificate.ps1 first.'
 }
 if (-not $PackagePath) {
-    $packageRoot = Join-Path $repoRoot "artifacts\package\$Configuration"
-    $PackagePath = Get-ChildItem -LiteralPath $packageRoot -Recurse -File |
-        Where-Object { $_.Name -match '^RightAgent\.Package_.+_x64\.(msix|appx)$' -and $_.DirectoryName -notmatch '\\Dependencies(\\|$)' } |
-        Sort-Object LastWriteTimeUtc -Descending |
-        Select-Object -First 1 -ExpandProperty FullName
+    $PackagePath = Get-RightAgentPackagePath -RepoRoot $repoRoot -Configuration $Configuration
 }
 if (-not $PackagePath -or -not (Test-Path -LiteralPath $PackagePath -PathType Leaf)) {
     throw 'No signed package was found.'

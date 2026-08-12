@@ -70,7 +70,7 @@ public sealed partial class MainWindow : Window
         }
         finally
         {
-            SaveButton.IsEnabled = true;
+            SaveButton.IsEnabled = ViewModel.CanSave;
         }
     }
 

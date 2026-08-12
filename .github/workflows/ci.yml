@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build unsigned release package
+    runs-on: windows-2025
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Test and build
+        shell: pwsh
+        run: ./scripts/Build.ps1 -Configuration Release -PackageIdentity Release
+
+      - name: Locate unsigned package
+        id: package
+        shell: pwsh
+        run: |
+          . ./scripts/PackageHelpers.ps1
+          $package = Get-RightAgentPackagePath -RepoRoot $env:GITHUB_WORKSPACE -Configuration Release -PackageIdentity Release
+          $signature = Get-AuthenticodeSignature -LiteralPath $package
+          if ($signature.Status -ne 'NotSigned') {
+              throw "CI package must remain unsigned, but signature status is $($signature.Status)."
+          }
+          "path=$package" >> $env:GITHUB_OUTPUT
+
+      - name: Upload unsigned CI package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: RightAgent-unsigned-ci-${{ github.sha }}
+          path: ${{ steps.package.outputs.path }}
+          if-no-files-found: error
+          retention-days: 7

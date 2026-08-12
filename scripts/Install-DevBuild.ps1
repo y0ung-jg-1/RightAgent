@@ -2,7 +2,8 @@
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [switch]$ResetInstalledPackage
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,21 +28,32 @@ if (-not $certificate -or -not (Test-Path -LiteralPath $cerPath -PathType Leaf))
 }
 
 # 2. Build the MSIX (managed and native tests run unless -SkipTests is given).
-#    Note: Debug packages are named *_x64_Debug.msix, which the package-name
-#    checks in Build/Sign/Install do not match. Use the default Release.
 & (Join-Path $PSScriptRoot 'Build.ps1') -Configuration $Configuration -SkipTests:$SkipTests
 
 # 3. Sign and install. The first install asks for administrator approval once to
 #    trust the development certificate in Local Computer\Trusted People.
 & (Join-Path $PSScriptRoot 'Sign-Package.ps1') -Configuration $Configuration
 
-# Windows blocks reinstalling a same-version package whose contents differ, so
-# remove an existing installation first. Note: this resets the packaged
-# LocalState settings of the previous installation.
-$installed = Get-AppxPackage -Name 'RightAgent.Dev' -ErrorAction SilentlyContinue
-if ($installed) {
-    Write-Host "Removing the installed $($installed.PackageFullName) first (same-version reinstalls are blocked)..."
-    $installed | Remove-AppxPackage
+# Windows blocks replacing a package with different contents at the same version.
+# Preserve LocalState for real upgrades/downgrades, and require an explicit opt-in
+# before uninstalling a same-version development package.
+$installedPackages = @(Get-AppxPackage -Name 'RightAgent.Dev' -ErrorAction SilentlyContinue)
+if ($installedPackages.Count -gt 1) {
+    throw "Expected at most one installed RightAgent.Dev package, but found $($installedPackages.Count)."
+}
+if ($installedPackages.Count -eq 1) {
+    $installed = $installedPackages[0]
+    [xml]$manifest = Get-Content -LiteralPath (Join-Path $repoRoot 'RightAgent.Package\Package.appxmanifest') -Raw
+    $targetVersion = [version]$manifest.Package.Identity.Version
+    $installedVersion = [version]$installed.Version
+    if ($installedVersion -eq $targetVersion) {
+        if (-not $ResetInstalledPackage) {
+            throw "RightAgent.Dev $targetVersion is already installed. Increment the manifest version to preserve LocalState, or rerun with -ResetInstalledPackage to explicitly uninstall it and erase that package's settings."
+        }
+
+        Write-Warning "Resetting $($installed.PackageFullName); this erases that development package's LocalState settings."
+        $installed | Remove-AppxPackage -ErrorAction Stop
+    }
 }
 
 & (Join-Path $PSScriptRoot 'Install-DevPackage.ps1') -Configuration $Configuration

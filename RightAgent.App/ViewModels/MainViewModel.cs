@@ -36,14 +36,29 @@ public sealed class MainViewModel : BindableBase
 
     public ObservableCollection<AgentItemViewModel> PreviewEntries { get; } = [];
 
-    public IReadOnlyList<OptionItem> LanguageOptions { get; private set; } = [];
+    public IReadOnlyList<OptionItem> LanguageOptions { get; } =
+    [
+        new OptionItem(SettingsContract.SystemLanguage, string.Empty),
+        new OptionItem(SettingsContract.ChineseLanguage, string.Empty),
+        new OptionItem(SettingsContract.EnglishLanguage, string.Empty)
+    ];
 
-    public IReadOnlyList<OptionItem> MenuModeOptions { get; private set; } = [];
+    public IReadOnlyList<OptionItem> MenuModeOptions { get; } =
+    [
+        new OptionItem(SettingsContract.GroupedMenu, string.Empty),
+        new OptionItem(SettingsContract.DirectMenu, string.Empty)
+    ];
 
     public bool IsLoaded
     {
         get => isLoaded;
-        private set => SetProperty(ref isLoaded, value);
+        private set
+        {
+            if (SetProperty(ref isLoaded, value))
+            {
+                OnPropertyChanged(nameof(CanSave));
+            }
+        }
     }
 
     public string Language
@@ -174,8 +189,16 @@ public sealed class MainViewModel : BindableBase
     public bool HasValidationErrors
     {
         get => hasValidationErrors;
-        private set => SetProperty(ref hasValidationErrors, value);
+        private set
+        {
+            if (SetProperty(ref hasValidationErrors, value))
+            {
+                OnPropertyChanged(nameof(CanSave));
+            }
+        }
     }
+
+    public bool CanSave => IsLoaded && !HasValidationErrors;
 
     public string WindowTitle => localization["WindowTitle"];
     public string HeaderTitle => localization["Title"];
@@ -406,17 +429,11 @@ public sealed class MainViewModel : BindableBase
     private void RefreshLocalization()
     {
         localization.ConfiguredLanguage = language;
-        LanguageOptions =
-        [
-            new OptionItem(SettingsContract.SystemLanguage, localization["SystemLanguage"]),
-            new OptionItem(SettingsContract.ChineseLanguage, localization["Chinese"]),
-            new OptionItem(SettingsContract.EnglishLanguage, localization["English"])
-        ];
-        MenuModeOptions =
-        [
-            new OptionItem(SettingsContract.GroupedMenu, localization["Grouped"]),
-            new OptionItem(SettingsContract.DirectMenu, localization["Direct"])
-        ];
+        LanguageOptions[0].UpdateLabel(localization["SystemLanguage"]);
+        LanguageOptions[1].UpdateLabel(localization["Chinese"]);
+        LanguageOptions[2].UpdateLabel(localization["English"]);
+        MenuModeOptions[0].UpdateLabel(localization["Grouped"]);
+        MenuModeOptions[1].UpdateLabel(localization["Direct"]);
         foreach (var agent in Agents)
         {
             agent.RefreshLanguage();
@@ -428,8 +445,6 @@ public sealed class MainViewModel : BindableBase
 
     private void NotifyLocalizedProperties()
     {
-        OnPropertyChanged(nameof(LanguageOptions));
-        OnPropertyChanged(nameof(MenuModeOptions));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HeaderTitle));
         OnPropertyChanged(nameof(MasterSwitchLabel));
