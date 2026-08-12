@@ -57,7 +57,7 @@ try {
         'Microsoft.WindowsAppSDK/2.3.1',
         'Microsoft.WindowsAppSDK.WinUI/2.3.0',
         'Microsoft.WindowsAppSDK.ML/2.1.74',
-        'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/10.0.10',
+        'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/10.0.11',
         'Microsoft.Web.WebView2/1.0.3719.77',
         'System.Numerics.Tensors/9.0.0'
     )

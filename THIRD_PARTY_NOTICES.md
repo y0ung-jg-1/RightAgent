@@ -15,7 +15,7 @@ verbatim under `ThirdPartyNotices/`:
 | Microsoft Windows App SDK | 2.3.1 | `WindowsAppSDK/LICENSE.txt`, `WindowsAppSDK/NOTICE.txt` |
 | Microsoft Windows App SDK WinUI | 2.3.0 | `WindowsAppSDKWinUI/LICENSE.txt`, `WindowsAppSDKWinUI/NOTICE.txt` |
 | Microsoft Windows App SDK ML | 2.1.74 | `WindowsAppSDKML/LICENSE.txt`, `WindowsAppSDKML/THIRD_PARTY_NOTICES.txt` |
-| Microsoft .NET runtime for Windows x64 | 10.0.10 | `DotNETRuntime/LICENSE.txt`, `DotNETRuntime/THIRD_PARTY_NOTICES.txt` |
+| Microsoft .NET runtime for Windows x64 | 10.0.11 | `DotNETRuntime/LICENSE.txt`, `DotNETRuntime/THIRD_PARTY_NOTICES.txt` |
 | Microsoft WebView2 SDK components | 1.0.3719.77 | `WebView2/LICENSE.txt`, `WebView2/NOTICE.txt` |
 | System.Numerics.Tensors | 9.0.0 | `SystemNumericsTensors/LICENSE.txt`, `SystemNumericsTensors/THIRD_PARTY_NOTICES.txt` |
 
