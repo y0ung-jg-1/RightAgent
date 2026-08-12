@@ -37,6 +37,7 @@ public sealed partial class MainWindow : Window
         try
         {
             await ViewModel.LoadAsync();
+            Bindings.Update();
             SynchronizeSelectors();
             UpdateStatusInfoBar();
             Title = ViewModel.WindowTitle;

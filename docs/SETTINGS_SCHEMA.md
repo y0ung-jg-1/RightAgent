@@ -5,6 +5,7 @@ The public local contract is UTF-8 JSON named `settings.json`:
 ```json
 {
   "schemaVersion": 1,
+  "menuEnabled": true,
   "language": "system",
   "menuMode": "grouped",
   "directAgentId": "claude-code",
@@ -39,6 +40,7 @@ The public local contract is UTF-8 JSON named `settings.json`:
 ## Field rules
 
 - `schemaVersion`: integer `1`. Writers always emit the current version.
+- `menuEnabled`: optional boolean, default `true`. When `false`, the Explorer command is hidden everywhere. Added later within schema version 1: readers ignore unknown fields, and files written before this field existed behave as `true`.
 - `language`: `system`, `zh-CN`, or `en-US`; unknown values normalize to `system`, with non-Chinese systems falling back to English.
 - `menuMode`: `grouped` or `direct`; unknown values normalize to `grouped`.
 - `directAgentId`: ID of an enabled agent. If absent or disabled, the first enabled agent becomes the fallback.

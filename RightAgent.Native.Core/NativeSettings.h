@@ -36,6 +36,7 @@ namespace rightagent
     struct Settings
     {
         int schemaVersion{kSettingsSchemaVersion};
+        bool menuEnabled{true};
         std::wstring language{L"system"};
         MenuMode menuMode{MenuMode::Grouped};
         std::wstring directAgentId;

@@ -74,6 +74,16 @@ public sealed class SettingsTests
         }
     }
 
+    [Fact]
+    public void MenuEnabledDefaultsToTrueAndSurvivesNormalize()
+    {
+        Assert.True(SettingsDefaults.Create(_ => false).MenuEnabled);
+        Assert.True(SettingsValidator.Normalize(new RightAgentSettings()).MenuEnabled);
+
+        var disabled = new RightAgentSettings { MenuEnabled = false };
+        Assert.False(SettingsValidator.Normalize(disabled).MenuEnabled);
+    }
+
     private static AgentDefinition Agent(
         string name,
         string id,

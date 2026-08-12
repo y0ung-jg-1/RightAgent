@@ -70,7 +70,6 @@ public sealed class AgentItemViewModel : BindableBase
             if (SetProperty(ref iconPath, value))
             {
                 OnPropertyChanged(nameof(IconDisplayPath));
-                OnPropertyChanged(nameof(IconSourceDescription));
             }
         }
     }
@@ -94,21 +93,6 @@ public sealed class AgentItemViewModel : BindableBase
                 key = "rightagent";
             }
             return $"ms-appx:///Assets/Agents/{key}.svg";
-        }
-    }
-
-    public string IconSourceDescription
-    {
-        get
-        {
-            if (IconPath.StartsWith("local:", StringComparison.OrdinalIgnoreCase))
-            {
-                var relative = IconPath["local:".Length..].Replace('\\', '/');
-                var fileName = relative.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? relative;
-                return string.Format(CultureInfo.CurrentCulture, localization["CustomIcon"], fileName);
-            }
-
-            return localization["BuiltinIcon"];
         }
     }
 
@@ -177,13 +161,10 @@ public sealed class AgentItemViewModel : BindableBase
     public string NameLabel => localization["Name"];
     public string ActionTypeLabel => localization["ActionType"];
     public string ActionValueLabel => localization["ActionValue"];
-    public string EnabledLabel => localization["Enabled"];
-    public string DisabledLabel => localization["Disabled"];
     public string ChooseIconLabel => localization["ChooseIcon"];
     public string MoveUpLabel => localization["MoveUp"];
     public string MoveDownLabel => localization["MoveDown"];
     public string DeleteLabel => localization["Delete"];
-    public string IconLabel => localization["IconLabel"];
 
     public string EnabledAutomationName => Format("EnableFor");
     public string MoveUpAutomationName => Format("MoveUpFor");
@@ -217,14 +198,10 @@ public sealed class AgentItemViewModel : BindableBase
         OnPropertyChanged(nameof(NameLabel));
         OnPropertyChanged(nameof(ActionTypeLabel));
         OnPropertyChanged(nameof(ActionValueLabel));
-        OnPropertyChanged(nameof(EnabledLabel));
-        OnPropertyChanged(nameof(DisabledLabel));
         OnPropertyChanged(nameof(ChooseIconLabel));
         OnPropertyChanged(nameof(MoveUpLabel));
         OnPropertyChanged(nameof(MoveDownLabel));
         OnPropertyChanged(nameof(DeleteLabel));
-        OnPropertyChanged(nameof(IconLabel));
-        OnPropertyChanged(nameof(IconSourceDescription));
         RefreshValidation();
         NotifyAutomationNames();
     }

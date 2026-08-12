@@ -377,6 +377,10 @@ namespace
             *state = ECS_HIDDEN;
 
             const auto settings = rightagent::LoadSettings();
+            if (!settings.menuEnabled)
+            {
+                return S_OK;
+            }
             if (agent_)
             {
                 if (rightagent::FindEnabledAgent(settings, agent_->id) == nullptr)

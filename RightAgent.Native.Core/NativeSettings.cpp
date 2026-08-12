@@ -296,6 +296,7 @@ namespace rightagent
             const auto root = JsonObject::Parse(text);
             Settings settings;
             settings.schemaVersion = GetInteger(root, L"schemaVersion", kSettingsSchemaVersion);
+            settings.menuEnabled = GetBoolean(root, L"menuEnabled", true);
             settings.language = GetString(root, L"language", L"system");
             settings.menuMode = GetString(root, L"menuMode", L"grouped") == L"direct" ? MenuMode::Direct : MenuMode::Grouped;
             settings.directAgentId = GetString(root, L"directAgentId");

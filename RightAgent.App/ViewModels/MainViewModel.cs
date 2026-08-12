@@ -15,11 +15,13 @@ public sealed class MainViewModel : BindableBase
     private string menuMode = SettingsContract.GroupedMenu;
     private string? directAgentId;
     private string? terminalProfile;
+    private bool menuEnabled = true;
     private bool isLoaded;
     private string previewRootTitle = string.Empty;
     private string previewRootIconPath = AppIconPath;
     private bool previewIsGrouped = true;
     private bool previewHasEntries;
+    private bool previewShowRootTitle = true;
     private bool previewShowRootHint;
     private string validationSummary = string.Empty;
     private bool hasValidationErrors;
@@ -81,6 +83,19 @@ public sealed class MainViewModel : BindableBase
 
     public bool IsDirectMode => MenuMode == SettingsContract.DirectMenu;
 
+    public bool MenuEnabled
+    {
+        get => menuEnabled;
+        set
+        {
+            if (SetProperty(ref menuEnabled, value))
+            {
+                RefreshPreview();
+                RefreshValidation();
+            }
+        }
+    }
+
     public string? DirectAgentId
     {
         get => directAgentId;
@@ -126,6 +141,12 @@ public sealed class MainViewModel : BindableBase
         private set => SetProperty(ref previewHasEntries, value);
     }
 
+    public bool PreviewShowRootTitle
+    {
+        get => previewShowRootTitle;
+        private set => SetProperty(ref previewShowRootTitle, value);
+    }
+
     public bool PreviewShowRootHint
     {
         get => previewShowRootHint;
@@ -133,6 +154,8 @@ public sealed class MainViewModel : BindableBase
     }
 
     public string PreviewEmptyLabel => localization["PreviewEmpty"];
+
+    public string PreviewHintText => MenuEnabled ? localization["PreviewEmpty"] : localization["MenuOff"];
 
     public string ValidationSummary
     {
@@ -148,12 +171,11 @@ public sealed class MainViewModel : BindableBase
 
     public string WindowTitle => localization["WindowTitle"];
     public string HeaderTitle => localization["Title"];
-    public string Subtitle => localization["Subtitle"];
+    public string MasterSwitchLabel => localization["MasterSwitch"];
     public string SaveLabel => localization["Save"];
     public string SavedMessage => localization["Saved"];
     public string SaveFailedLabel => localization["SaveFailed"];
     public string MenuSectionLabel => localization["MenuSection"];
-    public string MenuDescription => localization["MenuDescription"];
     public string MenuModeLabel => localization["MenuMode"];
     public string GroupedLabel => localization["Grouped"];
     public string DirectLabel => localization["Direct"];
@@ -162,7 +184,6 @@ public sealed class MainViewModel : BindableBase
     public string TerminalProfileHint => localization["TerminalProfileHint"];
     public string PreviewLabel => localization["Preview"];
     public string AgentsSectionLabel => localization["AgentsSection"];
-    public string AgentsDescription => localization["AgentsDescription"];
     public string AddAgentLabel => localization["AddAgent"];
     public string NoAgentsLabel => localization["NoAgents"];
     public string GeneralSectionLabel => localization["GeneralSection"];
@@ -181,6 +202,7 @@ public sealed class MainViewModel : BindableBase
         menuMode = settings.MenuMode;
         directAgentId = settings.DirectAgentId;
         terminalProfile = settings.TerminalProfile;
+        menuEnabled = settings.MenuEnabled;
 
         foreach (var existing in Agents)
         {
@@ -207,6 +229,7 @@ public sealed class MainViewModel : BindableBase
             MenuMode = MenuMode,
             DirectAgentId = DirectAgentId,
             TerminalProfile = TerminalProfile,
+            MenuEnabled = MenuEnabled,
             Agents = Agents.Select(agent => agent.ToDefinition()).ToList()
         };
         var normalized = SettingsValidator.Normalize(settings);
@@ -309,8 +332,15 @@ public sealed class MainViewModel : BindableBase
         }
 
         PreviewHasEntries = enabled.Count > 0;
-        PreviewIsGrouped = MenuMode == SettingsContract.GroupedMenu;
-        if (PreviewIsGrouped)
+        PreviewIsGrouped = MenuEnabled && MenuMode == SettingsContract.GroupedMenu;
+        PreviewShowRootTitle = MenuEnabled && (MenuMode == SettingsContract.GroupedMenu || enabled.Count > 0);
+        PreviewShowRootHint = !PreviewShowRootTitle;
+        if (!MenuEnabled)
+        {
+            PreviewRootTitle = string.Empty;
+            PreviewRootIconPath = AppIconPath;
+        }
+        else if (PreviewIsGrouped)
         {
             PreviewRootTitle = localization["OpenWithRightAgent"];
             PreviewRootIconPath = AppIconPath;
@@ -324,11 +354,19 @@ public sealed class MainViewModel : BindableBase
                 : string.Format(CultureInfo.CurrentCulture, localization["OpenWithAgent"], selected.Name);
             PreviewRootIconPath = selected?.IconDisplayPath ?? AppIconPath;
         }
-        PreviewShowRootHint = !PreviewIsGrouped && !PreviewHasEntries;
+        OnPropertyChanged(nameof(PreviewHintText));
     }
 
     private void RefreshValidation()
     {
+        if (!MenuEnabled)
+        {
+            // With the master switch off the menu never appears, so pending edits must not block saving.
+            ValidationSummary = string.Empty;
+            HasValidationErrors = false;
+            return;
+        }
+
         var lines = new List<string>();
         foreach (var agent in Agents)
         {
@@ -372,12 +410,11 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(LanguageOptions));
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(HeaderTitle));
-        OnPropertyChanged(nameof(Subtitle));
+        OnPropertyChanged(nameof(MasterSwitchLabel));
         OnPropertyChanged(nameof(SaveLabel));
         OnPropertyChanged(nameof(SavedMessage));
         OnPropertyChanged(nameof(SaveFailedLabel));
         OnPropertyChanged(nameof(MenuSectionLabel));
-        OnPropertyChanged(nameof(MenuDescription));
         OnPropertyChanged(nameof(MenuModeLabel));
         OnPropertyChanged(nameof(GroupedLabel));
         OnPropertyChanged(nameof(DirectLabel));
@@ -386,8 +423,8 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(TerminalProfileHint));
         OnPropertyChanged(nameof(PreviewLabel));
         OnPropertyChanged(nameof(PreviewEmptyLabel));
+        OnPropertyChanged(nameof(PreviewHintText));
         OnPropertyChanged(nameof(AgentsSectionLabel));
-        OnPropertyChanged(nameof(AgentsDescription));
         OnPropertyChanged(nameof(AddAgentLabel));
         OnPropertyChanged(nameof(NoAgentsLabel));
         OnPropertyChanged(nameof(GeneralSectionLabel));

@@ -19,6 +19,9 @@ public sealed class RightAgentSettings
     [JsonPropertyName("schemaVersion")]
     public int SchemaVersion { get; set; } = SettingsContract.CurrentSchemaVersion;
 
+    [JsonPropertyName("menuEnabled")]
+    public bool MenuEnabled { get; set; } = true;
+
     [JsonPropertyName("language")]
     public string Language { get; set; } = SettingsContract.SystemLanguage;
 

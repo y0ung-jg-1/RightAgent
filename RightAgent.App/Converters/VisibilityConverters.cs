@@ -12,3 +12,8 @@ public static class VisibilityConverters
 
     public static Visibility CollapsedIf(bool value) => value ? Visibility.Collapsed : Visibility.Visible;
 }
+
+public static class EnabledAppearance
+{
+    public static double OpacityFor(bool enabled) => enabled ? 1.0 : 0.55;
+}
