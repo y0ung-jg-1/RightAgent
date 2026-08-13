@@ -173,6 +173,10 @@
                                 SelectedValuePath="Key" />
                         </controls:SettingsCard>
 
+                        <TextBlock
+                            Style="{StaticResource SettingsSectionHeaderTextBlockStyle}"
+                            Text="{x:Bind ViewModel.AgentsSectionLabel, Mode=OneWay}" />
+
                         <controls:SettingsExpander
                             CornerRadius="8"
                             Header="{x:Bind ViewModel.DirectAgentLabel, Mode=OneWay}"
@@ -290,6 +294,17 @@
                                     </StackPanel>
                                 </controls:SettingsCard>
                             </controls:SettingsExpander.Items>
+                            <controls:SettingsExpander.ItemsFooter>
+                                <controls:SettingsCard
+                                    AccessKey="A"
+                                    Click="AddAgent_Click"
+                                    Header="{x:Bind ViewModel.AddAgentLabel, Mode=OneWay}"
+                                    IsClickEnabled="True">
+                                    <controls:SettingsCard.HeaderIcon>
+                                        <FontIcon Glyph="&#xE710;" />
+                                    </controls:SettingsCard.HeaderIcon>
+                                </controls:SettingsCard>
+                            </controls:SettingsExpander.ItemsFooter>
                         </controls:SettingsExpander>
 
                         <TextBlock
@@ -299,11 +314,6 @@
                             TextAlignment="Center"
                             TextWrapping="Wrap"
                             Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.ShowNoAgentEditor), Mode=OneWay}" />
-
-                        <TextBlock
-                            Style="{StaticResource SettingsSectionHeaderTextBlockStyle}"
-                            Text="{x:Bind ViewModel.AgentsSectionLabel, Mode=OneWay}"
-                            Visibility="{x:Bind app:VisibilityConverters.CollapsedIf(ViewModel.IsDirectMode), Mode=OneWay}" />
 
                         <ItemsControl
                             ItemTemplate="{StaticResource AgentEditorTemplate}"
@@ -325,7 +335,8 @@
                             Click="AddAgent_Click"
                             CornerRadius="8"
                             Header="{x:Bind ViewModel.AddAgentLabel, Mode=OneWay}"
-                            IsClickEnabled="True">
+                            IsClickEnabled="True"
+                            Visibility="{x:Bind app:VisibilityConverters.CollapsedIf(ViewModel.IsDirectMode), Mode=OneWay}">
                             <controls:SettingsCard.HeaderIcon>
                                 <FontIcon Glyph="&#xE710;" />
                             </controls:SettingsCard.HeaderIcon>

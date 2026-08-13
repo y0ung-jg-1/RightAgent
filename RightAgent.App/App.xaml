@@ -12,7 +12,7 @@
                 x:Key="SettingsSectionHeaderTextBlockStyle"
                 BasedOn="{StaticResource BodyStrongTextBlockStyle}"
                 TargetType="TextBlock">
-                <Setter Property="Margin" Value="1,29,0,5" />
+                <Setter Property="Margin" Value="1,30,0,6" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>
