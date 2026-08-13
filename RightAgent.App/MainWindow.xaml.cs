@@ -204,57 +204,6 @@ public sealed partial class MainWindow : Window
         ViewModel.AddAgent();
     }
 
-    private void AgentExpander_SizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        // The Expander template reserves a 20px margin before its chevron border
-        // ("ExpandCollapseChevronBorder", Margin 20,0,8,0), which leaves the toggle
-        // looking stranded. Tighten that margin directly on the template part, then
-        // stretch the header grid to the exact right edge of the content column —
-        // anything wider gets layout-clipped by the chevron slot.
-        if (sender is not Expander { Header: FrameworkElement header } expander)
-        {
-            return;
-        }
-        var border = FindDescendantByName(expander, "ExpandCollapseChevronBorder");
-        if (border is null)
-        {
-            return;
-        }
-        if (border.Margin.Left != 2 || border.Margin.Right != 4)
-        {
-            border.Margin = new Thickness(2, 0, 4, 0);
-        }
-        // The margin change does not alter the Expander's own size, so SizeChanged will
-        // not fire again — force a synchronous layout pass and measure the new geometry.
-        expander.UpdateLayout();
-        var headerLeft = header.TransformToVisual(expander).TransformPoint(new Windows.Foundation.Point(0, 0)).X;
-        var columnRight = border.TransformToVisual(expander).TransformPoint(new Windows.Foundation.Point(0, 0)).X - border.Margin.Left;
-        var width = columnRight - headerLeft;
-        if (width > 0 && System.Math.Abs(header.Width - width) > 0.5)
-        {
-            header.Width = width;
-        }
-    }
-
-    private static FrameworkElement? FindDescendantByName(Microsoft.UI.Xaml.DependencyObject root, string name)
-    {
-        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
-        for (var index = 0; index < count; ++index)
-        {
-            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, index);
-            if (child is FrameworkElement element && element.Name == name)
-            {
-                return element;
-            }
-            var found = FindDescendantByName(child, name);
-            if (found is not null)
-            {
-                return found;
-            }
-        }
-        return null;
-    }
-
     private void MoveUp_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string id } && ViewModel.FindAgent(id) is { } agent)

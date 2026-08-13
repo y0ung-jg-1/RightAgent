@@ -5,6 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:app="using:RightAgent.App"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:viewModels="using:RightAgent.App.ViewModels"
     mc:Ignorable="d">
 
@@ -12,6 +13,15 @@
         x:Name="RootGrid"
         Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
         SizeChanged="RootGrid_SizeChanged">
+        <Grid.Resources>
+            <x:Double x:Key="SettingsCardSpacing">4</x:Double>
+            <Style
+                x:Key="SettingsSectionHeaderTextBlockStyle"
+                BasedOn="{StaticResource BodyStrongTextBlockStyle}"
+                TargetType="TextBlock">
+                <Setter Property="Margin" Value="1,30,0,6" />
+            </Style>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -79,138 +89,72 @@
                 Padding="0,0,16,16"
                 HorizontalScrollBarVisibility="Disabled"
                 VerticalScrollBarVisibility="Auto">
-                <StackPanel Spacing="8">
+                <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
                     <StackPanel.ChildrenTransitions>
-                        <TransitionCollection>
-                            <EntranceThemeTransition />
-                        </TransitionCollection>
+                        <EntranceThemeTransition FromVerticalOffset="50" />
+                        <RepositionThemeTransition IsStaggeringEnabled="False" />
                     </StackPanel.ChildrenTransitions>
 
-                    <!-- Master switch: same row anatomy as every other setting. -->
-                    <Border
-                        Padding="20,10"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                        <Grid MinHeight="64" ColumnSpacing="14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="20" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon
-                                VerticalAlignment="Center"
-                                FontSize="16"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Glyph="&#xE7E8;" />
-                            <TextBlock
-                                Grid.Column="1"
-                                VerticalAlignment="Center"
-                                Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                Text="{x:Bind ViewModel.MasterSwitchLabel, Mode=OneWay}" />
-                            <ToggleSwitch
-                                Grid.Column="2"
-                                MinWidth="0"
-                                MinHeight="44"
-                                VerticalAlignment="Center"
-                                AutomationProperties.Name="{x:Bind ViewModel.MasterSwitchLabel, Mode=OneWay}"
-                                IsOn="{x:Bind ViewModel.MenuEnabled, Mode=TwoWay}"
-                                OffContent=""
-                                OnContent="" />
-                        </Grid>
-                    </Border>
+                    <controls:SettingsCard CornerRadius="8" Header="{x:Bind ViewModel.MasterSwitchLabel, Mode=OneWay}">
+                        <controls:SettingsCard.HeaderIcon>
+                            <FontIcon Glyph="&#xE7E8;" />
+                        </controls:SettingsCard.HeaderIcon>
+                        <ToggleSwitch
+                            MinWidth="0"
+                            MinHeight="44"
+                            AutomationProperties.Name="{x:Bind ViewModel.MasterSwitchLabel, Mode=OneWay}"
+                            IsOn="{x:Bind ViewModel.MenuEnabled, Mode=TwoWay}"
+                            OffContent=""
+                            OnContent="" />
+                    </controls:SettingsCard>
 
                     <ContentControl
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Stretch"
-                        IsEnabled="{x:Bind ViewModel.MenuEnabled, Mode=OneWay}"
-                        Opacity="{x:Bind app:EnabledAppearance.OpacityFor(ViewModel.MenuEnabled), Mode=OneWay}">
-                        <StackPanel Spacing="8">
+                        IsEnabled="{x:Bind ViewModel.MenuEnabled, Mode=OneWay}">
+                    <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
                             <TextBlock
-                                Margin="0,8,0,4"
-                                Style="{ThemeResource SubtitleTextBlockStyle}"
+                                Style="{StaticResource SettingsSectionHeaderTextBlockStyle}"
                                 Text="{x:Bind ViewModel.MenuSectionLabel, Mode=OneWay}" />
 
-                            <Border
-                                Padding="20,10"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                                <Grid MinHeight="64" ColumnSpacing="14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="20" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon
-                                        VerticalAlignment="Center"
-                                        FontSize="16"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Glyph="&#xE700;" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                        Text="{x:Bind ViewModel.MenuModeLabel, Mode=OneWay}" />
-                                    <ComboBox
-                                        x:Name="MenuModeComboBox"
-                                        Grid.Column="2"
-                                        MinWidth="260"
-                                        MinHeight="44"
-                                        VerticalAlignment="Center"
-                                        AutomationProperties.Name="{x:Bind ViewModel.MenuModeLabel, Mode=OneWay}"
-                                        DisplayMemberPath="Label"
-                                        ItemsSource="{x:Bind ViewModel.MenuModeOptions, Mode=OneWay}"
-                                        SelectedValue="{x:Bind ViewModel.MenuMode, Mode=TwoWay}"
-                                        SelectedValuePath="Key"
-                                        SelectionChanged="MenuMode_SelectionChanged" />
-                                </Grid>
-                            </Border>
+                            <controls:SettingsCard CornerRadius="8" Header="{x:Bind ViewModel.MenuModeLabel, Mode=OneWay}">
+                                <controls:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE700;" />
+                                </controls:SettingsCard.HeaderIcon>
+                                <ComboBox
+                                    x:Name="MenuModeComboBox"
+                                    MinWidth="240"
+                                    MinHeight="44"
+                                    AutomationProperties.Name="{x:Bind ViewModel.MenuModeLabel, Mode=OneWay}"
+                                    DisplayMemberPath="Label"
+                                    ItemsSource="{x:Bind ViewModel.MenuModeOptions, Mode=OneWay}"
+                                    SelectedValue="{x:Bind ViewModel.MenuMode, Mode=TwoWay}"
+                                    SelectedValuePath="Key"
+                                    SelectionChanged="MenuMode_SelectionChanged" />
+                            </controls:SettingsCard>
 
-                            <Border
-                                Padding="20,10"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1"
+                            <controls:SettingsCard
                                 CornerRadius="8"
+                                Header="{x:Bind ViewModel.DirectAgentLabel, Mode=OneWay}"
                                 Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.IsDirectMode), Mode=OneWay}">
-                                <Grid MinHeight="64" ColumnSpacing="14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="20" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon
-                                        VerticalAlignment="Center"
-                                        FontSize="16"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Glyph="&#xE72E;" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                        Text="{x:Bind ViewModel.DirectAgentLabel, Mode=OneWay}" />
-                                    <ComboBox
-                                        x:Name="DirectAgentComboBox"
-                                        Grid.Column="2"
-                                        MinWidth="260"
-                                        MinHeight="44"
-                                        VerticalAlignment="Center"
-                                        AutomationProperties.Name="{x:Bind ViewModel.DirectAgentLabel, Mode=OneWay}"
-                                        DisplayMemberPath="Name"
-                                        ItemsSource="{x:Bind ViewModel.Agents, Mode=OneWay}"
-                                        PlaceholderText="{x:Bind ViewModel.PreviewEmptyLabel, Mode=OneWay}"
-                                        SelectedValue="{x:Bind ViewModel.DirectAgentId, Mode=TwoWay}"
-                                        SelectedValuePath="Id"
-                                        SelectionChanged="DirectAgent_SelectionChanged" />
-                                </Grid>
-                            </Border>
+                                <controls:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE72E;" />
+                                </controls:SettingsCard.HeaderIcon>
+                                <ComboBox
+                                    x:Name="DirectAgentComboBox"
+                                    MinWidth="240"
+                                    MinHeight="44"
+                                    AutomationProperties.Name="{x:Bind ViewModel.DirectAgentLabel, Mode=OneWay}"
+                                    DisplayMemberPath="Name"
+                                    ItemsSource="{x:Bind ViewModel.Agents, Mode=OneWay}"
+                                    PlaceholderText="{x:Bind ViewModel.PreviewEmptyLabel, Mode=OneWay}"
+                                    SelectedValue="{x:Bind ViewModel.DirectAgentId, Mode=TwoWay}"
+                                    SelectedValuePath="Id"
+                                    SelectionChanged="DirectAgent_SelectionChanged" />
+                            </controls:SettingsCard>
 
                             <TextBlock
-                                Margin="0,20,0,4"
-                                Style="{ThemeResource SubtitleTextBlockStyle}"
+                                Style="{StaticResource SettingsSectionHeaderTextBlockStyle}"
                                 Text="{x:Bind ViewModel.AgentsSectionLabel, Mode=OneWay}" />
 
                             <TextBlock
@@ -221,298 +165,178 @@
                                 TextWrapping="Wrap"
                                 Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.IsEmpty), Mode=OneWay}" />
 
-                            <ItemsRepeater ItemsSource="{x:Bind ViewModel.Agents, Mode=OneWay}">
-                                <ItemsRepeater.Layout>
-                                    <StackLayout Spacing="8" />
-                                </ItemsRepeater.Layout>
-                                <ItemsRepeater.ItemTemplate>
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.Agents, Mode=OneWay}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
+                                            <StackPanel.ChildrenTransitions>
+                                                <RepositionThemeTransition IsStaggeringEnabled="False" />
+                                            </StackPanel.ChildrenTransitions>
+                                        </StackPanel>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="viewModels:AgentItemViewModel">
-                                        <Expander
-                                            Padding="0"
-                                            HorizontalAlignment="Stretch"
-                                            HorizontalContentAlignment="Stretch"
-                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="8"
-                                            IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}"
-                                            SizeChanged="AgentExpander_SizeChanged">
-                                            <Expander.Header>
-                                                <Grid
-                                                    MinHeight="64"
-                                                    HorizontalAlignment="Stretch"
-                                                    ColumnSpacing="12"
-                                                    VerticalAlignment="Center">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="40" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border
-                                                        Width="40"
-                                                        Height="40"
-                                                        Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                                        CornerRadius="8">
-                                                        <Image
-                                                            Width="24"
-                                                            Height="24"
-                                                            AutomationProperties.Name="{x:Bind IconPreviewAutomationName, Mode=OneWay}"
-                                                            Source="{x:Bind IconDisplayPath, Mode=OneWay}"
-                                                            Stretch="Uniform" />
-                                                    </Border>
-                                                    <TextBlock
-                                                        Grid.Column="1"
-                                                        VerticalAlignment="Center"
-                                                        Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                                        Text="{x:Bind Name, Mode=OneWay}"
-                                                        TextTrimming="CharacterEllipsis"
-                                                        ToolTipService.ToolTip="{x:Bind Name, Mode=OneWay}" />
-                                                    <!-- Negative right margin absorbs the ToggleSwitch template's
-                                                         built-in trailing padding, so the pill ends flush with the
-                                                         content column edge measured in AgentExpander_SizeChanged. -->
-                                                    <ToggleSwitch
-                                                        Grid.Column="2"
-                                                        MinWidth="0"
-                                                        MinHeight="44"
-                                                        Margin="0,0,-8,0"
-                                                        AutomationProperties.Name="{x:Bind EnabledAutomationName, Mode=OneWay}"
-                                                        IsOn="{x:Bind Enabled, Mode=TwoWay}"
-                                                        OffContent=""
-                                                        OnContent="" />
-                                                </Grid>
-                                            </Expander.Header>
-                                            <StackPanel Padding="20,4,20,20" Spacing="14">
-                                                <StackPanel Spacing="6">
-                                                    <TextBox
-                                                        MinHeight="44"
-                                                        Header="{x:Bind NameLabel, Mode=OneWay}"
-                                                        Text="{x:Bind Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        TextWrapping="Wrap" />
-                                                    <TextBlock
-                                                        AutomationProperties.LiveSetting="Polite"
-                                                        FontSize="12"
-                                                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                                                        Text="{x:Bind NameError, Mode=OneWay}"
-                                                        TextWrapping="Wrap"
-                                                        Visibility="{x:Bind app:VisibilityConverters.VisibleIf(HasNameError), Mode=OneWay}" />
-                                                </StackPanel>
-                                                <Grid ColumnSpacing="12" RowSpacing="6">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="200" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Grid.RowDefinitions>
-                                                        <RowDefinition Height="Auto" />
-                                                        <RowDefinition Height="Auto" />
-                                                    </Grid.RowDefinitions>
+                                        <controls:SettingsExpander
+                                            Header="{x:Bind Name, Mode=OneWay}"
+                                            IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
+                                            <controls:SettingsExpander.HeaderIcon>
+                                                <ImageIcon Source="{x:Bind IconDisplayPath, Mode=OneWay}" />
+                                            </controls:SettingsExpander.HeaderIcon>
+                                            <ToggleSwitch
+                                                MinWidth="0"
+                                                MinHeight="44"
+                                                AutomationProperties.Name="{x:Bind EnabledAutomationName, Mode=OneWay}"
+                                                IsOn="{x:Bind Enabled, Mode=TwoWay}"
+                                                OffContent=""
+                                                OnContent="" />
+                                            <controls:SettingsExpander.Items>
+                                                <controls:SettingsCard Header="{x:Bind NameLabel, Mode=OneWay}">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBox
+                                                            MinWidth="240"
+                                                            MinHeight="44"
+                                                            Text="{x:Bind Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            TextWrapping="Wrap" />
+                                                        <TextBlock
+                                                            AutomationProperties.LiveSetting="Polite"
+                                                            FontSize="12"
+                                                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                                            Text="{x:Bind NameError, Mode=OneWay}"
+                                                            TextWrapping="Wrap"
+                                                            Visibility="{x:Bind app:VisibilityConverters.VisibleIf(HasNameError), Mode=OneWay}" />
+                                                    </StackPanel>
+                                                </controls:SettingsCard>
+                                                <controls:SettingsCard Header="{x:Bind ActionTypeLabel, Mode=OneWay}">
                                                     <ComboBox
+                                                        MinWidth="200"
                                                         MinHeight="44"
-                                                        HorizontalAlignment="Stretch"
-                                                        Header="{x:Bind ActionTypeLabel, Mode=OneWay}"
                                                         DisplayMemberPath="Label"
                                                         ItemsSource="{x:Bind ActionTypeOptions, Mode=OneWay}"
                                                         SelectedValue="{x:Bind ActionType, Mode=TwoWay}"
                                                         SelectedValuePath="Key" />
-                                                    <TextBox
-                                                        Grid.Column="1"
-                                                        MinHeight="44"
-                                                        Header="{x:Bind ActionValueLabel, Mode=OneWay}"
-                                                        Text="{x:Bind ActionValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                        TextWrapping="Wrap" />
-                                                    <TextBlock
-                                                        Grid.Row="1"
-                                                        Grid.Column="1"
-                                                        AutomationProperties.LiveSetting="Polite"
-                                                        FontSize="12"
-                                                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                                                        Text="{x:Bind ActionError, Mode=OneWay}"
-                                                        TextWrapping="Wrap"
-                                                        Visibility="{x:Bind app:VisibilityConverters.VisibleIf(HasActionError), Mode=OneWay}" />
-                                                </Grid>
-                                                <Grid ColumnSpacing="12">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border
-                                                        Width="44"
-                                                        Height="44"
-                                                        Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                                        CornerRadius="8">
-                                                        <Image
-                                                            Width="24"
-                                                            Height="24"
-                                                            AutomationProperties.Name="{x:Bind IconPreviewAutomationName, Mode=OneWay}"
-                                                            Source="{x:Bind IconDisplayPath, Mode=OneWay}"
-                                                            Stretch="Uniform"
-                                                            ToolTipService.ToolTip="{x:Bind IconPath, Mode=OneWay}" />
-                                                    </Border>
+                                                </controls:SettingsCard>
+                                                <controls:SettingsCard Header="{x:Bind ActionValueLabel, Mode=OneWay}">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBox
+                                                            MinWidth="240"
+                                                            MinHeight="44"
+                                                            Text="{x:Bind ActionValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                            TextWrapping="Wrap" />
+                                                        <TextBlock
+                                                            AutomationProperties.LiveSetting="Polite"
+                                                            FontSize="12"
+                                                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                                            Text="{x:Bind ActionError, Mode=OneWay}"
+                                                            TextWrapping="Wrap"
+                                                            Visibility="{x:Bind app:VisibilityConverters.VisibleIf(HasActionError), Mode=OneWay}" />
+                                                    </StackPanel>
+                                                </controls:SettingsCard>
+                                                <controls:SettingsCard Header="{x:Bind ChooseIconLabel, Mode=OneWay}">
                                                     <Button
-                                                        Grid.Column="1"
                                                         MinHeight="44"
                                                         Padding="14,0"
                                                         AutomationProperties.Name="{x:Bind ChooseIconAutomationName, Mode=OneWay}"
                                                         Click="ChooseIcon_Click"
-                                                        Tag="{x:Bind Id}"
-                                                        ToolTipService.ToolTip="{x:Bind ChooseIconLabel, Mode=OneWay}">
+                                                        Tag="{x:Bind Id}">
                                                         <StackPanel Orientation="Horizontal" Spacing="8">
-                                                            <FontIcon Glyph="&#xEB9F;" FontSize="16" />
+                                                            <ImageIcon
+                                                                Width="16"
+                                                                Height="16"
+                                                                Source="{x:Bind IconDisplayPath, Mode=OneWay}" />
                                                             <TextBlock Text="{x:Bind ChooseIconLabel, Mode=OneWay}" />
                                                         </StackPanel>
                                                     </Button>
-                                                </Grid>
-                                                <Grid ColumnSpacing="8">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Button
-                                                        Grid.Column="1"
-                                                        Width="44"
-                                                        Height="44"
-                                                        AutomationProperties.Name="{x:Bind MoveUpAutomationName, Mode=OneWay}"
-                                                        Click="MoveUp_Click"
-                                                        Tag="{x:Bind Id}"
-                                                        ToolTipService.ToolTip="{x:Bind MoveUpLabel, Mode=OneWay}">
-                                                        <FontIcon Glyph="&#xE70E;" FontSize="16" />
-                                                    </Button>
-                                                    <Button
-                                                        Grid.Column="2"
-                                                        Width="44"
-                                                        Height="44"
-                                                        AutomationProperties.Name="{x:Bind MoveDownAutomationName, Mode=OneWay}"
-                                                        Click="MoveDown_Click"
-                                                        Tag="{x:Bind Id}"
-                                                        ToolTipService.ToolTip="{x:Bind MoveDownLabel, Mode=OneWay}">
-                                                        <FontIcon Glyph="&#xE70D;" FontSize="16" />
-                                                    </Button>
-                                                    <Button
-                                                        Grid.Column="3"
-                                                        Width="44"
-                                                        Height="44"
-                                                        AutomationProperties.Name="{x:Bind DeleteAutomationName, Mode=OneWay}"
-                                                        Click="Delete_Click"
-                                                        Tag="{x:Bind Id}"
-                                                        ToolTipService.ToolTip="{x:Bind DeleteLabel, Mode=OneWay}">
-                                                        <FontIcon Glyph="&#xE74D;" FontSize="16" />
-                                                    </Button>
-                                                </Grid>
-                                            </StackPanel>
-                                        </Expander>
+                                                </controls:SettingsCard>
+                                                <controls:SettingsCard Header="{x:Bind DeleteLabel, Mode=OneWay}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Button
+                                                            Width="44"
+                                                            Height="44"
+                                                            AutomationProperties.Name="{x:Bind MoveUpAutomationName, Mode=OneWay}"
+                                                            Click="MoveUp_Click"
+                                                            Tag="{x:Bind Id}"
+                                                            ToolTipService.ToolTip="{x:Bind MoveUpLabel, Mode=OneWay}">
+                                                            <FontIcon FontSize="16" Glyph="&#xE70E;" />
+                                                        </Button>
+                                                        <Button
+                                                            Width="44"
+                                                            Height="44"
+                                                            AutomationProperties.Name="{x:Bind MoveDownAutomationName, Mode=OneWay}"
+                                                            Click="MoveDown_Click"
+                                                            Tag="{x:Bind Id}"
+                                                            ToolTipService.ToolTip="{x:Bind MoveDownLabel, Mode=OneWay}">
+                                                            <FontIcon FontSize="16" Glyph="&#xE70D;" />
+                                                        </Button>
+                                                        <Button
+                                                            Width="44"
+                                                            Height="44"
+                                                            AutomationProperties.Name="{x:Bind DeleteAutomationName, Mode=OneWay}"
+                                                            Click="Delete_Click"
+                                                            Tag="{x:Bind Id}"
+                                                            ToolTipService.ToolTip="{x:Bind DeleteLabel, Mode=OneWay}">
+                                                            <FontIcon FontSize="16" Glyph="&#xE74D;" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                </controls:SettingsCard>
+                                            </controls:SettingsExpander.Items>
+                                        </controls:SettingsExpander>
                                     </DataTemplate>
-                                </ItemsRepeater.ItemTemplate>
-                            </ItemsRepeater>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
 
-                            <Button
-                                MinHeight="64"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Left"
-                                Padding="20,0"
+                            <controls:SettingsCard
+                                CornerRadius="8"
                                 AccessKey="A"
-                                AutomationProperties.Name="{x:Bind ViewModel.AddAgentLabel, Mode=OneWay}"
+                                Header="{x:Bind ViewModel.AddAgentLabel, Mode=OneWay}"
+                                IsClickEnabled="True"
                                 Click="AddAgent_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <Border
-                                        Width="40"
-                                        Height="40"
-                                        Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                        CornerRadius="8">
-                                        <FontIcon
-                                            VerticalAlignment="Center"
-                                            HorizontalAlignment="Center"
-                                            FontSize="16"
-                                            Glyph="&#xE710;" />
-                                    </Border>
-                                    <TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.AddAgentLabel, Mode=OneWay}" />
-                                </StackPanel>
-                            </Button>
+                                <controls:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE710;" />
+                                </controls:SettingsCard.HeaderIcon>
+                            </controls:SettingsCard>
 
                             <TextBlock
-                                Margin="0,20,0,4"
-                                Style="{ThemeResource SubtitleTextBlockStyle}"
+                                Style="{StaticResource SettingsSectionHeaderTextBlockStyle}"
                                 Text="{x:Bind ViewModel.GeneralSectionLabel, Mode=OneWay}" />
 
-                            <Border
-                                Padding="20,10"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                                <Grid MinHeight="64" ColumnSpacing="14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="20" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon
-                                        VerticalAlignment="Center"
-                                        FontSize="16"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Glyph="&#xE774;" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                        Text="{x:Bind ViewModel.LanguageLabel, Mode=OneWay}" />
-                                    <ComboBox
-                                        x:Name="LanguageComboBox"
-                                        Grid.Column="2"
-                                        Width="260"
-                                        MinHeight="44"
-                                        VerticalAlignment="Center"
-                                        AutomationProperties.Name="{x:Bind ViewModel.LanguageLabel, Mode=OneWay}"
-                                        DisplayMemberPath="Label"
-                                        ItemsSource="{x:Bind ViewModel.LanguageOptions, Mode=OneWay}"
-                                        SelectedValue="{x:Bind ViewModel.Language, Mode=TwoWay}"
-                                        SelectedValuePath="Key"
-                                        SelectionChanged="Language_SelectionChanged" />
-                                </Grid>
-                            </Border>
+                            <controls:SettingsCard CornerRadius="8" Header="{x:Bind ViewModel.LanguageLabel, Mode=OneWay}">
+                                <controls:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE774;" />
+                                </controls:SettingsCard.HeaderIcon>
+                                <ComboBox
+                                    x:Name="LanguageComboBox"
+                                    MinWidth="200"
+                                    MinHeight="44"
+                                    AutomationProperties.Name="{x:Bind ViewModel.LanguageLabel, Mode=OneWay}"
+                                    DisplayMemberPath="Label"
+                                    ItemsSource="{x:Bind ViewModel.LanguageOptions, Mode=OneWay}"
+                                    SelectedValue="{x:Bind ViewModel.Language, Mode=TwoWay}"
+                                    SelectedValuePath="Key"
+                                    SelectionChanged="Language_SelectionChanged" />
+                            </controls:SettingsCard>
 
-                            <Border
-                                Padding="20,10"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                                <Grid MinHeight="64" ColumnSpacing="14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="20" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon
-                                        VerticalAlignment="Center"
-                                        FontSize="16"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Glyph="&#xE8FD;" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                        Text="{x:Bind ViewModel.TerminalProfileLabel, Mode=OneWay}"
-                                        TextWrapping="NoWrap" />
-                                    <ComboBox
-                                        x:Name="TerminalProfileComboBox"
-                                        Grid.Column="2"
-                                        Width="260"
-                                        MinHeight="44"
-                                        MaxDropDownHeight="360"
-                                        VerticalAlignment="Center"
-                                        AutomationProperties.HelpText="{x:Bind ViewModel.TerminalProfileHelp, Mode=OneWay}"
-                                        AutomationProperties.Name="{x:Bind ViewModel.TerminalProfileLabel, Mode=OneWay}"
-                                        DisplayMemberPath="Label"
-                                        ItemsSource="{x:Bind ViewModel.TerminalProfileOptions, Mode=OneWay}"
-                                        SelectedValue="{x:Bind ViewModel.TerminalProfile, Mode=TwoWay}"
-                                        SelectedValuePath="Key"
-                                        SelectionChanged="TerminalProfile_SelectionChanged"
-                                        ToolTipService.ToolTip="{x:Bind ViewModel.TerminalProfileHelp, Mode=OneWay}" />
-                                </Grid>
-                            </Border>
-                        </StackPanel>
+                            <controls:SettingsCard
+                                CornerRadius="8"
+                                Header="{x:Bind ViewModel.TerminalProfileLabel, Mode=OneWay}">
+                                <controls:SettingsCard.HeaderIcon>
+                                    <FontIcon Glyph="&#xE8FD;" />
+                                </controls:SettingsCard.HeaderIcon>
+                                <ComboBox
+                                    x:Name="TerminalProfileComboBox"
+                                    MinWidth="240"
+                                    MinHeight="44"
+                                    MaxDropDownHeight="360"
+                                    AutomationProperties.HelpText="{x:Bind ViewModel.TerminalProfileHelp, Mode=OneWay}"
+                                    AutomationProperties.Name="{x:Bind ViewModel.TerminalProfileLabel, Mode=OneWay}"
+                                    DisplayMemberPath="Label"
+                                    ItemsSource="{x:Bind ViewModel.TerminalProfileOptions, Mode=OneWay}"
+                                    SelectedValue="{x:Bind ViewModel.TerminalProfile, Mode=TwoWay}"
+                                    SelectedValuePath="Key"
+                                    SelectionChanged="TerminalProfile_SelectionChanged"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.TerminalProfileHelp, Mode=OneWay}" />
+                            </controls:SettingsCard>
+                    </StackPanel>
                     </ContentControl>
                     <TextBlock
                         Margin="4,16,0,0"

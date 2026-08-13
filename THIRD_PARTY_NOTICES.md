@@ -23,6 +23,12 @@ Those files include the notices for transitive native and managed components
 distributed by the corresponding packages. They must be reviewed and refreshed
 whenever one of the versions above changes.
 
+## Windows Community Toolkit
+
+The settings app uses `CommunityToolkit.WinUI.Controls.SettingsControls`
+8.2.251219 (`SettingsCard` and `SettingsExpander`) under the MIT License.
+The original license text is in `ThirdPartyNotices/CommunityToolkit/LICENSE.md`.
+
 ## Installer technology
 
 The GitHub Release Setup executable is generated with Inno Setup 6.7.3.
