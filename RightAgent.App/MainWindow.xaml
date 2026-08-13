@@ -470,7 +470,7 @@
                                     <ComboBox
                                         x:Name="LanguageComboBox"
                                         Grid.Column="2"
-                                        MinWidth="220"
+                                        Width="260"
                                         MinHeight="44"
                                         VerticalAlignment="Center"
                                         AutomationProperties.Name="{x:Bind ViewModel.LanguageLabel, Mode=OneWay}"
@@ -506,7 +506,7 @@
                                         Text="{x:Bind ViewModel.TerminalShellLabel, Mode=OneWay}" />
                                     <ComboBox
                                         Grid.Column="2"
-                                        Width="320"
+                                        Width="260"
                                         MinHeight="44"
                                         VerticalAlignment="Center"
                                         AutomationProperties.HelpText="{x:Bind ViewModel.TerminalShellHint, Mode=OneWay}"
