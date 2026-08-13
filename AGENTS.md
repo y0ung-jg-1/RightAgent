@@ -5,7 +5,7 @@ Read `docs/ARCHITECTURE.md` and `docs/SETTINGS_SCHEMA.md` before changing launch
 ## Settings UI
 
 - Setting rows use Community Toolkit `SettingsCard` / `SettingsExpander`. Do not rebuild them with hand-rolled `Border` cards or by editing Expander template parts.
-- Group related cards with a `SettingsSectionHeaderTextBlockStyle` heading (Windows Settings spacing `1,29,0,5`). Do not fake hierarchy by indenting a block of cards.
+- Group related cards with a `SettingsSectionHeaderTextBlockStyle` heading (Windows Settings spacing `1,30,0,6`). Do not fake hierarchy by indenting a block of cards.
 - **Do not add a second line of small description text** on cards or expanders. Do not set `SettingsCard.Description` or `SettingsExpander.Description` for help copy, command previews, or “what this setting does.”
 - Help belongs on a tooltip or `AutomationProperties.HelpText`. Validation errors appear only when a field is actually invalid, next to that field (or in the summary InfoBar).
 - The live context-menu preview stays a custom surface; there is no stock WinUI control for it.

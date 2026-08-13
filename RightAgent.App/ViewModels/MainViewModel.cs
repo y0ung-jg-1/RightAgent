@@ -60,13 +60,7 @@ public sealed class MainViewModel : BindableBase
     public bool IsLoaded
     {
         get => isLoaded;
-        private set
-        {
-            if (SetProperty(ref isLoaded, value))
-            {
-                OnPropertyChanged(nameof(CanSave));
-            }
-        }
+        private set => SetProperty(ref isLoaded, value);
     }
 
     public string Language
@@ -118,8 +112,6 @@ public sealed class MainViewModel : BindableBase
 
     public bool IsDirectMode => MenuMode == SettingsContract.DirectMenu;
 
-    public bool IsMultiDirectMode => MenuMode == SettingsContract.MultiDirectMenu;
-
     public bool ShowAgentList => !IsDirectMode && !IsEmpty;
 
     public AgentItemViewModel? SelectedDirectAgent => IsDirectMode ? FindAgent(DirectAgentId) : null;
@@ -147,17 +139,29 @@ public sealed class MainViewModel : BindableBase
         get => directAgentId;
         set
         {
+            // ComboBox pushes null while ItemsSource is swapped; only RemoveAgent
+            // and Normalize may clear the selection through ApplyDirectAgentId.
             if (value is null)
             {
                 return;
             }
-            if (SetProperty(ref directAgentId, value))
-            {
-                NotifyMenuModePresentation();
-                RefreshPreview();
-                RefreshValidation();
-                ScheduleAutoSave();
-            }
+            ApplyDirectAgentId(value, allowClear: false);
+        }
+    }
+
+    private void ApplyDirectAgentId(string? value, bool allowClear)
+    {
+        if (value is null && !allowClear)
+        {
+            return;
+        }
+
+        if (SetProperty(ref directAgentId, value, nameof(DirectAgentId)))
+        {
+            NotifyMenuModePresentation();
+            RefreshPreview();
+            RefreshValidation();
+            ScheduleAutoSave();
         }
     }
 
@@ -228,13 +232,7 @@ public sealed class MainViewModel : BindableBase
     public bool HasValidationErrors
     {
         get => hasValidationErrors;
-        private set
-        {
-            if (SetProperty(ref hasValidationErrors, value))
-            {
-                OnPropertyChanged(nameof(CanSave));
-            }
-        }
+        private set => SetProperty(ref hasValidationErrors, value);
     }
 
     public bool PreviewShowsMultipleRoots
@@ -243,16 +241,10 @@ public sealed class MainViewModel : BindableBase
         private set => SetProperty(ref previewShowsMultipleRoots, value);
     }
 
-    public bool CanSave => IsLoaded && !HasValidationErrors;
-
     public event EventHandler<string>? PersistFailed;
 
     public string WindowTitle => localization["WindowTitle"];
-    public string HeaderTitle => localization["Title"];
     public string MasterSwitchLabel => localization["MasterSwitch"];
-    public string SaveLabel => localization["Save"];
-    public string SavedMessage => localization["Saved"];
-    public string SavedMenuUpdatedMessage => localization["SavedMenuUpdated"];
     public string SaveFailedLabel => localization["SaveFailed"];
     public string MenuSectionLabel => localization["MenuSection"];
     public string MenuModeLabel => localization["MenuMode"];
@@ -334,7 +326,9 @@ public sealed class MainViewModel : BindableBase
         NotifyState();
     }
 
-    public async Task SaveAsync(CancellationToken cancellationToken = default)
+    public async Task SaveAsync(
+        CancellationToken cancellationToken = default,
+        bool synchronizeOccupancy = true)
     {
         if (!IsLoaded || HasValidationErrors)
         {
@@ -345,6 +339,11 @@ public sealed class MainViewModel : BindableBase
         try
         {
             var normalized = await PersistAsync(cancellationToken);
+            if (!synchronizeOccupancy)
+            {
+                return;
+            }
+
             try
             {
                 await CommandPackageSynchronizer.SynchronizeAsync(
@@ -356,9 +355,9 @@ public sealed class MainViewModel : BindableBase
             {
                 throw;
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                PersistFailed?.Invoke(this, exception.Message);
+                // JSON is already on disk. Occupancy is repaired on the next successful load.
             }
         }
         finally
@@ -370,7 +369,8 @@ public sealed class MainViewModel : BindableBase
     public async Task FlushAutoSaveAsync()
     {
         autoSaveCts?.Cancel();
-        await SaveAsync();
+        // Closing the window must not wait on package add/remove or Explorer restart.
+        await SaveAsync(synchronizeOccupancy: false);
     }
 
     private void ScheduleAutoSave()
@@ -420,7 +420,7 @@ public sealed class MainViewModel : BindableBase
         };
         var normalized = SettingsValidator.Normalize(settings);
         await store.SaveAsync(normalized, cancellationToken);
-        DirectAgentId = normalized.DirectAgentId;
+        ApplyDirectAgentId(normalized.DirectAgentId, allowClear: true);
         return normalized;
     }
 
@@ -463,7 +463,9 @@ public sealed class MainViewModel : BindableBase
         Agents.Remove(agent);
         if (agent.Id.Equals(DirectAgentId, StringComparison.OrdinalIgnoreCase))
         {
-            DirectAgentId = Agents.FirstOrDefault(candidate => candidate.Enabled)?.Id;
+            ApplyDirectAgentId(
+                Agents.FirstOrDefault(candidate => candidate.Enabled)?.Id,
+                allowClear: true);
         }
         RefreshSort();
         NotifyState();
@@ -671,11 +673,7 @@ public sealed class MainViewModel : BindableBase
     private void NotifyLocalizedProperties()
     {
         OnPropertyChanged(nameof(WindowTitle));
-        OnPropertyChanged(nameof(HeaderTitle));
         OnPropertyChanged(nameof(MasterSwitchLabel));
-        OnPropertyChanged(nameof(SaveLabel));
-        OnPropertyChanged(nameof(SavedMessage));
-        OnPropertyChanged(nameof(SavedMenuUpdatedMessage));
         OnPropertyChanged(nameof(SaveFailedLabel));
         OnPropertyChanged(nameof(MenuSectionLabel));
         OnPropertyChanged(nameof(MenuModeLabel));
@@ -732,7 +730,6 @@ public sealed class MainViewModel : BindableBase
     private void NotifyMenuModePresentation()
     {
         OnPropertyChanged(nameof(IsDirectMode));
-        OnPropertyChanged(nameof(IsMultiDirectMode));
         OnPropertyChanged(nameof(ShowAgentList));
         OnPropertyChanged(nameof(SelectedDirectAgent));
         OnPropertyChanged(nameof(ShowDirectAgentEditor));
