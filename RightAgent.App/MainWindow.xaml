@@ -86,7 +86,7 @@
 
             <ScrollViewer
                 Grid.Row="1"
-                Padding="0,0,8,16"
+                Padding="0,0,16,16"
                 HorizontalScrollBarVisibility="Disabled"
                 VerticalScrollBarVisibility="Auto">
                 <StackPanel Spacing="8">
@@ -132,6 +132,8 @@
                     </Border>
 
                     <ContentControl
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Stretch"
                         IsEnabled="{x:Bind ViewModel.MenuEnabled, Mode=OneWay}"
                         Opacity="{x:Bind app:EnabledAppearance.OpacityFor(ViewModel.MenuEnabled), Mode=OneWay}">
                         <StackPanel Spacing="8">

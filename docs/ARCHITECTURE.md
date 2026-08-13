@@ -27,11 +27,12 @@ This split is internal: users still download and run one Setup executable.
 Setup remains under the Windows user who started it, validates every package,
 and requests elevation only when a first-install helper must trust the public
 certificate in Local Machine\Trusted People. The helper exits before the
-original user process deploys the 17-package set. Fixed Setup and
-package-installation mutexes reject concurrent installation attempts. During
-deployment, the PowerShell host forwards Windows `DeploymentProgress`
-percentages across the complete set to Setup, which replaces its initial
-indeterminate animation with a determinate progress bar.
+original user process deploys the main package, registers the command slots
+required by the current settings, and caches all 16 command MSIX files. Fixed
+Setup and package-installation mutexes reject concurrent installation
+attempts. During deployment, the PowerShell host forwards Windows
+`DeploymentProgress` percentages for the packages it registers to Setup, which
+replaces its initial indeterminate animation with a determinate progress bar.
 
 ## Explorer contract
 

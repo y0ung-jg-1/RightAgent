@@ -7,13 +7,20 @@ using Windows.Management.Deployment;
 
 namespace RightAgent.App.Services;
 
+internal enum CommandPackageSyncResult
+{
+    Unchanged,
+    Refreshed,
+    Skipped
+}
+
 internal static class CommandPackageSynchronizer
 {
     private const string InstallationMutexName = @"Local\RightAgent.PackageInstallation";
     private const uint ShellAssociationChanged = 0x08000000;
     private const uint ShellNotifyIdList = 0x0000;
 
-    public static Task SynchronizeAsync(
+    public static Task<CommandPackageSyncResult> SynchronizeAsync(
         RightAgentSettings settings,
         string localStateDirectory,
         CancellationToken cancellationToken = default)
@@ -24,22 +31,18 @@ internal static class CommandPackageSynchronizer
         return Task.Run(() => Synchronize(settings, localStateDirectory, cancellationToken), cancellationToken);
     }
 
-    private static void Synchronize(
+    private static CommandPackageSyncResult Synchronize(
         RightAgentSettings settings,
         string localStateDirectory,
         CancellationToken cancellationToken)
     {
         if (!TryGetMainPackageIdentity(out var mainPackageName, out var publisher))
         {
-            return;
+            return CommandPackageSyncResult.Skipped;
         }
 
         var cacheDirectory = Path.Combine(localStateDirectory, CommandSlotPlanner.CommandPackageCacheDirectoryName);
-        if (!CommandSlotPlanner.CacheIsComplete(cacheDirectory))
-        {
-            return;
-        }
-
+        var cacheComplete = CommandSlotPlanner.CacheIsComplete(cacheDirectory);
         var requiredSlots = CommandSlotPlanner.RequiredSlotCount(settings);
         var installed = ListInstalledCommandSlots(mainPackageName, publisher);
         var toAdd = new List<int>();
@@ -49,7 +52,10 @@ internal static class CommandPackageSynchronizer
             var isInstalled = installed.TryGetValue(slot, out var fullName);
             if (slot < requiredSlots && !isInstalled)
             {
-                toAdd.Add(slot);
+                if (cacheComplete)
+                {
+                    toAdd.Add(slot);
+                }
             }
             else if (slot >= requiredSlots && isInstalled && !string.IsNullOrWhiteSpace(fullName))
             {
@@ -57,12 +63,14 @@ internal static class CommandPackageSynchronizer
             }
         }
 
+        var missingAdds = !cacheComplete
+            && Enumerable.Range(0, requiredSlots).Any(slot => !installed.ContainsKey(slot));
         var stampPath = Path.Combine(localStateDirectory, "command-slots.refreshed");
         var stampMatches = File.Exists(stampPath)
             && string.Equals(File.ReadAllText(stampPath).Trim(), requiredSlots.ToString(), StringComparison.Ordinal);
         if (toAdd.Count == 0 && toRemove.Count == 0 && stampMatches)
         {
-            return;
+            return missingAdds ? CommandPackageSyncResult.Skipped : CommandPackageSyncResult.Unchanged;
         }
 
         if (toAdd.Count > 0 || toRemove.Count > 0)
@@ -82,7 +90,7 @@ internal static class CommandPackageSynchronizer
 
                 if (!acquired)
                 {
-                    return;
+                    return CommandPackageSyncResult.Skipped;
                 }
 
                 StopCommandSurrogates(cancellationToken);
@@ -107,10 +115,18 @@ internal static class CommandPackageSynchronizer
                 }
             }
         }
+        else if (missingAdds)
+        {
+            return CommandPackageSyncResult.Skipped;
+        }
 
         SHChangeNotify(ShellAssociationChanged, ShellNotifyIdList, IntPtr.Zero, IntPtr.Zero);
         RestartExplorer();
-        File.WriteAllText(stampPath, requiredSlots.ToString());
+        if (!missingAdds)
+        {
+            File.WriteAllText(stampPath, requiredSlots.ToString());
+        }
+        return CommandPackageSyncResult.Refreshed;
     }
 
     private static bool TryGetMainPackageIdentity(out string mainPackageName, out string publisher)

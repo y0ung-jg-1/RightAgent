@@ -180,9 +180,11 @@ public sealed partial class MainWindow : Window
         SaveButton.IsEnabled = false;
         try
         {
-            await ViewModel.SaveAsync();
+            var menuUpdated = await ViewModel.SaveAsync();
             SynchronizeSelectors();
-            ShowStatus(InfoBarSeverity.Success, ViewModel.SavedMessage);
+            ShowStatus(
+                InfoBarSeverity.Success,
+                menuUpdated ? ViewModel.SavedMenuUpdatedMessage : ViewModel.SavedMessage);
         }
         catch (Exception exception)
         {

@@ -59,13 +59,13 @@ english.InstallingRightAgentProgress=Installing RightAgent for the current user.
 english.InstallFailed=RightAgent installation failed with exit code %1. Review the Setup log for details.
 english.AnotherInstall=Another RightAgent installation is already running. Wait for it to finish before starting Setup again.
 english.MissingInstaller=The embedded RightAgent installation script is missing.
-english.InstallComplete=RightAgent was installed successfully. If File Explorer cached the old menu, close all File Explorer windows or sign out once.
+english.InstallComplete=RightAgent was installed successfully. Setup refreshed File Explorer to match the current menu. If the menu is still stale, close all File Explorer windows or sign out once.
 chinesesimplified.InstallingRightAgent=正在为当前用户安装 RightAgent。首次安装可能需要几分钟，请耐心等待…
 chinesesimplified.InstallingRightAgentProgress=正在为当前用户安装 RightAgent… %1%%
 chinesesimplified.InstallFailed=RightAgent 安装失败，退出代码为 %1。请查看安装日志了解详情。
 chinesesimplified.AnotherInstall=另一个 RightAgent 安装过程正在运行，请等待它结束后再重新启动安装器。
 chinesesimplified.MissingInstaller=内嵌的 RightAgent 安装脚本缺失。
-chinesesimplified.InstallComplete=RightAgent 已安装成功。如果资源管理器仍缓存旧菜单，请关闭全部资源管理器窗口或注销一次。
+chinesesimplified.InstallComplete=RightAgent 已安装成功。安装器已刷新资源管理器以匹配当前菜单。若菜单仍未更新，请关闭全部资源管理器窗口或注销一次。
 
 [Files]
 Source: "{#PayloadDir}\*"; DestDir: "{tmp}\RightAgentPayload"; Flags: recursesubdirs createallsubdirs deleteafterinstall

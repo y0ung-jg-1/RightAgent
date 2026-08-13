@@ -243,6 +243,7 @@ public sealed class MainViewModel : BindableBase
     public string MasterSwitchLabel => localization["MasterSwitch"];
     public string SaveLabel => localization["Save"];
     public string SavedMessage => localization["Saved"];
+    public string SavedMenuUpdatedMessage => localization["SavedMenuUpdated"];
     public string SaveFailedLabel => localization["SaveFailed"];
     public string MenuSectionLabel => localization["MenuSection"];
     public string MenuModeLabel => localization["MenuMode"];
@@ -325,12 +326,15 @@ public sealed class MainViewModel : BindableBase
         NotifyState();
     }
 
-    public async Task SaveAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> SaveAsync(CancellationToken cancellationToken = default)
     {
         var normalized = await PersistAsync(cancellationToken);
         try
         {
-            await SynchronizeCommandPackagesAsync(normalized, cancellationToken);
+            return await CommandPackageSynchronizer.SynchronizeAsync(
+                normalized,
+                store.LocalStateDirectory,
+                cancellationToken) == CommandPackageSyncResult.Refreshed;
         }
         catch (OperationCanceledException)
         {
@@ -338,7 +342,7 @@ public sealed class MainViewModel : BindableBase
         }
         catch (Exception)
         {
-            // Settings were already written. Occupancy is retried on the next launch or save.
+            return false;
         }
     }
 
@@ -557,6 +561,7 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(MasterSwitchLabel));
         OnPropertyChanged(nameof(SaveLabel));
         OnPropertyChanged(nameof(SavedMessage));
+        OnPropertyChanged(nameof(SavedMenuUpdatedMessage));
         OnPropertyChanged(nameof(SaveFailedLabel));
         OnPropertyChanged(nameof(MenuSectionLabel));
         OnPropertyChanged(nameof(MenuModeLabel));
