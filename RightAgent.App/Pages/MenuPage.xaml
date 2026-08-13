@@ -10,6 +10,7 @@
     <Page.Resources>
         <DataTemplate x:Key="AgentEditorTemplate" x:DataType="viewModels:AgentItemViewModel">
             <controls:SettingsExpander
+                CornerRadius="8"
                 Header="{x:Bind Name, Mode=OneWay}"
                 IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
                 <controls:SettingsExpander.HeaderIcon>
@@ -172,13 +173,14 @@
                                 SelectedValuePath="Key" />
                         </controls:SettingsCard>
 
-                        <controls:SettingsCard
+                        <controls:SettingsExpander
                             CornerRadius="8"
                             Header="{x:Bind ViewModel.DirectAgentLabel, Mode=OneWay}"
+                            IsExpanded="True"
                             Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.IsDirectMode), Mode=OneWay}">
-                            <controls:SettingsCard.HeaderIcon>
-                                <FontIcon Glyph="&#xE72E;" />
-                            </controls:SettingsCard.HeaderIcon>
+                            <controls:SettingsExpander.HeaderIcon>
+                                <ImageIcon Source="{x:Bind ViewModel.SelectedDirectAgent.IconDisplayPath, Mode=OneWay}" />
+                            </controls:SettingsExpander.HeaderIcon>
                             <ComboBox
                                 MinWidth="240"
                                 MinHeight="44"
@@ -188,11 +190,107 @@
                                 PlaceholderText="{x:Bind ViewModel.PreviewEmptyLabel, Mode=OneWay}"
                                 SelectedValue="{x:Bind ViewModel.DirectAgentId, Mode=TwoWay}"
                                 SelectedValuePath="Id" />
-                        </controls:SettingsCard>
-
-                        <TextBlock
-                            Style="{StaticResource SettingsSectionHeaderTextBlockStyle}"
-                            Text="{x:Bind ViewModel.AgentsSectionLabel, Mode=OneWay}" />
+                            <controls:SettingsExpander.Items>
+                                <controls:SettingsCard
+                                    Header="{x:Bind ViewModel.SelectedDirectAgent.NameLabel, Mode=OneWay}"
+                                    Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.ShowDirectAgentEditor), Mode=OneWay}">
+                                    <StackPanel Spacing="4">
+                                        <TextBox
+                                            MinWidth="240"
+                                            MinHeight="44"
+                                            Text="{x:Bind ViewModel.SelectedDirectAgent.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            AutomationProperties.LiveSetting="Polite"
+                                            FontSize="12"
+                                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                            Text="{x:Bind ViewModel.SelectedDirectAgent.NameError, Mode=OneWay}"
+                                            TextWrapping="Wrap"
+                                            Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.SelectedDirectAgent.HasNameError), Mode=OneWay}" />
+                                    </StackPanel>
+                                </controls:SettingsCard>
+                                <controls:SettingsCard
+                                    Header="{x:Bind ViewModel.SelectedDirectAgent.ActionTypeLabel, Mode=OneWay}"
+                                    Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.ShowDirectAgentEditor), Mode=OneWay}">
+                                    <ComboBox
+                                        MinWidth="200"
+                                        MinHeight="44"
+                                        DisplayMemberPath="Label"
+                                        ItemsSource="{x:Bind ViewModel.SelectedDirectAgent.ActionTypeOptions, Mode=OneWay}"
+                                        SelectedValue="{x:Bind ViewModel.SelectedDirectAgent.ActionType, Mode=TwoWay}"
+                                        SelectedValuePath="Key" />
+                                </controls:SettingsCard>
+                                <controls:SettingsCard
+                                    Header="{x:Bind ViewModel.SelectedDirectAgent.ActionValueLabel, Mode=OneWay}"
+                                    Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.ShowDirectAgentEditor), Mode=OneWay}">
+                                    <StackPanel Spacing="4">
+                                        <TextBox
+                                            MinWidth="240"
+                                            MinHeight="44"
+                                            Text="{x:Bind ViewModel.SelectedDirectAgent.ActionValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            AutomationProperties.LiveSetting="Polite"
+                                            FontSize="12"
+                                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                            Text="{x:Bind ViewModel.SelectedDirectAgent.ActionError, Mode=OneWay}"
+                                            TextWrapping="Wrap"
+                                            Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.SelectedDirectAgent.HasActionError), Mode=OneWay}" />
+                                    </StackPanel>
+                                </controls:SettingsCard>
+                                <controls:SettingsCard
+                                    Header="{x:Bind ViewModel.SelectedDirectAgent.ChooseIconLabel, Mode=OneWay}"
+                                    Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.ShowDirectAgentEditor), Mode=OneWay}">
+                                    <Button
+                                        MinHeight="44"
+                                        Padding="14,0"
+                                        AutomationProperties.Name="{x:Bind ViewModel.SelectedDirectAgent.ChooseIconAutomationName, Mode=OneWay}"
+                                        Click="ChooseIcon_Click"
+                                        Tag="{x:Bind ViewModel.SelectedDirectAgent.Id, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <ImageIcon
+                                                Width="16"
+                                                Height="16"
+                                                Source="{x:Bind ViewModel.SelectedDirectAgent.IconDisplayPath, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SelectedDirectAgent.ChooseIconLabel, Mode=OneWay}" />
+                                        </StackPanel>
+                                    </Button>
+                                </controls:SettingsCard>
+                                <controls:SettingsCard
+                                    Header="{x:Bind ViewModel.SelectedDirectAgent.DeleteLabel, Mode=OneWay}"
+                                    Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.ShowDirectAgentEditor), Mode=OneWay}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button
+                                            Width="44"
+                                            Height="44"
+                                            AutomationProperties.Name="{x:Bind ViewModel.SelectedDirectAgent.MoveUpAutomationName, Mode=OneWay}"
+                                            Click="MoveUp_Click"
+                                            Tag="{x:Bind ViewModel.SelectedDirectAgent.Id, Mode=OneWay}"
+                                            ToolTipService.ToolTip="{x:Bind ViewModel.SelectedDirectAgent.MoveUpLabel, Mode=OneWay}">
+                                            <FontIcon FontSize="16" Glyph="&#xE70E;" />
+                                        </Button>
+                                        <Button
+                                            Width="44"
+                                            Height="44"
+                                            AutomationProperties.Name="{x:Bind ViewModel.SelectedDirectAgent.MoveDownAutomationName, Mode=OneWay}"
+                                            Click="MoveDown_Click"
+                                            Tag="{x:Bind ViewModel.SelectedDirectAgent.Id, Mode=OneWay}"
+                                            ToolTipService.ToolTip="{x:Bind ViewModel.SelectedDirectAgent.MoveDownLabel, Mode=OneWay}">
+                                            <FontIcon FontSize="16" Glyph="&#xE70D;" />
+                                        </Button>
+                                        <Button
+                                            Width="44"
+                                            Height="44"
+                                            AutomationProperties.Name="{x:Bind ViewModel.SelectedDirectAgent.DeleteAutomationName, Mode=OneWay}"
+                                            Click="Delete_Click"
+                                            Tag="{x:Bind ViewModel.SelectedDirectAgent.Id, Mode=OneWay}"
+                                            ToolTipService.ToolTip="{x:Bind ViewModel.SelectedDirectAgent.DeleteLabel, Mode=OneWay}">
+                                            <FontIcon FontSize="16" Glyph="&#xE74D;" />
+                                        </Button>
+                                    </StackPanel>
+                                </controls:SettingsCard>
+                            </controls:SettingsExpander.Items>
+                        </controls:SettingsExpander>
 
                         <TextBlock
                             Padding="8,20"
@@ -201,6 +299,11 @@
                             TextAlignment="Center"
                             TextWrapping="Wrap"
                             Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.ShowNoAgentEditor), Mode=OneWay}" />
+
+                        <TextBlock
+                            Style="{StaticResource SettingsSectionHeaderTextBlockStyle}"
+                            Text="{x:Bind ViewModel.AgentsSectionLabel, Mode=OneWay}"
+                            Visibility="{x:Bind app:VisibilityConverters.CollapsedIf(ViewModel.IsDirectMode), Mode=OneWay}" />
 
                         <ItemsControl
                             ItemTemplate="{StaticResource AgentEditorTemplate}"
@@ -216,13 +319,6 @@
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                         </ItemsControl>
-
-                        <ContentControl
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Stretch"
-                            Content="{x:Bind ViewModel.SelectedDirectAgent, Mode=OneWay}"
-                            ContentTemplate="{StaticResource AgentEditorTemplate}"
-                            Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.ShowDirectAgentEditor), Mode=OneWay}" />
 
                         <controls:SettingsCard
                             AccessKey="A"
