@@ -5,7 +5,7 @@ namespace RightAgent.App;
 
 public partial class App : Application
 {
-    private Window? window;
+    public static MainWindow? Main { get; private set; }
 
     public App()
     {
@@ -36,9 +36,11 @@ public partial class App : Application
         }
     }
 
+    internal static void SetMain(MainWindow window) => Main = window;
+
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        window = new MainWindow();
-        window.Activate();
+        Main = new MainWindow();
+        Main.Activate();
     }
 }

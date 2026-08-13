@@ -7,6 +7,13 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+            <x:Double x:Key="SettingsCardSpacing">4</x:Double>
+            <Style
+                x:Key="SettingsSectionHeaderTextBlockStyle"
+                BasedOn="{StaticResource BodyStrongTextBlockStyle}"
+                TargetType="TextBlock">
+                <Setter Property="Margin" Value="1,29,0,5" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

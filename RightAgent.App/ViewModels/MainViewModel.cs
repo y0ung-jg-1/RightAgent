@@ -28,6 +28,8 @@ public sealed class MainViewModel : BindableBase
     private bool previewShowsMultipleRoots;
     private string validationSummary = string.Empty;
     private bool hasValidationErrors;
+    private CancellationTokenSource? autoSaveCts;
+    private readonly SemaphoreSlim saveLock = new(1, 1);
 
     public MainViewModel(string localStateDirectory)
     {
@@ -85,6 +87,7 @@ public sealed class MainViewModel : BindableBase
             {
                 localization.ConfiguredLanguage = normalized;
                 RefreshLocalization();
+                ScheduleAutoSave();
             }
         }
     }
@@ -105,14 +108,25 @@ public sealed class MainViewModel : BindableBase
                 : SettingsContract.GroupedMenu;
             if (SetProperty(ref menuMode, normalized))
             {
-                OnPropertyChanged(nameof(IsDirectMode));
+                NotifyMenuModePresentation();
                 RefreshPreview();
                 RefreshValidation();
+                ScheduleAutoSave();
             }
         }
     }
 
     public bool IsDirectMode => MenuMode == SettingsContract.DirectMenu;
+
+    public bool IsMultiDirectMode => MenuMode == SettingsContract.MultiDirectMenu;
+
+    public bool ShowAgentList => !IsDirectMode && !IsEmpty;
+
+    public AgentItemViewModel? SelectedDirectAgent => IsDirectMode ? FindAgent(DirectAgentId) : null;
+
+    public bool ShowDirectAgentEditor => SelectedDirectAgent is not null;
+
+    public bool ShowNoAgentEditor => !ShowAgentList && !ShowDirectAgentEditor;
 
     public bool MenuEnabled
     {
@@ -123,6 +137,7 @@ public sealed class MainViewModel : BindableBase
             {
                 RefreshPreview();
                 RefreshValidation();
+                ScheduleAutoSave();
             }
         }
     }
@@ -132,10 +147,16 @@ public sealed class MainViewModel : BindableBase
         get => directAgentId;
         set
         {
+            if (value is null)
+            {
+                return;
+            }
             if (SetProperty(ref directAgentId, value))
             {
+                NotifyMenuModePresentation();
                 RefreshPreview();
                 RefreshValidation();
+                ScheduleAutoSave();
             }
         }
     }
@@ -149,7 +170,10 @@ public sealed class MainViewModel : BindableBase
             {
                 return;
             }
-            SetProperty(ref terminalProfile, value);
+            if (SetProperty(ref terminalProfile, value))
+            {
+                ScheduleAutoSave();
+            }
         }
     }
 
@@ -220,6 +244,8 @@ public sealed class MainViewModel : BindableBase
     }
 
     public bool CanSave => IsLoaded && !HasValidationErrors;
+
+    public event EventHandler<string>? PersistFailed;
 
     public string WindowTitle => localization["WindowTitle"];
     public string HeaderTitle => localization["Title"];
@@ -308,23 +334,72 @@ public sealed class MainViewModel : BindableBase
         NotifyState();
     }
 
-    public async Task<bool> SaveAsync(CancellationToken cancellationToken = default)
+    public async Task SaveAsync(CancellationToken cancellationToken = default)
     {
-        var normalized = await PersistAsync(cancellationToken);
+        if (!IsLoaded || HasValidationErrors)
+        {
+            return;
+        }
+
+        await saveLock.WaitAsync(cancellationToken);
         try
         {
-            return await CommandPackageSynchronizer.SynchronizeAsync(
-                normalized,
-                store.LocalStateDirectory,
-                cancellationToken) == CommandPackageSyncResult.Refreshed;
+            var normalized = await PersistAsync(cancellationToken);
+            try
+            {
+                await CommandPackageSynchronizer.SynchronizeAsync(
+                    normalized,
+                    store.LocalStateDirectory,
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                PersistFailed?.Invoke(this, exception.Message);
+            }
+        }
+        finally
+        {
+            saveLock.Release();
+        }
+    }
+
+    public async Task FlushAutoSaveAsync()
+    {
+        autoSaveCts?.Cancel();
+        await SaveAsync();
+    }
+
+    private void ScheduleAutoSave()
+    {
+        if (!IsLoaded || HasValidationErrors)
+        {
+            return;
+        }
+
+        autoSaveCts?.Cancel();
+        autoSaveCts?.Dispose();
+        autoSaveCts = new CancellationTokenSource();
+        var token = autoSaveCts.Token;
+        _ = DebouncedSaveAsync(token);
+    }
+
+    private async Task DebouncedSaveAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(500, token);
+            await SaveAsync(token);
         }
         catch (OperationCanceledException)
         {
-            throw;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            return false;
+            PersistFailed?.Invoke(this, exception.Message);
         }
     }
 
@@ -371,7 +446,12 @@ public sealed class MainViewModel : BindableBase
         {
             IsExpanded = true
         });
+        if (IsDirectMode)
+        {
+            DirectAgentId = id;
+        }
         NotifyState();
+        ScheduleAutoSave();
     }
 
     public AgentItemViewModel? FindAgent(string? id) =>
@@ -387,6 +467,7 @@ public sealed class MainViewModel : BindableBase
         }
         RefreshSort();
         NotifyState();
+        ScheduleAutoSave();
     }
 
     public void MoveAgent(AgentItemViewModel agent, int offset)
@@ -400,6 +481,7 @@ public sealed class MainViewModel : BindableBase
         Agents.Move(current, target);
         RefreshSort();
         RefreshPreview();
+        ScheduleAutoSave();
     }
 
     public void SetAgentIcon(AgentItemViewModel agent, string relativePath)
@@ -430,6 +512,15 @@ public sealed class MainViewModel : BindableBase
         {
             RefreshPreview();
             RefreshValidation();
+        }
+
+        if (args.PropertyName is nameof(AgentItemViewModel.Name)
+            or nameof(AgentItemViewModel.Enabled)
+            or nameof(AgentItemViewModel.IconPath)
+            or nameof(AgentItemViewModel.ActionType)
+            or nameof(AgentItemViewModel.ActionValue))
+        {
+            ScheduleAutoSave();
         }
     }
 
@@ -531,6 +622,10 @@ public sealed class MainViewModel : BindableBase
             agent.RefreshLanguage();
         }
         NotifyLocalizedProperties();
+        OnPropertyChanged(nameof(Language));
+        OnPropertyChanged(nameof(MenuMode));
+        OnPropertyChanged(nameof(DirectAgentId));
+        OnPropertyChanged(nameof(TerminalProfile));
         RefreshPreview();
         RefreshValidation();
     }
@@ -629,8 +724,22 @@ public sealed class MainViewModel : BindableBase
     {
         OnPropertyChanged(nameof(Agents));
         OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(IsDirectMode));
+        NotifyMenuModePresentation();
         RefreshPreview();
         RefreshValidation();
+    }
+
+    private void NotifyMenuModePresentation()
+    {
+        OnPropertyChanged(nameof(IsDirectMode));
+        OnPropertyChanged(nameof(IsMultiDirectMode));
+        OnPropertyChanged(nameof(ShowAgentList));
+        OnPropertyChanged(nameof(SelectedDirectAgent));
+        OnPropertyChanged(nameof(ShowDirectAgentEditor));
+        OnPropertyChanged(nameof(ShowNoAgentEditor));
+        if (SelectedDirectAgent is { } agent)
+        {
+            agent.IsExpanded = true;
+        }
     }
 }

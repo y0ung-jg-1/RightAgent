@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="WindowTitle" xml:space="preserve"><value>RightAgent Settings</value></data>
+  <data name="Title" xml:space="preserve"><value>RightAgent</value></data>
+  <data name="MasterSwitch" xml:space="preserve"><value>Enable RightAgent</value></data>
+  <data name="MenuOff" xml:space="preserve"><value>(Menu is off)</value></data>
+  <data name="Save" xml:space="preserve"><value>Save settings</value></data>
+  <data name="Saved" xml:space="preserve"><value>Settings saved.</value></data>
+  <data name="SavedMenuUpdated" xml:space="preserve"><value>Settings saved. The context menu has been updated.</value></data>
+  <data name="SaveFailed" xml:space="preserve"><value>Could not save settings</value></data>
+  <data name="MenuSection" xml:space="preserve"><value>Context menu</value></data>
+  <data name="MenuMode" xml:space="preserve"><value>Menu mode</value></data>
+  <data name="Grouped" xml:space="preserve"><value>Open with RightAgent (grouped)</value></data>
+  <data name="Direct" xml:space="preserve"><value>Open with one agent (direct)</value></data>
+  <data name="MultiDirect" xml:space="preserve"><value>Open with multiple agents (multi-direct)</value></data>
+  <data name="DirectAgent" xml:space="preserve"><value>Direct agent</value></data>
+  <data name="TerminalProfile" xml:space="preserve"><value>Windows Terminal profile</value></data>
+  <data name="TerminalProfileHint" xml:space="preserve"><value>Follows the Startup default profile in Terminal</value></data>
+  <data name="TerminalProfileHelp" xml:space="preserve"><value>Opens that Terminal profile, including its own shell, icon, and colors.</value></data>
+  <data name="TerminalProfileDefault" xml:space="preserve"><value>Use Terminal default</value></data>
+  <data name="TerminalProfileDefaultNamed" xml:space="preserve"><value>Use Terminal default ({0})</value></data>
+  <data name="TerminalRequiredTitle" xml:space="preserve"><value>Windows Terminal is required</value></data>
+  <data name="TerminalRequiredBody" xml:space="preserve"><value>RightAgent uses Windows Terminal to open agents. Windows Terminal was not detected on this PC. Install it from Microsoft Store first.</value></data>
+  <data name="InstallFromStore" xml:space="preserve"><value>Open Microsoft Store</value></data>
+  <data name="InstallLater" xml:space="preserve"><value>Later</value></data>
+  <data name="TerminalStoreOpenFailed" xml:space="preserve"><value>Could not open the Windows Terminal page in Microsoft Store. Search for “Windows Terminal” in the Store manually.</value></data>
+  <data name="Preview" xml:space="preserve"><value>Menu preview</value></data>
+  <data name="AgentsSection" xml:space="preserve"><value>Agents</value></data>
+  <data name="AddAgent" xml:space="preserve"><value>Add agent</value></data>
+  <data name="NoAgents" xml:space="preserve"><value>No agents yet. Add a terminal command or web action.</value></data>
+  <data name="GeneralSection" xml:space="preserve"><value>General</value></data>
+  <data name="Language" xml:space="preserve"><value>App and menu language</value></data>
+  <data name="SystemLanguage" xml:space="preserve"><value>Use system language</value></data>
+  <data name="Chinese" xml:space="preserve"><value>简体中文</value></data>
+  <data name="English" xml:space="preserve"><value>English</value></data>
+  <data name="Name" xml:space="preserve"><value>Name</value></data>
+  <data name="ActionType" xml:space="preserve"><value>Action type</value></data>
+  <data name="ActionValue" xml:space="preserve"><value>Command or URL</value></data>
+  <data name="TerminalCommand" xml:space="preserve"><value>Terminal command</value></data>
+  <data name="Url" xml:space="preserve"><value>Web URL</value></data>
+  <data name="ChooseIcon" xml:space="preserve"><value>Choose icon</value></data>
+  <data name="MoveUp" xml:space="preserve"><value>Move up</value></data>
+  <data name="MoveDown" xml:space="preserve"><value>Move down</value></data>
+  <data name="Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="DeleteTitle" xml:space="preserve"><value>Delete agent?</value></data>
+  <data name="DeleteBody" xml:space="preserve"><value>This removes the agent from the RightAgent configuration.</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="NewAgent" xml:space="preserve"><value>New agent</value></data>
+  <data name="ValidationName" xml:space="preserve"><value>Every agent needs a name.</value></data>
+  <data name="ValidationAction" xml:space="preserve"><value>Every enabled agent needs a valid command or an http/https URL.</value></data>
+  <data name="ValidationDirect" xml:space="preserve"><value>Direct mode requires an enabled agent.</value></data>
+  <data name="ValidationMultiDirectLimit" xml:space="preserve"><value>Multi-direct mode supports up to 16 enabled agents.</value></data>
+  <data name="VersionFormat" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="ValidationTitle" xml:space="preserve"><value>Fix the following before saving</value></data>
+  <data name="ErrorNameRequired" xml:space="preserve"><value>Enter a name.</value></data>
+  <data name="ErrorActionRequired" xml:space="preserve"><value>An enabled agent needs a command or URL.</value></data>
+  <data name="ErrorUrlInvalid" xml:space="preserve"><value>The URL must start with http:// or https://.</value></data>
+  <data name="UnnamedAgent" xml:space="preserve"><value>(Unnamed)</value></data>
+  <data name="OpenWithRightAgent" xml:space="preserve"><value>Open with RightAgent</value></data>
+  <data name="OpenWithAgent" xml:space="preserve"><value>Open with {0}</value></data>
+  <data name="PreviewEmpty" xml:space="preserve"><value>(No enabled agents — the menu is hidden)</value></data>
+  <data name="EnableFor" xml:space="preserve"><value>Enable {0}</value></data>
+  <data name="MoveUpFor" xml:space="preserve"><value>Move {0} up</value></data>
+  <data name="MoveDownFor" xml:space="preserve"><value>Move {0} down</value></data>
+  <data name="DeleteFor" xml:space="preserve"><value>Delete {0}</value></data>
+  <data name="ChooseIconFor" xml:space="preserve"><value>Choose icon for {0}</value></data>
+  <data name="IconFor" xml:space="preserve"><value>Icon for {0}</value></data>
+  <data name="IconFilter" xml:space="preserve"><value>Icon files</value></data>
+</root>

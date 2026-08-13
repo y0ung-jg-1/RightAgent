@@ -5,6 +5,7 @@
     <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
     <RootNamespace>RightAgent.App</RootNamespace>
     <AssemblyName>RightAgent.App</AssemblyName>
+    <NeutralLanguage>en-US</NeutralLanguage>
     <Version>1.1.4</Version>
     <AssemblyVersion>1.1.4.0</AssemblyVersion>
     <FileVersion>1.1.4.0</FileVersion>
