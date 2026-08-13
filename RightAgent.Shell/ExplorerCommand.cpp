@@ -72,6 +72,30 @@ namespace
         return nullptr;
     }
 
+    bool IsRootSlotVisible(const rightagent::Settings& settings, const std::size_t rootSlot)
+    {
+        if (!settings.menuEnabled)
+        {
+            return false;
+        }
+        if (settings.menuMode == rightagent::MenuMode::MultiDirect)
+        {
+            return EnabledAgentAt(settings, rootSlot) != nullptr;
+        }
+        if (rootSlot != 0)
+        {
+            return false;
+        }
+        if (settings.menuMode == rightagent::MenuMode::Direct)
+        {
+            return rightagent::FindDirectAgent(settings) != nullptr;
+        }
+        return std::any_of(settings.agents.begin(), settings.agents.end(), [](const auto& candidate)
+        {
+            return candidate.enabled;
+        });
+    }
+
     GUID CanonicalGuidForAgent(const std::wstring& id)
     {
         constexpr unsigned long long offset = 14695981039346656037ull;
@@ -350,6 +374,10 @@ namespace
             else
             {
                 const auto settings = rightagent::LoadSettings();
+                if (!IsRootSlotVisible(settings, rootSlot_))
+                {
+                    return E_FAIL;
+                }
                 const auto* selectedAgent = ResolveSelectedAgent(settings);
                 text = settings.menuMode == rightagent::MenuMode::MultiDirect && selectedAgent != nullptr
                     ? DirectTitle(settings, *selectedAgent)
@@ -366,6 +394,10 @@ namespace
             }
             *icon = nullptr;
             const auto settings = rightagent::LoadSettings();
+            if (!agent_ && !IsRootSlotVisible(settings, rootSlot_))
+            {
+                return E_NOTIMPL;
+            }
             std::wstring iconKey = L"builtin:rightagent";
             if (agent_)
             {
@@ -419,39 +451,14 @@ namespace
             *state = ECS_HIDDEN;
 
             const auto settings = rightagent::LoadSettings();
-            if (!settings.menuEnabled)
-            {
-                return S_OK;
-            }
             if (agent_)
             {
-                if (rightagent::FindEnabledAgent(settings, agent_->id) == nullptr)
+                if (!settings.menuEnabled || rightagent::FindEnabledAgent(settings, agent_->id) == nullptr)
                 {
                     return S_OK;
                 }
             }
-            else if (settings.menuMode == rightagent::MenuMode::MultiDirect)
-            {
-                if (ResolveSelectedAgent(settings) == nullptr)
-                {
-                    return S_OK;
-                }
-            }
-            else if (rootSlot_ != 0)
-            {
-                return S_OK;
-            }
-            else if (settings.menuMode == rightagent::MenuMode::Direct)
-            {
-                if (rightagent::FindDirectAgent(settings) == nullptr)
-                {
-                    return S_OK;
-                }
-            }
-            else if (std::none_of(settings.agents.begin(), settings.agents.end(), [](const auto& candidate)
-            {
-                return candidate.enabled;
-            }))
+            else if (!IsRootSlotVisible(settings, rootSlot_))
             {
                 return S_OK;
             }

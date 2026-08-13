@@ -12,7 +12,10 @@ public sealed class SettingsTests
 
         Assert.True(settings.Agents.Single(agent => agent.Id == "claude-code").Enabled);
         Assert.False(settings.Agents.Single(agent => agent.Id == "codex").Enabled);
-        Assert.True(settings.Agents.Single(agent => agent.Id == "kimi-web").Enabled);
+        var kimi = settings.Agents.Single(agent => agent.Id == "kimi");
+        Assert.True(kimi.Enabled);
+        Assert.Equal("Kimi", kimi.Name);
+        Assert.Equal("kimi", kimi.Action.Value);
         Assert.True(settings.Agents.Single(agent => agent.Id == "cursor-agent").Enabled);
         Assert.Equal("claude-code", settings.DirectAgentId);
         Assert.Equal(SettingsContract.AutomaticTerminalShell, settings.TerminalShell);
@@ -92,6 +95,78 @@ public sealed class SettingsTests
             Assert.Equal(SettingsContract.CommandPromptTerminalShell, reloaded.TerminalShell);
             Assert.Contains(reloaded.Agents, agent => agent.Name == "测试 Agent" && agent.Action.Value == "echo 路径 & 空格");
             Assert.Empty(Directory.GetFiles(root, "*.tmp-*"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void CommandSlotPlannerMatchesVisibleRootCommands()
+    {
+        var disabled = new RightAgentSettings
+        {
+            MenuEnabled = false,
+            MenuMode = SettingsContract.MultiDirectMenu,
+            Agents = [Agent("One", "one", true, 0), Agent("Two", "two", true, 1)]
+        };
+        Assert.Equal(0, CommandSlotPlanner.RequiredSlotCount(disabled));
+
+        var empty = new RightAgentSettings
+        {
+            MenuMode = SettingsContract.GroupedMenu,
+            Agents = [Agent("Off", "off", false, 0)]
+        };
+        Assert.Equal(0, CommandSlotPlanner.RequiredSlotCount(empty));
+
+        var grouped = new RightAgentSettings
+        {
+            MenuMode = SettingsContract.GroupedMenu,
+            Agents = [Agent("One", "one", true, 0), Agent("Two", "two", true, 1)]
+        };
+        Assert.Equal(1, CommandSlotPlanner.RequiredSlotCount(grouped));
+        Assert.Equal(1, CommandSlotPlanner.RequiredSlotCount(new RightAgentSettings
+        {
+            MenuMode = SettingsContract.DirectMenu,
+            DirectAgentId = "two",
+            Agents = grouped.Agents
+        }));
+
+        var multiDirect = new RightAgentSettings
+        {
+            MenuMode = SettingsContract.MultiDirectMenu,
+            Agents =
+            [
+                Agent("One", "one", true, 0),
+                Agent("Off", "off", false, 1),
+                Agent("Two", "two", true, 2),
+                Agent("Three", "three", true, 3)
+            ]
+        };
+        Assert.Equal(3, CommandSlotPlanner.RequiredSlotCount(multiDirect));
+        Assert.Equal("00.msix", CommandSlotPlanner.CommandPackageFileName(0));
+        Assert.Equal("15.msix", CommandSlotPlanner.CommandPackageFileName(15));
+    }
+
+    [Fact]
+    public void CommandPackageCacheRequiresEverySlotFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "RightAgent.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Assert.False(CommandSlotPlanner.CacheIsComplete(root));
+            Directory.CreateDirectory(root);
+            for (var slot = 0; slot < SettingsContract.MaxMultiDirectAgents; ++slot)
+            {
+                File.WriteAllBytes(Path.Combine(root, CommandSlotPlanner.CommandPackageFileName(slot)), [1]);
+            }
+            Assert.True(CommandSlotPlanner.CacheIsComplete(root));
+            File.Delete(Path.Combine(root, "07.msix"));
+            Assert.False(CommandSlotPlanner.CacheIsComplete(root));
         }
         finally
         {

@@ -135,7 +135,61 @@ if ($dependencies.Count -gt 0) {
 } else {
     Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
 }
-foreach ($commandPackagePath in $CommandPackagePaths) {
-    Add-AppxPackage -Path $commandPackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+
+$mainPackage = Get-AppxPackage -Name 'RightAgent.Dev' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ceq 'RightAgent.Dev' -and $_.Publisher -ceq 'CN=RightAgent Dev' } |
+    Select-Object -First 1
+if (-not $mainPackage) {
+    throw 'Cannot cache command packages because RightAgent.Dev is not installed.'
 }
-Write-Host 'RightAgent installed. If Explorer cached the old menu, close all Explorer windows or sign out once.'
+$cacheDirectory = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\CommandPackages"
+New-Item -ItemType Directory -Path $cacheDirectory -Force | Out-Null
+for ($slot = 0; $slot -lt $CommandPackagePaths.Count; ++$slot) {
+    Copy-Item -LiteralPath $CommandPackagePaths[$slot] -Destination (Join-Path $cacheDirectory ('{0:D2}.msix' -f $slot)) -Force -ErrorAction Stop
+}
+
+$settingsPath = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\settings.json"
+$requiredSlots = 1
+if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
+    try {
+        $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($settings.PSObject.Properties.Name -contains 'menuEnabled' -and -not [bool]$settings.menuEnabled) {
+            $requiredSlots = 0
+        }
+        else {
+            $enabled = @($settings.agents | Where-Object { $_.enabled })
+            $requiredSlots = if ($enabled.Count -eq 0) {
+                0
+            }
+            elseif ([string]$settings.menuMode -eq 'multiDirect') {
+                [Math]::Min(16, [int]$enabled.Count)
+            }
+            else {
+                1
+            }
+        }
+    }
+    catch {
+        $requiredSlots = 1
+    }
+}
+
+for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
+    Add-AppxPackage -Path $CommandPackagePaths[$slot] -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+}
+for ($slot = $requiredSlots; $slot -lt 16; ++$slot) {
+    $commandPackageName = "RightAgent.Dev.Command$($slot.ToString('D2'))"
+    $extraPackages = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq 'CN=RightAgent Dev' })
+    foreach ($extraPackage in $extraPackages) {
+        $extraPackage | Remove-AppxPackage -ErrorAction Stop
+    }
+}
+
+Get-Process -Name explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 600
+if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) {
+    Start-Process -FilePath (Join-Path $env:WINDIR 'explorer.exe')
+}
+
+Write-Host 'RightAgent installed. Explorer was refreshed so the context menu matches the current menu mode.'

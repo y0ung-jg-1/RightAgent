@@ -41,7 +41,7 @@ namespace
 
     void TestQuoting()
     {
-        VerifyRoundTrip({L"RightAgent.Launcher.exe", L"--cwd", L"C:\\普通目录\\space & (test)\\", L"--agent", L"kimi-web"});
+        VerifyRoundTrip({L"RightAgent.Launcher.exe", L"--cwd", L"C:\\普通目录\\space & (test)\\", L"--agent", L"kimi"});
         VerifyRoundTrip({L"", L"quote\"inside", L"trailing\\", L"single'quote"});
         Expect(
             rightagent::EncodePowerShellCommand(L"Write-Output hello; exit")
@@ -179,7 +179,7 @@ namespace
   "directAgentId": "codex",
   "agents": [
     {"id":"codex","name":"Codex","enabled":true,"sort":0,"iconPath":"builtin:codex","action":{"type":"terminalCommand","value":"codex"}},
-    {"id":"kimi-web","name":"Kimi Web","enabled":true,"sort":1,"iconPath":"builtin:kimi","action":{"type":"url","value":"https://www.kimi.com"}}
+    {"id":"kimi","name":"Kimi","enabled":true,"sort":1,"iconPath":"builtin:kimi","action":{"type":"url","value":"https://www.kimi.com"}}
   ]
 })";
         }
@@ -245,7 +245,7 @@ namespace
   "directAgentId": "codex",
   "agents": [
     {"id":"codex","name":"Codex","enabled":true,"sort":0,"iconPath":"builtin:codex","action":{"type":"terminalCommand","value":"codex"}},
-    {"id":"kimi-web","name":"Kimi Web","enabled":true,"sort":1,"iconPath":"builtin:kimi","action":{"type":"url","value":"https://www.kimi.com"}}
+    {"id":"kimi","name":"Kimi","enabled":true,"sort":1,"iconPath":"builtin:kimi","action":{"type":"url","value":"https://www.kimi.com"}}
   ]
 })";
         }
@@ -267,6 +267,9 @@ namespace
         EXPCMDSTATE state = ECS_ENABLED;
         Expect(SUCCEEDED(hiddenDirectSlot->GetState(selection, FALSE, &state)) && state == ECS_HIDDEN,
             "Non-primary slots must stay hidden in single-direct mode");
+        title = nullptr;
+        Expect(hiddenDirectSlot->GetTitle(nullptr, &title) == E_FAIL && title == nullptr,
+            "Hidden slots must not advertise a title");
         hiddenDirectSlot->Release();
 
         {
@@ -295,7 +298,7 @@ namespace
   "menuMode": "multiDirect",
   "agents": [
     {"id":"codex","name":"Codex","enabled":true,"sort":0,"iconPath":"builtin:codex","action":{"type":"terminalCommand","value":"codex"}},
-    {"id":"kimi-web","name":"Kimi Web","enabled":true,"sort":1,"iconPath":"builtin:kimi","action":{"type":"url","value":"https://www.kimi.com"}}
+    {"id":"kimi","name":"Kimi","enabled":true,"sort":1,"iconPath":"builtin:kimi","action":{"type":"url","value":"https://www.kimi.com"}}
   ]
 })";
         }
@@ -313,7 +316,7 @@ namespace
         {
             command = createRootCommand(slot);
             title = nullptr;
-            const std::wstring expectedTitle = slot == 0 ? L"Open with Codex" : L"Open with Kimi Web";
+            const std::wstring expectedTitle = slot == 0 ? L"Open with Codex" : L"Open with Kimi";
             Expect(SUCCEEDED(command->GetTitle(nullptr, &title)) && std::wstring(title) == expectedTitle,
                 "Unexpected multi-direct root title");
             CoTaskMemFree(title);
@@ -337,6 +340,12 @@ namespace
         state = ECS_ENABLED;
         Expect(SUCCEEDED(unusedSlot->GetState(selection, FALSE, &state)) && state == ECS_HIDDEN,
             "Unused multi-direct slots must stay hidden");
+        title = nullptr;
+        Expect(unusedSlot->GetTitle(nullptr, &title) == E_FAIL && title == nullptr,
+            "Unused multi-direct slots must not advertise a title");
+        PWSTR unusedIcon = nullptr;
+        Expect(unusedSlot->GetIcon(nullptr, &unusedIcon) == E_NOTIMPL && unusedIcon == nullptr,
+            "Unused multi-direct slots must not resolve an icon");
         unusedSlot->Release();
 
         GUID unknownClassId = CLSID_RightAgentExplorerCommand;

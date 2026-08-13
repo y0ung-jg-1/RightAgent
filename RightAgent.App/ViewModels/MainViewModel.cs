@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using RightAgent.App.Services;
 using RightAgent.Core;
 
 namespace RightAgent.App.ViewModels;
@@ -302,9 +303,22 @@ public sealed class MainViewModel : BindableBase
         }
 
         RefreshSort();
+        var occupancy = settings;
         if (addedBuiltIn)
         {
-            await SaveAsync(cancellationToken);
+            occupancy = await PersistAsync(cancellationToken);
+        }
+        try
+        {
+            await SynchronizeCommandPackagesAsync(occupancy, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Settings still load if Explorer command occupancy cannot be updated.
         }
         RefreshLocalization();
         IsLoaded = true;
@@ -312,6 +326,23 @@ public sealed class MainViewModel : BindableBase
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken = default)
+    {
+        var normalized = await PersistAsync(cancellationToken);
+        try
+        {
+            await SynchronizeCommandPackagesAsync(normalized, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Settings were already written. Occupancy is retried on the next launch or save.
+        }
+    }
+
+    private async Task<RightAgentSettings> PersistAsync(CancellationToken cancellationToken)
     {
         RefreshSort();
         var settings = new RightAgentSettings
@@ -327,6 +358,14 @@ public sealed class MainViewModel : BindableBase
         var normalized = SettingsValidator.Normalize(settings);
         await store.SaveAsync(normalized, cancellationToken);
         DirectAgentId = normalized.DirectAgentId;
+        return normalized;
+    }
+
+    private Task SynchronizeCommandPackagesAsync(
+        RightAgentSettings settings,
+        CancellationToken cancellationToken)
+    {
+        return CommandPackageSynchronizer.SynchronizeAsync(settings, store.LocalStateDirectory, cancellationToken);
     }
 
     public void AddAgent()

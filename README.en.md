@@ -6,13 +6,13 @@
 
 **AI coding agents in your Windows 11 right-click menu.**
 
-Current version: v1.1.1 · [MIT License](LICENSE)
+Current version: v1.1.3 · [MIT License](LICENSE)
 
 ```text
 Open with RightAgent  >
     Claude Code
     Codex
-    Kimi Web
+    Kimi
     Grok
     opencode
     Cursor Agent
@@ -27,7 +27,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 ## Features
 
 - **Three menu modes**: a grouped submenu, one direct agent, or multiple direct commands ordered exactly like the enabled agent list.
-- **Six built-in agents**: Claude Code, Codex, Kimi Web, Grok, opencode, and Cursor Agent.
+- **Six built-in agents**: Claude Code, Codex, Kimi, Grok, opencode, and Cursor Agent.
 - **Fully customizable**: add, rename, enable, disable, and reorder arbitrary agents; actions can be terminal commands or `http` and `https` URLs.
 - **Custom icons**: local PNG, JPG, BMP, and ICO files are normalized to ICO.
 - **Bilingual interface**: follow the system language or explicitly select Simplified Chinese or English.
@@ -46,7 +46,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 
 ## Installation
 
-Download `RightAgent-1.1.1-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer remains under the current Windows user. On the first installation, if the bundled public certificate is not trusted yet, Setup requests administrator approval only for importing that certificate into Local Computer\Trusted People, then installs the complete package set for the current user. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries one main package and 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. Upgrades do not request elevation again while the certificate remains trusted, and the private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
+Download `RightAgent-1.1.3-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer remains under the current Windows user. On the first installation, if the bundled public certificate is not trusted yet, Setup requests administrator approval only for importing that certificate into Local Computer\Trusted People, then installs the complete package set for the current user. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries one main package and 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. Upgrades do not request elevation again while the certificate remains trusted, and the private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
 
 ### Build and install from source
 

@@ -74,8 +74,9 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
    Setup signature, timestamp, certificate thumbprint, and SHA-256. The release
    job also runs the final Setup silently on its clean hosted runner, rejects any
    installer exception or elevated install mode, requires the package-deployment
-   progress protocol to reach 100%, verifies the main package plus all 16 hidden
-   command packages at the expected version, confirms only the main app appears
+   progress protocol to reach 100%, verifies the main package, command slot zero
+   at the expected version, unused command slots left unregistered, and all 16
+   command MSIX files cached, confirms only the main app appears
    in Start, and verifies the certificate-store boundary before uploading assets.
 7. Run Setup on a clean Windows 11 x64 standard-user account. Confirm Setup
    stays under that user, requests UAC only when the first installation needs

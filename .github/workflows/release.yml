@@ -223,17 +223,33 @@ jobs:
 
           [xml]$manifest = Get-Content -LiteralPath './RightAgent.Package/Package.Release.appxmanifest' -Raw
           $expectedVersion = [version]([string]$manifest.Package.Identity.Version)
-          $expectedPackageNames = @('RightAgent') + @(0..15 | ForEach-Object { "RightAgent.Command$($_.ToString('D2'))" })
-          foreach ($expectedPackageName in $expectedPackageNames) {
-            $installedPackage = Get-AppxPackage -Name $expectedPackageName -ErrorAction SilentlyContinue |
-              Where-Object {
-                $_.Name -ceq $expectedPackageName -and
-                $_.Publisher -ceq 'CN=RightAgent'
-              } |
+          $mainPackage = Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ceq 'RightAgent' -and $_.Publisher -ceq 'CN=RightAgent' } |
+            Select-Object -First 1
+          if (-not $mainPackage -or [version]$mainPackage.Version -ne $expectedVersion) {
+            throw "Setup did not register package 'RightAgent' at version $expectedVersion."
+          }
+
+          $command00 = Get-AppxPackage -Name 'RightAgent.Command00' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ceq 'RightAgent.Command00' -and $_.Publisher -ceq 'CN=RightAgent' } |
+            Select-Object -First 1
+          if (-not $command00 -or [version]$command00.Version -ne $expectedVersion) {
+            throw "A clean Setup must register command package slot 00 at version $expectedVersion."
+          }
+          foreach ($slot in 1..15) {
+            $commandName = "RightAgent.Command$($slot.ToString('D2'))"
+            $unexpected = Get-AppxPackage -Name $commandName -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -ceq $commandName -and $_.Publisher -ceq 'CN=RightAgent' } |
               Select-Object -First 1
-            if (-not $installedPackage -or [version]$installedPackage.Version -ne $expectedVersion) {
-              throw "Setup did not register package '$expectedPackageName' at version $expectedVersion."
+            if ($unexpected) {
+              throw "A clean Setup must not register unused command package '$commandName'."
             }
+          }
+
+          $cacheDirectory = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\CommandPackages"
+          $cachedPackages = @(Get-ChildItem -LiteralPath $cacheDirectory -Filter '*.msix' -File -ErrorAction SilentlyContinue)
+          if ($cachedPackages.Count -ne 16) {
+            throw "Setup did not cache all 16 command packages. Found $($cachedPackages.Count) in '$cacheDirectory'."
           }
 
           $rightAgentStartApps = @(Get-StartApps | Where-Object { $_.Name -like 'RightAgent*' })

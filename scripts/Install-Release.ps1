@@ -111,6 +111,103 @@ function Get-RightAgentAppxManifest {
     }
 }
 
+function Install-RightAgentCommandPackageCache {
+    param(
+        [Parameter(Mandatory)]
+        [string]$MainPackageName,
+
+        [Parameter(Mandatory)]
+        [string]$Publisher,
+
+        [Parameter(Mandatory)]
+        [string[]]$CommandPackagePaths
+    )
+
+    if ($CommandPackagePaths.Count -ne 16) {
+        throw "Expected exactly 16 command packages to cache, but found $($CommandPackagePaths.Count)."
+    }
+
+    $mainPackage = Get-AppxPackage -Name $MainPackageName -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ceq $MainPackageName -and $_.Publisher -ceq $Publisher } |
+        Select-Object -First 1
+    if (-not $mainPackage) {
+        throw "Cannot cache command packages because '$MainPackageName' is not installed."
+    }
+
+    $cacheDirectory = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\CommandPackages"
+    New-Item -ItemType Directory -Path $cacheDirectory -Force | Out-Null
+    for ($slot = 0; $slot -lt 16; ++$slot) {
+        $destination = Join-Path $cacheDirectory ('{0:D2}.msix' -f $slot)
+        Copy-Item -LiteralPath $CommandPackagePaths[$slot] -Destination $destination -Force -ErrorAction Stop
+        if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) {
+            throw "Failed to cache command package slot $($slot.ToString('D2'))."
+        }
+    }
+}
+
+function Get-RightAgentMainPackage {
+    param(
+        [Parameter(Mandatory)]
+        [string]$MainPackageName,
+
+        [Parameter(Mandatory)]
+        [string]$Publisher
+    )
+
+    Get-AppxPackage -Name $MainPackageName -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ceq $MainPackageName -and $_.Publisher -ceq $Publisher } |
+        Select-Object -First 1
+}
+
+function Get-RightAgentRequiredCommandSlotCount {
+    param(
+        [Parameter(Mandatory)]
+        [string]$MainPackageName,
+
+        [Parameter(Mandatory)]
+        [string]$Publisher
+    )
+
+    $mainPackage = Get-RightAgentMainPackage -MainPackageName $MainPackageName -Publisher $Publisher
+    if (-not $mainPackage) {
+        return 1
+    }
+
+    $settingsPath = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\settings.json"
+    if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+        return 1
+    }
+
+    try {
+        $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        return 1
+    }
+
+    if ($settings.PSObject.Properties.Name -contains 'menuEnabled' -and -not [bool]$settings.menuEnabled) {
+        return 0
+    }
+
+    $enabled = @($settings.agents | Where-Object { $_.enabled })
+    if ($enabled.Count -eq 0) {
+        return 0
+    }
+    if ([string]$settings.menuMode -eq 'multiDirect') {
+        return [Math]::Min(16, [int]$enabled.Count)
+    }
+    return 1
+}
+
+function Restart-RightAgentExplorer {
+    Get-Process -Name explorer -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 600
+    if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) {
+        Start-Process -FilePath (Join-Path $env:WINDIR 'explorer.exe')
+    }
+}
+
 function Stop-RightAgentComSurrogates {
     $installedRightAgentPackages = @(
         @(Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
@@ -359,23 +456,15 @@ try {
         return
     }
 
-    $expectedPackageNames = @('RightAgent') + @(0..15 | ForEach-Object { "RightAgent.Command$($_.ToString('D2'))" })
-    $sameVersionPackages = @{}
-    foreach ($expectedPackageName in $expectedPackageNames) {
-        $sameVersionPackage = Get-AppxPackage -Name $expectedPackageName -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.Name -ceq $expectedPackageName -and
-                $_.Publisher -ceq 'CN=RightAgent' -and
-                [version]$_.Version -eq $packageVersion
-            } |
-            Select-Object -First 1
-        $sameVersionPackages[$expectedPackageName] = $null -ne $sameVersionPackage
-    }
-    if (@($sameVersionPackages.Values | Where-Object { $_ }).Count -eq $expectedPackageNames.Count) {
-        Write-Host "RightAgent $packageVersion is already installed for the current user."
-        Write-RightAgentInstallationProgress -PercentComplete 100
-        return
-    }
+    $mainPackageName = 'RightAgent'
+    $publisher = 'CN=RightAgent'
+    $sameVersionMain = $null -ne (Get-AppxPackage -Name $mainPackageName -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -ceq $mainPackageName -and
+            $_.Publisher -ceq $publisher -and
+            [version]$_.Version -eq $packageVersion
+        } |
+        Select-Object -First 1)
 
     $dependencyDirectory = Join-Path $PSScriptRoot 'Dependencies\x64'
     $dependencies = if (Test-Path -LiteralPath $dependencyDirectory -PathType Container) {
@@ -387,40 +476,79 @@ try {
     }
 
     Stop-RightAgentComSurrogates
-    if ($sameVersionPackages['RightAgent']) {
+    if ($sameVersionMain) {
         Write-RightAgentInstallationProgress -PercentComplete 36
     }
     else {
         Add-RightAgentAppxPackage -Path $PackagePath -DependencyPath $dependencies -BasePercent 0 -SpanPercent 36
     }
-    foreach ($slot in 0..15) {
+
+    Install-RightAgentCommandPackageCache -MainPackageName $mainPackageName -Publisher $publisher -CommandPackagePaths $CommandPackagePaths
+    Write-RightAgentInstallationProgress -PercentComplete 50
+
+    $requiredSlots = Get-RightAgentRequiredCommandSlotCount -MainPackageName $mainPackageName -Publisher $publisher
+    $slotSpan = if ($requiredSlots -gt 0) { [int][Math]::Floor(40 / $requiredSlots) } else { 0 }
+    for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
-        $basePercent = 36 + (4 * $slot)
-        if ($sameVersionPackages[$commandPackageName]) {
-            Write-RightAgentInstallationProgress -PercentComplete ($basePercent + 4)
+        $sameVersionCommand = $null -ne (Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -ceq $commandPackageName -and
+                $_.Publisher -ceq $publisher -and
+                [version]$_.Version -eq $packageVersion
+            } |
+            Select-Object -First 1)
+        $basePercent = 50 + ($slotSpan * $slot)
+        if ($sameVersionCommand) {
+            Write-RightAgentInstallationProgress -PercentComplete ([Math]::Min(90, $basePercent + $slotSpan))
         }
         else {
             Add-RightAgentAppxPackage `
                 -Path $CommandPackagePaths[$slot] `
                 -BasePercent $basePercent `
-                -SpanPercent 4
+                -SpanPercent $slotSpan
         }
     }
 
-    foreach ($expectedPackageName in $expectedPackageNames) {
-        $installedPackage = Get-AppxPackage -Name $expectedPackageName -ErrorAction SilentlyContinue |
+    for ($slot = $requiredSlots; $slot -lt 16; ++$slot) {
+        $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
+        $extraPackages = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq $publisher })
+        foreach ($extraPackage in $extraPackages) {
+            $extraPackage | Remove-AppxPackage -ErrorAction Stop
+        }
+    }
+    Write-RightAgentInstallationProgress -PercentComplete 96
+
+    $installedMain = Get-RightAgentMainPackage -MainPackageName $mainPackageName -Publisher $publisher
+    if (-not $installedMain -or [version]$installedMain.Version -ne $packageVersion) {
+        throw "RightAgent installation verification failed for package '$mainPackageName' version $packageVersion."
+    }
+    for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
+        $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
+        $installedCommand = Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
             Where-Object {
-                $_.Name -ceq $expectedPackageName -and
-                $_.Publisher -ceq 'CN=RightAgent' -and
+                $_.Name -ceq $commandPackageName -and
+                $_.Publisher -ceq $publisher -and
                 [version]$_.Version -eq $packageVersion
             } |
             Select-Object -First 1
-        if (-not $installedPackage) {
-            throw "RightAgent installation verification failed for package '$expectedPackageName' version $packageVersion."
+        if (-not $installedCommand) {
+            throw "RightAgent installation verification failed for package '$commandPackageName' version $packageVersion."
+        }
+    }
+    for ($slot = $requiredSlots; $slot -lt 16; ++$slot) {
+        $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
+        $unexpected = Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq $publisher } |
+            Select-Object -First 1
+        if ($unexpected) {
+            throw "RightAgent left unused command package '$commandPackageName' registered."
         }
     }
 
-    Write-Host 'RightAgent installed. If Explorer cached the old menu, close all Explorer windows or sign out once.'
+    Restart-RightAgentExplorer
+    Write-RightAgentInstallationProgress -PercentComplete 100
+    Write-Host 'RightAgent installed. Explorer was refreshed so the context menu matches the current menu mode.'
 }
 catch {
     $installationFailure = $_
