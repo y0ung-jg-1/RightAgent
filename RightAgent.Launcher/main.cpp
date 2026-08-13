@@ -180,104 +180,6 @@ namespace
         return FileExists(alias) ? alias : std::filesystem::path{};
     }
 
-    std::filesystem::path FindPowerShell7()
-    {
-        if (const auto executable = FindOnPath(L"pwsh.exe"); !executable.empty())
-        {
-            return executable;
-        }
-
-        const std::filesystem::path candidates[] =
-        {
-            GetEnvironmentPath(L"ProgramFiles") / L"PowerShell" / L"7" / L"pwsh.exe",
-            GetEnvironmentPath(L"LOCALAPPDATA") / L"Microsoft" / L"WindowsApps" / L"pwsh.exe"
-        };
-        for (const auto& candidate : candidates)
-        {
-            if (FileExists(candidate))
-            {
-                return candidate;
-            }
-        }
-        return {};
-    }
-
-    std::filesystem::path FindWindowsPowerShell()
-    {
-        wchar_t windowsDirectory[MAX_PATH]{};
-        const UINT length = GetWindowsDirectoryW(windowsDirectory, ARRAYSIZE(windowsDirectory));
-        if (length > 0 && length < ARRAYSIZE(windowsDirectory))
-        {
-            const auto executable = std::filesystem::path(windowsDirectory) / L"System32" / L"WindowsPowerShell" / L"v1.0" / L"powershell.exe";
-            if (FileExists(executable))
-            {
-                return executable;
-            }
-        }
-        return FindOnPath(L"powershell.exe");
-    }
-
-    std::filesystem::path FindCommandPrompt()
-    {
-        wchar_t systemDirectory[MAX_PATH]{};
-        const UINT length = GetSystemDirectoryW(systemDirectory, ARRAYSIZE(systemDirectory));
-        if (length > 0 && length < ARRAYSIZE(systemDirectory))
-        {
-            const auto executable = std::filesystem::path(systemDirectory) / L"cmd.exe";
-            if (FileExists(executable))
-            {
-                return executable;
-            }
-        }
-        return FindOnPath(L"cmd.exe");
-    }
-
-    struct ShellLaunch
-    {
-        std::filesystem::path executable;
-        std::vector<std::wstring> arguments;
-    };
-
-    std::optional<ShellLaunch> ResolveShellLaunch(
-        const rightagent::TerminalShell configuredShell,
-        const std::wstring& command)
-    {
-        std::filesystem::path executable;
-        switch (configuredShell)
-        {
-        case rightagent::TerminalShell::Automatic:
-            executable = FindPowerShell7();
-            if (executable.empty())
-            {
-                executable = FindWindowsPowerShell();
-            }
-            break;
-        case rightagent::TerminalShell::PowerShell7:
-            executable = FindPowerShell7();
-            break;
-        case rightagent::TerminalShell::WindowsPowerShell:
-            executable = FindWindowsPowerShell();
-            break;
-        case rightagent::TerminalShell::CommandPrompt:
-            executable = FindCommandPrompt();
-            break;
-        }
-
-        if (executable.empty())
-        {
-            return std::nullopt;
-        }
-        if (configuredShell == rightagent::TerminalShell::CommandPrompt)
-        {
-            return ShellLaunch{std::move(executable), {L"/D", L"/K", command}};
-        }
-        // Windows Terminal treats semicolons as its own command separators. Base64 keeps
-        // the PowerShell script opaque until the selected shell receives and decodes it.
-        return ShellLaunch{
-            std::move(executable),
-            {L"-NoLogo", L"-NoExit", L"-EncodedCommand", rightagent::EncodePowerShellCommand(command)}};
-    }
-
     int LaunchTerminalAgent(
         const rightagent::Settings& settings,
         const rightagent::AgentDefinition& agent,
@@ -302,26 +204,26 @@ namespace
             return 4;
         }
 
-        const auto shell = ResolveShellLaunch(settings.terminalShell, agent.actionValue);
-        if (!shell)
-        {
-            const auto message = rightagent::IsChinese(settings)
-                ? L"找不到所选的命令 Shell。请安装该 Shell，或在 RightAgent 设置中选择其他选项。"
-                : L"The selected command shell was not found. Install it or choose another shell in RightAgent settings.";
-            ShowError(settings, message);
-            return 5;
-        }
+        const auto profile = rightagent::ResolveWindowsTerminalLaunchProfile(settings.terminalProfile);
+        const auto family = rightagent::ClassifyWindowsTerminalShell(profile.name, profile.source, profile.commandline);
+        const auto appended = rightagent::BuildWindowsTerminalAppendCommandLine(
+            family,
+            agent.actionValue,
+            profile.commandline);
 
         std::vector<std::wstring> arguments = {L"-w", L"new", L"new-tab"};
-        if (!settings.terminalProfile.empty())
+        if (!profile.id.empty())
         {
             arguments.emplace_back(L"-p");
-            arguments.push_back(settings.terminalProfile);
+            arguments.push_back(profile.id);
         }
         arguments.emplace_back(L"-d");
         arguments.push_back(workingDirectory.wstring());
-        arguments.push_back(shell->executable.wstring());
-        arguments.insert(arguments.end(), shell->arguments.begin(), shell->arguments.end());
+        // --appendCommandLine keeps the profile's own shell (pwsh, cmd, bash, VsDevCmd)
+        // and only adds the agent command. -- stops wt from parsing -NoLogo as its flag.
+        arguments.emplace_back(L"--appendCommandLine");
+        arguments.emplace_back(L"--");
+        arguments.push_back(appended);
 
         DWORD error = ERROR_SUCCESS;
         if (!rightagent::LaunchProcess(terminal, arguments, workingDirectory, CREATE_NEW_PROCESS_GROUP, &error))

@@ -165,6 +165,103 @@ namespace
         Expect(rightagent::FirstSimpleCommandToken(L"& 'C:\\Tools\\agent.exe'").empty(), "Complex command should not be prevalidated");
     }
 
+    void TestWindowsTerminalDefaultProfile()
+    {
+        Expect(rightagent::ReadWindowsTerminalDefaultProfile({}).empty(),
+            "An empty Terminal settings path should not invent a profile");
+        Expect(
+            rightagent::ReadWindowsTerminalDefaultProfile(L"C:\\RightAgent.Missing\\settings.json").empty(),
+            "A missing Terminal settings file should not invent a profile");
+        Expect(rightagent::ResolveWindowsTerminalProfile(L"  Ubuntu  ") == L"Ubuntu",
+            "An explicit Terminal profile must win over the default");
+
+        const auto root = std::filesystem::temp_directory_path()
+            / L"RightAgent.WindowsTerminal.Tests" / std::to_wstring(GetCurrentProcessId());
+        std::filesystem::create_directories(root);
+        const auto path = root / L"settings.json";
+        {
+            std::ofstream output(path, std::ios::binary);
+            output << "{\n"
+                "// Startup default\n"
+                "  \"defaultProfile\": \"{574e775e-4f2a-5b96-ac1e-a2962a402336}\",\n"
+                "  \"profiles\": { \"list\": [] }\n"
+                "}\n";
+        }
+        Expect(
+            rightagent::ReadWindowsTerminalDefaultProfile(path)
+                == L"{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+            "JSONC Terminal settings must still yield defaultProfile");
+
+        {
+            std::ofstream output(path, std::ios::binary | std::ios::trunc);
+            output << "{ \"name\": \"PowerShell\" }\n";
+        }
+        Expect(rightagent::ReadWindowsTerminalDefaultProfile(path).empty(),
+            "Terminal settings without defaultProfile should yield an empty profile");
+
+        {
+            std::ofstream output(path, std::ios::binary | std::ios::trunc);
+            output << R"({
+  "defaultProfile": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+  "profiles": {
+    "list": [
+      { "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}", "name": "Windows PowerShell", "commandline": "powershell.exe" },
+      { "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}", "name": "Command Prompt", "commandline": "cmd.exe" },
+      { "guid": "{2ece5bfe-50ed-5f3a-ab87-5cd4baafed2b}", "name": "Git Bash", "source": "Git", "commandline": "bash.exe -i -l" },
+      { "guid": "{332430fd-5b8f-5556-9c97-4d1e16e2b6c2}", "name": "Developer Command Prompt for VS 2022", "source": "Windows.Terminal.VisualStudio" },
+      { "guid": "{574e775e-4f2a-5b96-ac1e-a2962a402336}", "name": "PowerShell", "source": "Windows.Terminal.PowershellCore" }
+    ]
+  }
+})";
+        }
+        const auto catalog = rightagent::ReadWindowsTerminalProfileCatalog(path);
+        Expect(catalog.profiles.size() == 5, "Terminal profile catalog count changed");
+        const auto* powershell = rightagent::FindWindowsTerminalProfile(catalog, L"PowerShell");
+        Expect(powershell != nullptr && powershell->source == L"Windows.Terminal.PowershellCore",
+            "PowerShell profile was not resolved by name");
+        Expect(
+            rightagent::ClassifyWindowsTerminalShell(powershell->name, powershell->source, powershell->commandline)
+                == rightagent::WindowsTerminalShellFamily::PowerShell,
+            "PowerShell Core should stay a PowerShell family profile");
+        Expect(
+            rightagent::ClassifyWindowsTerminalShell(L"Git Bash", L"Git", L"bash.exe -i -l")
+                == rightagent::WindowsTerminalShellFamily::Bash,
+            "Git Bash should classify as Bash");
+        Expect(
+            rightagent::ClassifyWindowsTerminalShell(L"Developer Command Prompt for VS 2022", L"Windows.Terminal.VisualStudio", L"")
+                == rightagent::WindowsTerminalShellFamily::CommandPrompt,
+            "VS Developer Command Prompt should classify as CMD");
+        Expect(
+            rightagent::ClassifyWindowsTerminalShell(L"Ubuntu", L"Windows.Terminal.Wsl", L"wsl.exe -d Ubuntu")
+                == rightagent::WindowsTerminalShellFamily::Wsl,
+            "WSL should classify as Wsl");
+        Expect(
+            rightagent::BuildWindowsTerminalAppendCommandLine(
+                rightagent::WindowsTerminalShellFamily::CommandPrompt, L"hostname", L"cmd.exe")
+                == L"/D /K hostname",
+            "A bare CMD profile should keep the agent alive with /K");
+        Expect(
+            rightagent::BuildWindowsTerminalAppendCommandLine(
+                rightagent::WindowsTerminalShellFamily::CommandPrompt,
+                L"hostname",
+                L"cmd.exe /k VsDevCmd.bat")
+                == L"&& hostname",
+            "A VS CMD profile should append the agent after VsDevCmd");
+        Expect(
+            rightagent::BuildWindowsTerminalAppendCommandLine(
+                rightagent::WindowsTerminalShellFamily::Bash, L"hostname", L"bash.exe -i -l")
+                == L"-c \"hostname; exec bash -i -l\"",
+            "Bash should run the agent then keep an interactive shell");
+        const auto powershellAppend = rightagent::BuildWindowsTerminalAppendCommandLine(
+            rightagent::WindowsTerminalShellFamily::PowerShell, L"hostname", L"");
+        Expect(
+            powershellAppend == L"-NoLogo -NoExit -EncodedCommand " + rightagent::EncodePowerShellCommand(L"hostname"),
+            "PowerShell profiles should append an encoded keep-alive command");
+
+        std::error_code error;
+        std::filesystem::remove_all(root, error);
+    }
+
     void TestShellComSurface()
     {
         const auto root = std::filesystem::temp_directory_path() / L"RightAgent.Shell.Tests" / std::to_wstring(GetCurrentProcessId());
@@ -371,6 +468,7 @@ int wmain()
         TestSettingsParsing();
         TestUnpackagedSettingsPath();
         TestSimpleTokenDetection();
+        TestWindowsTerminalDefaultProfile();
         TestShellComSurface();
         std::wcout << L"RightAgent native tests passed.\n";
         return 0;

@@ -17,30 +17,20 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid
+        <TitleBar
             x:Name="AppTitleBar"
-            Height="32"
-            Padding="16,0,0,0">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Image
-                    Width="16"
-                    Height="16"
-                    VerticalAlignment="Center"
-                    AutomationProperties.AccessibilityView="Raw"
-                    Source="ms-appx:///Assets/Agents/rightagent.svg"
-                    Stretch="Uniform" />
-                <TextBlock
-                    VerticalAlignment="Center"
-                    Style="{ThemeResource CaptionTextBlockStyle}"
-                    Text="{x:Bind ViewModel.WindowTitle, Mode=OneWay}" />
-            </StackPanel>
-        </Grid>
+            MinHeight="48"
+            Title="{x:Bind ViewModel.WindowTitle, Mode=OneWay}">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="ms-appx:///Assets/Agents/rightagent.svg" />
+            </TitleBar.IconSource>
+        </TitleBar>
 
         <Grid
             x:Name="MainContentGrid"
             Grid.Row="1"
-            MaxWidth="1180"
-            Padding="40,8,40,32"
+            MaxWidth="1220"
+            Padding="40,16,40,32"
             HorizontalAlignment="Stretch"
             ColumnSpacing="24">
             <Grid.RowDefinitions>
@@ -498,63 +488,39 @@
                                         VerticalAlignment="Center"
                                         FontSize="16"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Glyph="&#xE756;" />
+                                        Glyph="&#xE8FD;" />
                                     <TextBlock
                                         Grid.Column="1"
                                         VerticalAlignment="Center"
                                         Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                        Text="{x:Bind ViewModel.TerminalShellLabel, Mode=OneWay}" />
+                                        Text="{x:Bind ViewModel.TerminalProfileLabel, Mode=OneWay}"
+                                        TextWrapping="NoWrap" />
                                     <ComboBox
+                                        x:Name="TerminalProfileComboBox"
                                         Grid.Column="2"
                                         Width="260"
                                         MinHeight="44"
-                                        VerticalAlignment="Center"
-                                        AutomationProperties.HelpText="{x:Bind ViewModel.TerminalShellHint, Mode=OneWay}"
-                                        AutomationProperties.Name="{x:Bind ViewModel.TerminalShellLabel, Mode=OneWay}"
-                                        DisplayMemberPath="Label"
-                                        ItemsSource="{x:Bind ViewModel.TerminalShellOptions, Mode=OneWay}"
-                                        SelectedValue="{x:Bind ViewModel.TerminalShell, Mode=TwoWay}"
-                                        SelectedValuePath="Key"
-                                        ToolTipService.ToolTip="{x:Bind ViewModel.TerminalShellHint, Mode=OneWay}" />
-                                </Grid>
-                            </Border>
-
-                            <Border
-                                Padding="20,10"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="8">
-                                <Grid MinHeight="64" ColumnSpacing="14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="20" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon
-                                        VerticalAlignment="Center"
-                                        FontSize="16"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Glyph="&#xE756;" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                        Text="{x:Bind ViewModel.TerminalProfileLabel, Mode=OneWay}" />
-                                    <TextBox
-                                        Grid.Column="2"
-                                        Width="260"
-                                        MinHeight="44"
+                                        MaxDropDownHeight="360"
                                         VerticalAlignment="Center"
                                         AutomationProperties.HelpText="{x:Bind ViewModel.TerminalProfileHelp, Mode=OneWay}"
                                         AutomationProperties.Name="{x:Bind ViewModel.TerminalProfileLabel, Mode=OneWay}"
-                                        PlaceholderText="{x:Bind ViewModel.TerminalProfileHint, Mode=OneWay}"
-                                        Text="{x:Bind ViewModel.TerminalProfile, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                        DisplayMemberPath="Label"
+                                        ItemsSource="{x:Bind ViewModel.TerminalProfileOptions, Mode=OneWay}"
+                                        SelectedValue="{x:Bind ViewModel.TerminalProfile, Mode=TwoWay}"
+                                        SelectedValuePath="Key"
+                                        SelectionChanged="TerminalProfile_SelectionChanged"
                                         ToolTipService.ToolTip="{x:Bind ViewModel.TerminalProfileHelp, Mode=OneWay}" />
                                 </Grid>
                             </Border>
                         </StackPanel>
                     </ContentControl>
+                    <TextBlock
+                        Margin="4,16,0,0"
+                        HorizontalAlignment="Left"
+                        AutomationProperties.Name="{x:Bind ViewModel.VersionText, Mode=OneWay}"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Style="{ThemeResource CaptionTextBlockStyle}"
+                        Text="{x:Bind ViewModel.VersionText, Mode=OneWay}" />
                 </StackPanel>
             </ScrollViewer>
 

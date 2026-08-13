@@ -1,4 +1,5 @@
 using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -16,6 +17,8 @@ public sealed partial class MainWindow : Window
 {
     private const double MinimumWindowWidth = 640;
     private const double MinimumWindowHeight = 540;
+    private const double DefaultWindowWidth = 1240;
+    private const double DefaultWindowHeight = 880;
     private const double PreviewBreakpointWidth = 900;
     private static readonly Uri WindowsTerminalStoreUri = new("ms-windows-store://pdp/?ProductId=9N0DX20HK701");
     private static readonly Uri WindowsTerminalStoreWebUri = new("https://apps.microsoft.com/detail/9n0dx20hk701");
@@ -28,7 +31,7 @@ public sealed partial class MainWindow : Window
     {
         ViewModel = new MainViewModel(App.LocalStateDirectory);
         InitializeComponent();
-        AppWindow.Resize(new SizeInt32(1200, 880));
+        AppWindow.Resize(new SizeInt32((int)DefaultWindowWidth, (int)DefaultWindowHeight));
         AppWindow.Changed += AppWindow_Changed;
         TryApplyMicaBackdrop();
         ExtendIntoTitleBar();
@@ -135,8 +138,8 @@ public sealed partial class MainWindow : Window
         PreviewColumn.Width = new GridLength(useNarrowLayout ? 0 : 320);
         MainContentGrid.ColumnSpacing = useNarrowLayout ? 0 : 24;
         MainContentGrid.Padding = useNarrowLayout
-            ? new Thickness(24, 8, 24, 32)
-            : new Thickness(40, 8, 40, 32);
+            ? new Thickness(24, 16, 24, 32)
+            : new Thickness(40, 16, 40, 32);
     }
 
     private void EnsureMinimumWindowSize(Microsoft.UI.Windowing.AppWindow appWindow)
@@ -358,6 +361,15 @@ public sealed partial class MainWindow : Window
         UpdateStatusInfoBar();
     }
 
+    private void TerminalProfile_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (synchronizing || sender is not ComboBox { SelectedValue: string value })
+        {
+            return;
+        }
+        ViewModel.TerminalProfile = value;
+    }
+
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(MainViewModel.ValidationSummary) or nameof(MainViewModel.HasValidationErrors))
@@ -374,6 +386,7 @@ public sealed partial class MainWindow : Window
             LanguageComboBox.SelectedValue = ViewModel.Language;
             MenuModeComboBox.SelectedValue = ViewModel.MenuMode;
             DirectAgentComboBox.SelectedValue = ViewModel.DirectAgentId;
+            TerminalProfileComboBox.SelectedValue = ViewModel.TerminalProfile;
         }
         finally
         {
@@ -422,12 +435,11 @@ public sealed partial class MainWindow : Window
 
     private void ExtendIntoTitleBar()
     {
-        // Draw the title area ourselves (icon + name) over the Mica backdrop and keep
-        // only the system caption buttons, with theme-neutral hover feedback.
         ExtendsContentIntoTitleBar = true;
-        SetTitleBar(AppTitleBar);
         var titleBar = AppWindow.TitleBar;
-        titleBar.IconShowOptions = Microsoft.UI.Windowing.IconShowOptions.HideIconAndSystemMenu;
+        titleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+        SetTitleBar(AppTitleBar);
+        titleBar.IconShowOptions = IconShowOptions.HideIconAndSystemMenu;
         var transparent = Windows.UI.Color.FromArgb(0, 0, 0, 0);
         titleBar.ButtonBackgroundColor = transparent;
         titleBar.ButtonInactiveBackgroundColor = transparent;

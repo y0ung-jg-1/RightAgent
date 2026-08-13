@@ -6,7 +6,7 @@
 
 **AI coding agents in your Windows 11 right-click menu.**
 
-Current version: v1.1.3 · [MIT License](LICENSE)
+Current version: v1.1.4 · [MIT License](LICENSE)
 
 ```text
 Open with RightAgent  >
@@ -18,7 +18,7 @@ Open with RightAgent  >
     Cursor Agent
 ```
 
-Right-click a folder background or a single selected folder and open that directory with your preferred AI coding agent. RightAgent supports a grouped submenu, one direct agent, or multiple direct commands that place every enabled agent at the context-menu root. The WinUI 3 settings app manages the menu mode, enabled agents, order, commands, URLs, icons, interface language, command shell, and Windows Terminal profile.
+Right-click a folder background or a single selected folder and open that directory with your preferred AI coding agent. RightAgent supports a grouped submenu, one direct agent, or multiple direct commands that place every enabled agent at the context-menu root. The WinUI 3 settings app manages the menu mode, enabled agents, order, commands, URLs, icons, interface language, and Windows Terminal profile.
 
 RightAgent has no tray process, background service, telemetry, or automatic updater. Closing the settings window exits the application completely.
 
@@ -31,7 +31,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 - **Fully customizable**: add, rename, enable, disable, and reorder arbitrary agents; actions can be terminal commands or `http` and `https` URLs.
 - **Custom icons**: local PNG, JPG, BMP, and ICO files are normalized to ICO.
 - **Bilingual interface**: follow the system language or explicitly select Simplified Chinese or English.
-- **Selectable command shell**: automatic mode prefers PowerShell 7 and falls back to Windows PowerShell 5.1; PowerShell 7, Windows PowerShell 5.1, and CMD can also be selected explicitly.
+- **Uses the Windows Terminal profile as the shell**: the chosen profile supplies its own shell, icon, and colors. There is no separate command-interpreter setting.
 - **Master switch**: turn the complete context menu on or off.
 - **Live preview**: see the resulting menu immediately; settings use atomic writes and recover from corrupted files through backup and replacement.
 
@@ -79,7 +79,7 @@ To debug only the settings interface without registering the File Explorer menu,
 
 - Right-clicking a folder background uses that folder; right-clicking one selected folder uses the selection.
 - Files, multiple selections, virtual folders, and non-file-system locations are hidden or disabled.
-- Terminal actions open a new Windows Terminal window with the selected command shell. Automatic mode prefers PowerShell 7 and falls back to Windows PowerShell 5.1. The Terminal window remains open after the agent exits.
+- Terminal actions open a new Windows Terminal window using the selected profile's own shell. The Terminal window remains open after the agent exits.
 - On startup, the settings app checks for `wt.exe`. If Windows Terminal is unavailable, it explains the requirement and offers the official Microsoft Store installation entry.
 - URL actions permit only `http` and `https`.
 - Missing executables are detected before Terminal opens; the error dialog offers a button to open RightAgent settings.

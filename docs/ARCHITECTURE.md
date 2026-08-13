@@ -4,7 +4,7 @@
 flowchart LR
     E["Explorer.exe / COM surrogate"] -->|"IExplorerCommand"| S["RightAgent.Shell.dll"]
     S -->|"--agent ID --cwd PATH"| L["RightAgent.Launcher.exe"]
-    L -->|"terminalCommand"| W["Windows Terminal + selected command shell"]
+    L -->|"terminalCommand"| W["Windows Terminal profile"]
     L -->|"url"| B["Default browser"]
     A["RightAgent.App.exe"] -->|"atomic write"| J["LocalState/settings.json"]
     S -->|"read only"| J
@@ -55,10 +55,10 @@ RightAgent.Launcher.exe --agent <agent-id> --cwd <absolute-directory>
 Each argument is encoded with the Windows `CommandLineToArgvW` quoting rules. The working directory is never interpolated into the user command. Terminal actions are passed as separate arguments with this semantic shape:
 
 ```text
-wt.exe -w new new-tab [-p <profile>] -d <directory> <shell-executable> <shell-options> <configured-command>
+wt.exe -w new new-tab -p <profile> -d <directory> --appendCommandLine -- <profile-shell-suffix>
 ```
 
-`terminalShell=auto` resolves PowerShell 7 (`pwsh.exe`) first and falls back to Windows PowerShell 5.1. Explicit `pwsh`, `windowsPowerShell`, and `cmd` selections use PowerShell's `-NoLogo -NoExit -EncodedCommand` or CMD's `/D /K` arguments as appropriate. PowerShell command text is Base64-encoded as UTF-16LE so Windows Terminal cannot reinterpret semicolons or quoting inside the user command. The Windows Terminal profile controls the tab profile independently; its configured command line is intentionally replaced by the selected command shell so RightAgent can execute the configured agent command.
+The selected Windows Terminal profile is the shell. RightAgent does not pick `pwsh`/`cmd` separately and does not replace the profile command line. `--appendCommandLine` keeps that profile's executable (PowerShell, CMD, Git Bash, VsDevCmd, WSL) and only appends the agent command. PowerShell families get `-NoLogo -NoExit -EncodedCommand`; a bare `cmd.exe` profile gets `/D /K`; a profile that already runs `cmd /k` (including Developer Command Prompt) gets `&& <command>`; Bash gets `-c "<command>; exec bash -i -l"`. PowerShell command text is Base64-encoded as UTF-16LE so Windows Terminal cannot reinterpret semicolons inside the user command. The settings app lists visible profiles from the user's Terminal `settings.json` and stores either `null` for “use Terminal default” or the selected profile GUID. When `terminalProfile` is empty, the launcher still passes `-p` with Terminal's `defaultProfile`.
 
 Only the user-authored command is evaluated by the selected shell. RightAgent runs without elevation and inherits the current user's environment.
 

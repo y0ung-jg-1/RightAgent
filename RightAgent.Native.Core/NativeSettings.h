@@ -68,4 +68,43 @@ namespace rightagent
         std::wstring_view iconPath,
         const std::filesystem::path& moduleDirectory,
         const std::filesystem::path& localStateDirectory = GetLocalStateDirectory());
+    enum class WindowsTerminalShellFamily
+    {
+        PowerShell,
+        CommandPrompt,
+        Bash,
+        Wsl
+    };
+
+    struct WindowsTerminalProfileInfo
+    {
+        std::wstring id;
+        std::wstring name;
+        std::wstring source;
+        std::wstring commandline;
+        bool hidden{};
+    };
+
+    struct WindowsTerminalProfileCatalog
+    {
+        std::wstring defaultProfileId;
+        std::vector<WindowsTerminalProfileInfo> profiles;
+    };
+
+    [[nodiscard]] std::wstring ReadWindowsTerminalDefaultProfile(const std::filesystem::path& settingsPath);
+    [[nodiscard]] std::wstring ResolveWindowsTerminalProfile(std::wstring_view configuredProfile);
+    [[nodiscard]] WindowsTerminalProfileCatalog ReadWindowsTerminalProfileCatalog(const std::filesystem::path& settingsPath);
+    [[nodiscard]] WindowsTerminalProfileCatalog LoadWindowsTerminalProfileCatalog();
+    [[nodiscard]] const WindowsTerminalProfileInfo* FindWindowsTerminalProfile(
+        const WindowsTerminalProfileCatalog& catalog,
+        std::wstring_view idOrName);
+    [[nodiscard]] WindowsTerminalProfileInfo ResolveWindowsTerminalLaunchProfile(std::wstring_view configuredProfile);
+    [[nodiscard]] WindowsTerminalShellFamily ClassifyWindowsTerminalShell(
+        std::wstring_view name,
+        std::wstring_view source,
+        std::wstring_view commandline);
+    [[nodiscard]] std::wstring BuildWindowsTerminalAppendCommandLine(
+        WindowsTerminalShellFamily family,
+        std::wstring_view command,
+        std::wstring_view profileCommandline);
 }

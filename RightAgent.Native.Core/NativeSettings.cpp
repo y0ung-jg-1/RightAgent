@@ -1,4 +1,5 @@
 #include "NativeSettings.h"
+#include "ProcessHelpers.h"
 
 #include <windows.h>
 #include <appmodel.h>
@@ -150,6 +151,146 @@ namespace
             return {};
         }
         return std::wstring(winrt::to_hstring(bytes));
+    }
+
+    std::wstring StripJsonComments(std::wstring_view text)
+    {
+        std::wstring result;
+        result.reserve(text.size());
+        enum class State
+        {
+            Normal,
+            String,
+            LineComment,
+            BlockComment
+        };
+        auto state = State::Normal;
+        for (std::size_t index = 0; index < text.size(); ++index)
+        {
+            const wchar_t current = text[index];
+            const wchar_t next = index + 1 < text.size() ? text[index + 1] : L'\0';
+            switch (state)
+            {
+            case State::Normal:
+                if (current == L'"')
+                {
+                    state = State::String;
+                    result.push_back(current);
+                }
+                else if (current == L'/' && next == L'/')
+                {
+                    state = State::LineComment;
+                    ++index;
+                }
+                else if (current == L'/' && next == L'*')
+                {
+                    state = State::BlockComment;
+                    ++index;
+                }
+                else
+                {
+                    result.push_back(current);
+                }
+                break;
+            case State::String:
+                result.push_back(current);
+                if (current == L'\\' && next != L'\0')
+                {
+                    result.push_back(next);
+                    ++index;
+                }
+                else if (current == L'"')
+                {
+                    state = State::Normal;
+                }
+                break;
+            case State::LineComment:
+                if (current == L'\n' || current == L'\r')
+                {
+                    state = State::Normal;
+                    result.push_back(current);
+                }
+                break;
+            case State::BlockComment:
+                if (current == L'*' && next == L'/')
+                {
+                    state = State::Normal;
+                    ++index;
+                }
+                break;
+            }
+        }
+        return result;
+    }
+
+    std::wstring ReadJsonStringProperty(std::wstring_view json, std::wstring_view key)
+    {
+        const std::wstring quotedKey = L"\"" + std::wstring(key) + L"\"";
+        std::size_t position = 0;
+        while ((position = json.find(quotedKey, position)) != std::wstring_view::npos)
+        {
+            std::size_t cursor = position + quotedKey.size();
+            while (cursor < json.size() && std::iswspace(json[cursor]))
+            {
+                ++cursor;
+            }
+            if (cursor >= json.size() || json[cursor] != L':')
+            {
+                ++position;
+                continue;
+            }
+            ++cursor;
+            while (cursor < json.size() && std::iswspace(json[cursor]))
+            {
+                ++cursor;
+            }
+            if (cursor >= json.size() || json[cursor] != L'"')
+            {
+                return {};
+            }
+
+            std::wstring value;
+            ++cursor;
+            while (cursor < json.size() && json[cursor] != L'"')
+            {
+                if (json[cursor] == L'\\' && cursor + 1 < json.size())
+                {
+                    value.push_back(json[cursor + 1]);
+                    cursor += 2;
+                    continue;
+                }
+                value.push_back(json[cursor]);
+                ++cursor;
+            }
+            return value;
+        }
+        return {};
+    }
+
+    std::filesystem::path FindWindowsTerminalSettingsPath()
+    {
+        const auto localAppData = GetLocalAppDataDirectory();
+        if (localAppData.empty())
+        {
+            return {};
+        }
+
+        const std::filesystem::path candidates[] =
+        {
+            localAppData / L"Packages" / L"Microsoft.WindowsTerminal_8wekyb3d8bbwe" / L"LocalState" / L"settings.json",
+            localAppData / L"Packages" / L"Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe" / L"LocalState" / L"settings.json",
+            localAppData / L"Packages" / L"Microsoft.WindowsTerminalCanary_8wekyb3d8bbwe" / L"LocalState" / L"settings.json",
+            localAppData / L"Microsoft" / L"Windows Terminal" / L"settings.json"
+        };
+        for (const auto& candidate : candidates)
+        {
+            std::error_code error;
+            if (std::filesystem::is_regular_file(candidate, error))
+            {
+                return candidate;
+            }
+        }
+        return {};
     }
 
     std::wstring GetString(const JsonObject& object, const wchar_t* key, std::wstring fallback = {})
@@ -589,5 +730,231 @@ namespace rightagent
             key = L"rightagent";
         }
         return moduleDirectory / L"Assets" / L"Agents" / (key + L".ico");
+    }
+
+    std::wstring CanonicalProfileId(std::wstring value)
+    {
+        value = Trim(std::move(value));
+        if (value.size() >= 2 && value.front() == L'{' && value.back() == L'}')
+        {
+            return ToLower(value.substr(1, value.size() - 2));
+        }
+        return ToLower(value);
+    }
+
+    bool ProfileIdsEqual(std::wstring_view left, std::wstring_view right)
+    {
+        return CanonicalProfileId(std::wstring(left)) == CanonicalProfileId(std::wstring(right));
+    }
+
+    bool ContainsToken(const std::wstring& haystack, const std::wstring& needle)
+    {
+        return haystack.find(needle) != std::wstring::npos;
+    }
+
+    std::wstring QuoteDoubleQuoted(std::wstring_view value)
+    {
+        std::wstring result(1, L'"');
+        for (const wchar_t character : value)
+        {
+            if (character == L'\\' || character == L'"')
+            {
+                result.push_back(L'\\');
+            }
+            result.push_back(character);
+        }
+        result.push_back(L'"');
+        return result;
+    }
+
+    std::wstring ReadWindowsTerminalDefaultProfile(const std::filesystem::path& settingsPath)
+    {
+        if (settingsPath.empty())
+        {
+            return {};
+        }
+        return Trim(ReadJsonStringProperty(StripJsonComments(ReadUtf8File(settingsPath)), L"defaultProfile"));
+    }
+
+    std::wstring ResolveWindowsTerminalProfile(const std::wstring_view configuredProfile)
+    {
+        auto configured = Trim(std::wstring(configuredProfile));
+        if (!configured.empty())
+        {
+            return configured;
+        }
+        return ReadWindowsTerminalDefaultProfile(FindWindowsTerminalSettingsPath());
+    }
+
+    WindowsTerminalProfileCatalog ReadWindowsTerminalProfileCatalog(const std::filesystem::path& settingsPath)
+    {
+        WindowsTerminalProfileCatalog catalog;
+        if (settingsPath.empty())
+        {
+            return catalog;
+        }
+
+        const auto text = StripJsonComments(ReadUtf8File(settingsPath));
+        catalog.defaultProfileId = Trim(ReadJsonStringProperty(text, L"defaultProfile"));
+        if (text.empty())
+        {
+            return catalog;
+        }
+
+        try
+        {
+            const auto root = JsonObject::Parse(text);
+            if (!root.HasKey(L"profiles"))
+            {
+                return catalog;
+            }
+
+            const auto profilesValue = root.GetNamedValue(L"profiles");
+            JsonArray list;
+            if (profilesValue.ValueType() == JsonValueType::Array)
+            {
+                list = profilesValue.GetArray();
+            }
+            else if (profilesValue.ValueType() == JsonValueType::Object)
+            {
+                const auto object = profilesValue.GetObject();
+                if (object.HasKey(L"list") && object.GetNamedValue(L"list").ValueType() == JsonValueType::Array)
+                {
+                    list = object.GetNamedArray(L"list");
+                }
+            }
+
+            for (const auto& value : list)
+            {
+                if (value.ValueType() != JsonValueType::Object)
+                {
+                    continue;
+                }
+
+                const auto object = value.GetObject();
+                WindowsTerminalProfileInfo profile;
+                profile.id = Trim(GetString(object, L"guid"));
+                profile.name = Trim(GetString(object, L"name"));
+                profile.source = Trim(GetString(object, L"source"));
+                profile.commandline = Trim(GetString(object, L"commandline"));
+                profile.hidden = GetBoolean(object, L"hidden", false);
+                if (profile.id.empty())
+                {
+                    profile.id = profile.name;
+                }
+                if (!profile.id.empty())
+                {
+                    catalog.profiles.push_back(std::move(profile));
+                }
+            }
+        }
+        catch (const winrt::hresult_error&)
+        {
+        }
+
+        return catalog;
+    }
+
+    WindowsTerminalProfileCatalog LoadWindowsTerminalProfileCatalog()
+    {
+        return ReadWindowsTerminalProfileCatalog(FindWindowsTerminalSettingsPath());
+    }
+
+    const WindowsTerminalProfileInfo* FindWindowsTerminalProfile(
+        const WindowsTerminalProfileCatalog& catalog,
+        const std::wstring_view idOrName)
+    {
+        const auto value = Trim(std::wstring(idOrName));
+        if (value.empty())
+        {
+            return nullptr;
+        }
+
+        for (const auto& profile : catalog.profiles)
+        {
+            if (ProfileIdsEqual(profile.id, value))
+            {
+                return &profile;
+            }
+        }
+        const auto lowered = ToLower(value);
+        for (const auto& profile : catalog.profiles)
+        {
+            if (ToLower(profile.name) == lowered)
+            {
+                return &profile;
+            }
+        }
+        return nullptr;
+    }
+
+    WindowsTerminalProfileInfo ResolveWindowsTerminalLaunchProfile(const std::wstring_view configuredProfile)
+    {
+        const auto catalog = LoadWindowsTerminalProfileCatalog();
+        const auto configured = Trim(std::wstring(configuredProfile));
+        if (const auto* profile = FindWindowsTerminalProfile(catalog, configured.empty() ? catalog.defaultProfileId : configured))
+        {
+            return *profile;
+        }
+
+        WindowsTerminalProfileInfo fallback;
+        fallback.id = configured.empty() ? catalog.defaultProfileId : configured;
+        fallback.name = fallback.id;
+        return fallback;
+    }
+
+    WindowsTerminalShellFamily ClassifyWindowsTerminalShell(
+        const std::wstring_view name,
+        const std::wstring_view source,
+        const std::wstring_view commandline)
+    {
+        const auto haystack = ToLower(
+            Trim(std::wstring(name)) + L'\n' + Trim(std::wstring(source)) + L'\n' + Trim(std::wstring(commandline)));
+        if (ContainsToken(haystack, L"wsl.exe") || ContainsToken(haystack, L"windows.terminal.wsl"))
+        {
+            return WindowsTerminalShellFamily::Wsl;
+        }
+        if (ContainsToken(haystack, L"bash.exe")
+            || ContainsToken(haystack, L"git bash")
+            || ToLower(Trim(std::wstring(source))) == L"git")
+        {
+            return WindowsTerminalShellFamily::Bash;
+        }
+        if (ContainsToken(haystack, L"cmd.exe")
+            || ContainsToken(haystack, L"command prompt")
+            || ContainsToken(haystack, L"命令提示符"))
+        {
+            return WindowsTerminalShellFamily::CommandPrompt;
+        }
+        return WindowsTerminalShellFamily::PowerShell;
+    }
+
+    std::wstring BuildWindowsTerminalAppendCommandLine(
+        const WindowsTerminalShellFamily family,
+        const std::wstring_view command,
+        const std::wstring_view profileCommandline)
+    {
+        const auto commandText = std::wstring(command);
+        switch (family)
+        {
+        case WindowsTerminalShellFamily::CommandPrompt:
+        {
+            const auto lowerCommandline = ToLower(std::wstring(profileCommandline));
+            if (ContainsToken(lowerCommandline, L"/k") || ContainsToken(lowerCommandline, L"/c"))
+            {
+                return L"&& " + commandText;
+            }
+            return L"/D /K " + commandText;
+        }
+        case WindowsTerminalShellFamily::Bash:
+            return L"-c " + QuoteDoubleQuoted(commandText + L"; exec bash -i -l");
+        case WindowsTerminalShellFamily::Wsl:
+            return L"-- bash -lc " + QuoteDoubleQuoted(commandText + L"; exec bash");
+        case WindowsTerminalShellFamily::PowerShell:
+        default:
+            // Windows Terminal treats semicolons as its own command separators.
+            // Base64 keeps the PowerShell script opaque until the profile shell decodes it.
+            return L"-NoLogo -NoExit -EncodedCommand " + EncodePowerShellCommand(commandText);
+        }
     }
 }

@@ -16,7 +16,7 @@ public sealed class MainViewModel : BindableBase
     private string menuMode = SettingsContract.GroupedMenu;
     private string? directAgentId;
     private string terminalShell = SettingsContract.AutomaticTerminalShell;
-    private string? terminalProfile;
+    private string terminalProfile = string.Empty;
     private bool menuEnabled = true;
     private bool isLoaded;
     private string previewRootTitle = string.Empty;
@@ -53,13 +53,7 @@ public sealed class MainViewModel : BindableBase
         new OptionItem(SettingsContract.MultiDirectMenu, string.Empty)
     ];
 
-    public IReadOnlyList<OptionItem> TerminalShellOptions { get; } =
-    [
-        new OptionItem(SettingsContract.AutomaticTerminalShell, string.Empty),
-        new OptionItem(SettingsContract.PowerShell7TerminalShell, string.Empty),
-        new OptionItem(SettingsContract.WindowsPowerShellTerminalShell, string.Empty),
-        new OptionItem(SettingsContract.CommandPromptTerminalShell, string.Empty)
-    ];
+    public ObservableCollection<OptionItem> TerminalProfileOptions { get; } = [];
 
     public bool IsLoaded
     {
@@ -146,28 +140,17 @@ public sealed class MainViewModel : BindableBase
         }
     }
 
-    public string TerminalShell
+    public string TerminalProfile
     {
-        get => terminalShell;
+        get => terminalProfile;
         set
         {
             if (value is null)
             {
                 return;
             }
-            var normalized = value is SettingsContract.PowerShell7TerminalShell
-                or SettingsContract.WindowsPowerShellTerminalShell
-                or SettingsContract.CommandPromptTerminalShell
-                ? value
-                : SettingsContract.AutomaticTerminalShell;
-            SetProperty(ref terminalShell, normalized);
+            SetProperty(ref terminalProfile, value);
         }
-    }
-
-    public string? TerminalProfile
-    {
-        get => terminalProfile;
-        set => SetProperty(ref terminalProfile, value);
     }
 
     public bool IsEmpty => Agents.Count == 0;
@@ -248,8 +231,6 @@ public sealed class MainViewModel : BindableBase
     public string MenuSectionLabel => localization["MenuSection"];
     public string MenuModeLabel => localization["MenuMode"];
     public string DirectAgentLabel => localization["DirectAgent"];
-    public string TerminalShellLabel => localization["TerminalShell"];
-    public string TerminalShellHint => localization["TerminalShellHint"];
     public string TerminalProfileLabel => localization["TerminalProfile"];
     public string TerminalProfileHint => localization["TerminalProfileHint"];
     public string TerminalProfileHelp => localization["TerminalProfileHelp"];
@@ -269,6 +250,7 @@ public sealed class MainViewModel : BindableBase
     public string DeleteLabel => localization["Delete"];
     public string CancelLabel => localization["Cancel"];
     public string ValidationTitle => localization["ValidationTitle"];
+    public string VersionText => string.Format(CultureInfo.CurrentCulture, localization["VersionFormat"], ReadDisplayVersion());
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -278,7 +260,7 @@ public sealed class MainViewModel : BindableBase
         menuMode = settings.MenuMode;
         directAgentId = settings.DirectAgentId;
         terminalShell = settings.TerminalShell;
-        terminalProfile = settings.TerminalProfile;
+        terminalProfile = settings.TerminalProfile ?? string.Empty;
         menuEnabled = settings.MenuEnabled;
 
         foreach (var existing in Agents)
@@ -354,8 +336,10 @@ public sealed class MainViewModel : BindableBase
             Language = Language,
             MenuMode = MenuMode,
             DirectAgentId = DirectAgentId,
-            TerminalShell = TerminalShell,
-            TerminalProfile = TerminalProfile,
+            TerminalShell = string.IsNullOrWhiteSpace(terminalShell)
+                ? SettingsContract.AutomaticTerminalShell
+                : terminalShell,
+            TerminalProfile = string.IsNullOrWhiteSpace(TerminalProfile) ? null : TerminalProfile,
             MenuEnabled = MenuEnabled,
             Agents = Agents.Select(agent => agent.ToDefinition()).ToList()
         };
@@ -541,10 +525,7 @@ public sealed class MainViewModel : BindableBase
         MenuModeOptions[0].UpdateLabel(localization["Grouped"]);
         MenuModeOptions[1].UpdateLabel(localization["Direct"]);
         MenuModeOptions[2].UpdateLabel(localization["MultiDirect"]);
-        TerminalShellOptions[0].UpdateLabel(localization["TerminalShellAuto"]);
-        TerminalShellOptions[1].UpdateLabel(localization["PowerShell7"]);
-        TerminalShellOptions[2].UpdateLabel(localization["WindowsPowerShell"]);
-        TerminalShellOptions[3].UpdateLabel(localization["CommandPrompt"]);
+        RefreshTerminalProfileOptions();
         foreach (var agent in Agents)
         {
             agent.RefreshLanguage();
@@ -553,6 +534,44 @@ public sealed class MainViewModel : BindableBase
         RefreshPreview();
         RefreshValidation();
     }
+
+    private void RefreshTerminalProfileOptions()
+    {
+        var catalog = WindowsTerminalProfileCatalog.Load();
+        var selected = catalog.NormalizeSelection(terminalProfile) ?? string.Empty;
+        if (!string.Equals(terminalProfile, selected, StringComparison.Ordinal))
+        {
+            terminalProfile = selected;
+            OnPropertyChanged(nameof(TerminalProfile));
+        }
+
+        var items = new List<OptionItem>
+        {
+            new(string.Empty, FormatDefaultProfileLabel(catalog.DefaultProfileName))
+        };
+        foreach (var profile in catalog.VisibleProfiles)
+        {
+            items.Add(new OptionItem(profile.Id, profile.Name));
+        }
+
+        if (selected.Length > 0
+            && items.TrueForAll(item => !item.Key.Equals(selected, StringComparison.OrdinalIgnoreCase)))
+        {
+            var leftover = catalog.Find(selected);
+            items.Add(new OptionItem(selected, leftover?.Name ?? selected));
+        }
+
+        TerminalProfileOptions.Clear();
+        foreach (var item in items)
+        {
+            TerminalProfileOptions.Add(item);
+        }
+    }
+
+    private string FormatDefaultProfileLabel(string? defaultProfileName) =>
+        string.IsNullOrWhiteSpace(defaultProfileName)
+            ? localization["TerminalProfileDefault"]
+            : string.Format(CultureInfo.CurrentCulture, localization["TerminalProfileDefaultNamed"], defaultProfileName);
 
     private void NotifyLocalizedProperties()
     {
@@ -566,8 +585,6 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(MenuSectionLabel));
         OnPropertyChanged(nameof(MenuModeLabel));
         OnPropertyChanged(nameof(DirectAgentLabel));
-        OnPropertyChanged(nameof(TerminalShellLabel));
-        OnPropertyChanged(nameof(TerminalShellHint));
         OnPropertyChanged(nameof(TerminalProfileLabel));
         OnPropertyChanged(nameof(TerminalProfileHint));
         OnPropertyChanged(nameof(TerminalProfileHelp));
@@ -589,6 +606,23 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(DeleteLabel));
         OnPropertyChanged(nameof(CancelLabel));
         OnPropertyChanged(nameof(ValidationTitle));
+        OnPropertyChanged(nameof(VersionText));
+    }
+
+    private static string ReadDisplayVersion()
+    {
+        try
+        {
+            var packageVersion = Windows.ApplicationModel.Package.Current.Id.Version;
+            return $"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}";
+        }
+        catch (Exception)
+        {
+            var assemblyVersion = typeof(App).Assembly.GetName().Version;
+            return assemblyVersion is null
+                ? "1.1.4"
+                : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
+        }
     }
 
     private void NotifyState()
