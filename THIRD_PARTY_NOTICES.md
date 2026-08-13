@@ -36,14 +36,16 @@ not a resident RightAgent runtime dependency.
 
 The following checked-in agent glyphs were adapted from the
 `@lobehub/icons-static-svg` package in the
-[Lobe Icons](https://github.com/lobehub/lobe-icons) project and retrieved on
-2026-08-12:
+[Lobe Icons](https://github.com/lobehub/lobe-icons) project. The original five
+glyphs were retrieved on 2026-08-12; the Cursor glyph was retrieved from
+package version 1.94.0 on 2026-08-13:
 
 - `RightAgent.App/Assets/Agents/claude.svg`
 - `RightAgent.App/Assets/Agents/codex.svg`
 - `RightAgent.App/Assets/Agents/kimi.svg`
 - `RightAgent.App/Assets/Agents/grok.svg`
 - `RightAgent.App/Assets/Agents/opencode.svg`
+- `RightAgent.App/Assets/Agents/cursor.svg`
 - the corresponding generated ICO files under
   `RightAgent.Package/Assets/Agents/`
 
@@ -75,10 +77,10 @@ SOFTWARE.
 
 ## Trademarks
 
-Claude, Codex, Kimi, Grok, OpenCode, and their respective logos are trademarks
-or brand assets of their respective owners. Their names identify compatible
-third-party tools only. RightAgent is an independent project and is not
-affiliated with, endorsed by, or sponsored by those owners.
+Claude, Codex, Kimi, Grok, OpenCode, Cursor, and their respective logos are
+trademarks or brand assets of their respective owners. Their names identify
+compatible third-party tools only. RightAgent is an independent project and is
+not affiliated with, endorsed by, or sponsored by those owners.
 
 The Lobe Icons MIT license covers copyright in the icon collection; it does
 not replace the separate trademark and brand-usage requirements documented in

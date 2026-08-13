@@ -6,7 +6,7 @@
 
 **把 AI 编程助手装进 Windows 11 的右键菜单。**
 
-当前版本：v1.1.0 · [MIT 许可证](LICENSE)
+当前版本：v1.1.1 · [MIT 许可证](LICENSE)
 
 ```text
 使用 RightAgent 打开  >
@@ -15,6 +15,7 @@
     Kimi Web
     Grok
     opencode
+    Cursor Agent
 ```
 
 在文件夹空白处或选中一个文件夹后点击右键，即可用喜欢的 AI 编程助手打开当前目录。RightAgent 支持分组菜单、单个 Agent 直达，以及把多个已启用 Agent 同时放在右键菜单根目录的多个直达模式。菜单模式、启用状态、排列顺序、命令、网址、图标、界面语言、命令解释器和 Windows Terminal 配置文件，都可以在 WinUI 3 设置应用中统一管理。
@@ -26,7 +27,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 ## 功能特性
 
 - **三种菜单模式**：分组子菜单、单个 Agent 直达，或按配置顺序显示全部已启用 Agent 的多个直达命令。
-- **五个内置助手**：Claude Code、Codex、Kimi Web、Grok 和 opencode，开箱即用。
+- **六个内置助手**：Claude Code、Codex、Kimi Web、Grok、opencode 和 Cursor Agent，开箱即用。
 - **完全可定制**：可以添加、重命名、启停和排序任意助手；动作支持终端命令或 `http`、`https` 网址。
 - **自定义图标**：本地 PNG、JPG、BMP、ICO 文件会自动规范化为 ICO。
 - **双语界面**：可以跟随系统，也可以明确选择简体中文或英文。
@@ -45,7 +46,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 
 ## 安装
 
-请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.1.0-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。安装器始终以当前 Windows 用户运行；首次安装若尚未信任随包公共证书，会单独请求一次管理员批准，只把该证书导入“本地计算机\受信任的人”，然后继续为当前用户安装 MSIX。证书已经受信任的升级不会重复请求管理员权限，发布包也不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
+请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.1.1-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。安装器始终以当前 Windows 用户运行；首次安装若尚未信任随包公共证书，会单独请求一次管理员批准，只把该证书导入“本地计算机\受信任的人”，然后继续为当前用户安装 MSIX。证书已经受信任的升级不会重复请求管理员权限，发布包也不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
 
 ### 从源码开发
 

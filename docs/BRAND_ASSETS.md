@@ -14,10 +14,12 @@ matching the agent icon family). Derived release assets live in `RightAgent.Pack
 
 ## Built-in agent icons
 
-The five checked-in agent icons were adapted from
+The six checked-in agent icons were adapted from
 [@lobehub/icons](https://github.com/lobehub/lobe-icons) (MIT license; source
-package `@lobehub/icons-static-svg`) on 2026-08-12. The full copyright notice is
-preserved in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
+package `@lobehub/icons-static-svg`). The original five were retrieved on
+2026-08-12; Cursor was retrieved from package version 1.94.0 on 2026-08-13. The
+full copyright notice is preserved in
+[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
 
 The MIT license covers the icon collection's copyright. It does not grant
 trademark permission from the vendors represented by the glyphs. For the v1
@@ -26,13 +28,14 @@ Lobe-derived assets and accepts responsibility for that separate trademark
 assessment. They identify compatible third-party tools only and do not imply
 affiliation, sponsorship, or endorsement.
 
-| Agent | Current checked-in asset | Official source reviewed 2026-08-12 | Public-release status |
+| Agent | Current checked-in asset | Vendor source reviewed | Public-release status |
 | --- | --- | --- | --- |
 | Claude Code | Lobe Icons glyph on a RightAgent tile | Anthropic product and legal pages; no public logo-use guide or downloadable asset was located | Retained for v1 by project decision; not represented as an official asset |
 | Codex | Lobe Icons color glyph on a RightAgent tile | [OpenAI brand guidelines](https://openai.com/brand/) | Retained for v1 by project decision; not represented as an official asset |
 | Kimi | Lobe Icons color glyph on a RightAgent tile | [Moonshot AI KIMI Branding Guide](https://moonshotai.github.io/Branding-Guide/) | Retained for v1 by project decision; not represented as an official asset |
 | Grok | Lobe Icons glyph on a RightAgent tile | [xAI brand guidelines](https://x.ai/legal/brand-guidelines) | Retained for v1 by project decision; not represented as an official asset |
 | OpenCode | Lobe Icons glyph on a RightAgent tile | [OpenCode brand page](https://opencode.ai/brand) | Retained for v1 by project decision; not represented as an official asset |
+| Cursor Agent | Lobe Icons glyph on a RightAgent tile | [Cursor](https://cursor.com/) | Retained for v1 by project decision; not represented as an official asset |
 
 For a future switch to vendor-provided official assets:
 

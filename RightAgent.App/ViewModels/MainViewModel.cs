@@ -291,15 +291,21 @@ public sealed class MainViewModel : BindableBase
 
         // Built-ins introduced after the user's settings file was written are merged in,
         // enabled only when their command is detected on this machine.
+        var addedBuiltIn = false;
         foreach (var builtIn in SettingsDefaults.Create().Agents)
         {
             if (FindAgent(builtIn.Id) is null)
             {
                 Attach(new AgentItemViewModel(builtIn, localization));
+                addedBuiltIn = true;
             }
         }
 
         RefreshSort();
+        if (addedBuiltIn)
+        {
+            await SaveAsync(cancellationToken);
+        }
         RefreshLocalization();
         IsLoaded = true;
         NotifyState();

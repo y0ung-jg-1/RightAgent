@@ -6,7 +6,7 @@
 
 **AI coding agents in your Windows 11 right-click menu.**
 
-Current version: v1.1.0 · [MIT License](LICENSE)
+Current version: v1.1.1 · [MIT License](LICENSE)
 
 ```text
 Open with RightAgent  >
@@ -15,6 +15,7 @@ Open with RightAgent  >
     Kimi Web
     Grok
     opencode
+    Cursor Agent
 ```
 
 Right-click a folder background or a single selected folder and open that directory with your preferred AI coding agent. RightAgent supports a grouped submenu, one direct agent, or multiple direct commands that place every enabled agent at the context-menu root. The WinUI 3 settings app manages the menu mode, enabled agents, order, commands, URLs, icons, interface language, command shell, and Windows Terminal profile.
@@ -26,7 +27,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 ## Features
 
 - **Three menu modes**: a grouped submenu, one direct agent, or multiple direct commands ordered exactly like the enabled agent list.
-- **Five built-in agents**: Claude Code, Codex, Kimi Web, Grok, and opencode.
+- **Six built-in agents**: Claude Code, Codex, Kimi Web, Grok, opencode, and Cursor Agent.
 - **Fully customizable**: add, rename, enable, disable, and reorder arbitrary agents; actions can be terminal commands or `http` and `https` URLs.
 - **Custom icons**: local PNG, JPG, BMP, and ICO files are normalized to ICO.
 - **Bilingual interface**: follow the system language or explicitly select Simplified Chinese or English.
@@ -45,7 +46,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 
 ## Installation
 
-Download `RightAgent-1.1.0-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer remains under the current Windows user. On the first installation, if the bundled public certificate is not trusted yet, Setup requests administrator approval only for importing that certificate into Local Computer\Trusted People, then installs the MSIX for the current user. Upgrades do not request elevation again while the certificate remains trusted, and the private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
+Download `RightAgent-1.1.1-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer remains under the current Windows user. On the first installation, if the bundled public certificate is not trusted yet, Setup requests administrator approval only for importing that certificate into Local Computer\Trusted People, then installs the MSIX for the current user. Upgrades do not request elevation again while the certificate remains trusted, and the private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
 
 ### Build and install from source
 

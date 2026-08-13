@@ -2,8 +2,8 @@
 
 ## Automated gates
 
-- Managed tests: defaults detect commands, Windows Terminal detection covers PATH/WindowsApps/missing cases, menu-mode and terminal-shell values normalize safely, IDs/order/direct target are repaired, URL schemes are restricted, and Unicode settings save/load atomically.
-- Native tests: Windows argument round-trip covers spaces, Chinese, parentheses, single quotes, ampersands, quotes, and trailing backslashes.
+- Managed tests: defaults detect commands, including Cursor Agent's exact `cursor-agent` command; Windows Terminal detection covers PATH/WindowsApps/missing cases, menu-mode and terminal-shell values normalize safely, IDs/order/direct target are repaired, URL schemes are restricted, and Unicode settings save/load atomically.
+- Native tests: Windows argument round-trip covers spaces, Chinese, parentheses, single quotes, ampersands, quotes, and trailing backslashes; built-in Cursor defaults and icon resolution are verified.
 - Native COM smoke test: loads `RightAgent.Shell.dll` without registration, checks grouped and single-direct behavior, then verifies the multi-direct separator flag and its ordered, root-style child titles.
 - Release build: x64 Launcher and Shell compile with warnings as errors; WAP produces one unsigned package before signing.
 - Release installer: the pinned Inno Setup compiler hash is verified; the final Setup EXE and embedded MSIX use the expected certificate and RFC 3161 timestamps; the external SHA-256 covers the exact EXE. The tag workflow runs the final Setup on its clean hosted runner and rejects installer exceptions, elevated install mode, missing completed deployment progress, a wrong package version, or an incorrect certificate store.
@@ -21,7 +21,7 @@
 9. Verify Chinese, English, and system language, including menu title and launcher errors.
 10. With command shell set to **Automatic**, launch an agent and run `$PSVersionTable.PSVersion`; confirm PowerShell 7 is used when `pwsh.exe` is installed, otherwise Windows PowerShell 5.1 is used.
 11. Select PowerShell 7, Windows PowerShell 5.1, and CMD explicitly; launch an agent in each and confirm the selected shell opens. For CMD, verify the working directory with `cd`; for PowerShell, use `Get-Location`.
-12. Launch `claude`, `codex`, and `kimi web`; confirm each new Terminal window uses the exact selected folder.
+12. Launch `claude`, `codex`, `kimi web`, and `cursor-agent`; confirm each new Terminal window uses the exact selected folder.
 13. Repeat with a folder named `中文 space & (test) 'quote'`.
 14. Configure an `https` web action and confirm the default browser opens. Confirm `file:`, `javascript:`, and malformed URLs cannot be saved as enabled actions.
 15. Temporarily configure a missing simple command and confirm the launcher error offers **Open settings** without crashing Explorer.

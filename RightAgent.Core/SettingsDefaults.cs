@@ -12,7 +12,8 @@ public static class SettingsDefaults
             BuiltIn("codex", "Codex", "builtin:codex", "codex", 1, commandExists("codex")),
             BuiltIn("kimi-web", "Kimi Web", "builtin:kimi", "kimi web", 2, commandExists("kimi")),
             BuiltIn("grok", "Grok", "builtin:grok", "grok", 3, commandExists("grok")),
-            BuiltIn("opencode", "opencode", "builtin:opencode", "opencode", 4, commandExists("opencode"))
+            BuiltIn("opencode", "opencode", "builtin:opencode", "opencode", 4, commandExists("opencode")),
+            BuiltIn("cursor-agent", "Cursor Agent", "builtin:cursor", "cursor-agent", 5, commandExists("cursor-agent"))
         };
 
         return new RightAgentSettings

@@ -32,7 +32,9 @@ try {
         'ThirdPartyNotices/WebView2/LICENSE.txt',
         'ThirdPartyNotices/WebView2/NOTICE.txt',
         'ThirdPartyNotices/SystemNumericsTensors/LICENSE.txt',
-        'ThirdPartyNotices/SystemNumericsTensors/THIRD_PARTY_NOTICES.txt'
+        'ThirdPartyNotices/SystemNumericsTensors/THIRD_PARTY_NOTICES.txt',
+        'Assets/Agents/cursor.svg',
+        'Assets/Agents/cursor.ico'
     )
     foreach ($requiredEntry in $requiredEntries) {
         if (-not $entries.ContainsKey($requiredEntry)) {
@@ -67,7 +69,7 @@ try {
         }
     }
 
-    Write-Host "Verified package notices: $($requiredEntries.Count) files; $($documentedLibraries.Count) dependency versions."
+    Write-Host "Verified required package files: $($requiredEntries.Count); $($documentedLibraries.Count) documented dependency versions."
 }
 finally {
     $archive.Dispose()

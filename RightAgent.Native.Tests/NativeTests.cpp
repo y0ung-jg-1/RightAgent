@@ -7,6 +7,7 @@
 #include <shobjidl.h>
 #include <winrt/base.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -76,7 +77,19 @@ namespace
         Expect(settings.agents.size() == 2, "Agent count changed");
         Expect(!settings.agents[0].enabled, "Unsafe URL should be disabled after sorting");
         Expect(settings.agents[0].iconPath == L"builtin:rightagent", "Unsafe icon path should be replaced");
-        Expect(rightagent::CreateDefaultSettings().terminalShell == rightagent::TerminalShell::Automatic, "Default terminal shell should be automatic");
+        const auto defaultSettings = rightagent::CreateDefaultSettings();
+        Expect(defaultSettings.terminalShell == rightagent::TerminalShell::Automatic, "Default terminal shell should be automatic");
+        const auto cursor = std::find_if(defaultSettings.agents.begin(), defaultSettings.agents.end(), [](const rightagent::AgentDefinition& agent)
+        {
+            return agent.id == L"cursor-agent";
+        });
+        Expect(cursor != defaultSettings.agents.end(), "Cursor Agent default is missing");
+        Expect(cursor->iconPath == L"builtin:cursor", "Cursor Agent default icon changed");
+        Expect(cursor->actionValue == L"cursor-agent", "Cursor Agent command changed");
+        Expect(
+            rightagent::ResolveIconPath(L"builtin:cursor", L"C:\\RightAgent", L"C:\\LocalState")
+                == std::filesystem::path(L"C:\\RightAgent\\Assets\\Agents\\cursor.ico"),
+            "Cursor built-in icon was not resolved");
 
         const auto benchmarkStart = std::chrono::steady_clock::now();
         constexpr int iterations = 200;

@@ -8,13 +8,26 @@ public sealed class SettingsTests
     [Fact]
     public void DefaultsEnableOnlyDetectedCommands()
     {
-        var settings = SettingsDefaults.Create(command => command is "claude" or "kimi");
+        var settings = SettingsDefaults.Create(command => command is "claude" or "kimi" or "cursor-agent");
 
         Assert.True(settings.Agents.Single(agent => agent.Id == "claude-code").Enabled);
         Assert.False(settings.Agents.Single(agent => agent.Id == "codex").Enabled);
         Assert.True(settings.Agents.Single(agent => agent.Id == "kimi-web").Enabled);
+        Assert.True(settings.Agents.Single(agent => agent.Id == "cursor-agent").Enabled);
         Assert.Equal("claude-code", settings.DirectAgentId);
         Assert.Equal(SettingsContract.AutomaticTerminalShell, settings.TerminalShell);
+    }
+
+    [Fact]
+    public void CursorAgentUsesExpectedBuiltInDefinition()
+    {
+        var cursor = SettingsDefaults.Create(_ => false).Agents.Single(agent => agent.Id == "cursor-agent");
+
+        Assert.Equal("Cursor Agent", cursor.Name);
+        Assert.Equal("builtin:cursor", cursor.IconPath);
+        Assert.Equal(SettingsContract.TerminalCommand, cursor.Action.Type);
+        Assert.Equal("cursor-agent", cursor.Action.Value);
+        Assert.Equal(5, cursor.Sort);
     }
 
     [Fact]

@@ -379,7 +379,8 @@ namespace rightagent
             BuiltIn(L"codex", L"Codex", L"builtin:codex", L"codex", 1, CommandExists(L"codex")),
             BuiltIn(L"kimi-web", L"Kimi Web", L"builtin:kimi", L"kimi web", 2, CommandExists(L"kimi")),
             BuiltIn(L"grok", L"Grok", L"builtin:grok", L"grok", 3, CommandExists(L"grok")),
-            BuiltIn(L"opencode", L"opencode", L"builtin:opencode", L"opencode", 4, CommandExists(L"opencode"))
+            BuiltIn(L"opencode", L"opencode", L"builtin:opencode", L"opencode", 4, CommandExists(L"opencode")),
+            BuiltIn(L"cursor-agent", L"Cursor Agent", L"builtin:cursor", L"cursor-agent", 5, CommandExists(L"cursor-agent"))
         };
         for (const auto& agent : settings.agents)
         {
@@ -429,6 +430,7 @@ namespace rightagent
         const std::filesystem::path extras[] =
         {
             std::filesystem::path(localAppData) / L"Microsoft" / L"WindowsApps",
+            std::filesystem::path(localAppData) / L"cursor-agent",
             std::filesystem::path(home) / L".local" / L"bin",
             std::filesystem::path(home) / L".kimi-code" / L"bin"
         };
@@ -503,7 +505,7 @@ namespace rightagent
         }
 
         auto key = lower.substr(8);
-        if (key != L"claude" && key != L"codex" && key != L"kimi" && key != L"grok" && key != L"opencode")
+        if (key != L"claude" && key != L"codex" && key != L"kimi" && key != L"grok" && key != L"opencode" && key != L"cursor")
         {
             key = L"rightagent";
         }

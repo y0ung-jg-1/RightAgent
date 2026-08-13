@@ -45,7 +45,7 @@ $v145Marker = if ($vsPath) { Join-Path $vsPath 'VC\Auxiliary\Build\Microsoft.VCT
 $v145Details = if ($v145Marker) { $v145Marker } else { 'Visual Studio 2026 not found' }
 Write-Check 'MSVC v145 x64 tools' ([bool]($v145Marker -and (Test-Path -LiteralPath $v145Marker))) $v145Details
 
-foreach ($command in 'git', 'wt', 'claude', 'codex', 'kimi') {
+foreach ($command in 'git', 'wt', 'claude', 'codex', 'kimi', 'cursor-agent') {
     $resolved = Get-Command $command -ErrorAction SilentlyContinue
     $resolvedDetails = if ($resolved) { $resolved.Source } else { 'not found' }
     Write-Check $command ([bool]$resolved) $resolvedDetails

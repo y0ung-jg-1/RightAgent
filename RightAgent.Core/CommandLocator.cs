@@ -56,6 +56,7 @@ public static class CommandLocator
         foreach (var extra in new[]
                  {
                      Path.Combine(localAppData, "Microsoft", "WindowsApps"),
+                     Path.Combine(localAppData, "cursor-agent"),
                      Path.Combine(home, ".local", "bin"),
                      Path.Combine(home, ".kimi-code", "bin")
                  })
