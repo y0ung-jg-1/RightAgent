@@ -43,8 +43,8 @@ The public local contract is UTF-8 JSON named `settings.json`:
 - `schemaVersion`: integer `1`. Writers always emit the current version.
 - `menuEnabled`: optional boolean, default `true`. When `false`, the Explorer command is hidden everywhere. Added later within schema version 1: readers ignore unknown fields, and files written before this field existed behave as `true`.
 - `language`: `system`, `zh-CN`, or `en-US`; unknown values normalize to `system`, with non-Chinese systems falling back to English.
-- `menuMode`: `grouped` or `direct`; unknown values normalize to `grouped`.
-- `directAgentId`: ID of an enabled agent. If absent or disabled, the first enabled agent becomes the fallback.
+- `menuMode`: `grouped`, `direct`, or `multiDirect`; unknown values normalize to `grouped`. `multiDirect` exposes each enabled agent as a separate root command in configured order and supports up to 16 enabled agents.
+- `directAgentId`: ID of an enabled agent used only by `direct` mode. If absent or disabled, the first enabled agent becomes the fallback.
 - `terminalShell`: `auto`, `pwsh`, `windowsPowerShell`, or `cmd`. Missing or unknown values normalize to `auto`, which prefers PowerShell 7 (`pwsh.exe`) and falls back to Windows PowerShell 5.1. CMD is used only when explicitly selected.
 - `terminalProfile`: optional Windows Terminal profile name. `null` or whitespace uses the Terminal default profile. This controls the Terminal profile independently from `terminalShell`; the selected shell executable is passed explicitly so the configured command can be executed reliably.
 - `agents`: ordered by `sort`; the settings writer rewrites sort values to contiguous zero-based integers.

@@ -13,7 +13,8 @@ namespace rightagent
     enum class MenuMode
     {
         Grouped,
-        Direct
+        Direct,
+        MultiDirect
     };
 
     enum class ActionType

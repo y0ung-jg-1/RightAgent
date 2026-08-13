@@ -24,6 +24,7 @@ namespace
 {
     HMODULE g_module = nullptr;
     std::atomic<long> g_moduleReferences = 0;
+    constexpr std::size_t MaxMultiDirectCommands = 16;
 
     void AddModuleReference() noexcept
     {
@@ -41,12 +42,15 @@ namespace
         {
             if (const auto* agent = rightagent::FindDirectAgent(settings))
             {
-                return rightagent::IsChinese(settings)
-                    ? L"使用 " + agent->name + L" 打开"
-                    : L"Open with " + agent->name;
+                return rightagent::IsChinese(settings) ? L"使用 " + agent->name + L" 打开" : L"Open with " + agent->name;
             }
         }
         return rightagent::IsChinese(settings) ? L"使用 RightAgent 打开" : L"Open with RightAgent";
+    }
+
+    std::wstring DirectTitle(const rightagent::Settings& settings, const rightagent::AgentDefinition& agent)
+    {
+        return rightagent::IsChinese(settings) ? L"使用 " + agent.name + L" 打开" : L"Open with " + agent.name;
     }
 
     GUID CanonicalGuidForAgent(const std::wstring& id)
@@ -165,8 +169,12 @@ namespace
     class ExplorerCommandEnumerator final : public IEnumExplorerCommand
     {
     public:
-        ExplorerCommandEnumerator(std::vector<rightagent::AgentDefinition> agents, IUnknown* site, const std::size_t index = 0)
-            : agents_(std::move(agents)), site_(site), index_(index)
+        ExplorerCommandEnumerator(
+            std::vector<rightagent::AgentDefinition> agents,
+            IUnknown* site,
+            const bool useDirectTitles,
+            const std::size_t index = 0)
+            : agents_(std::move(agents)), site_(site), useDirectTitles_(useDirectTitles), index_(index)
         {
             AddModuleReference();
             if (site_ != nullptr)
@@ -228,7 +236,7 @@ namespace
             {
                 return E_POINTER;
             }
-            *result = new (std::nothrow) ExplorerCommandEnumerator(agents_, site_, index_);
+            *result = new (std::nothrow) ExplorerCommandEnumerator(agents_, site_, useDirectTitles_, index_);
             return *result == nullptr ? E_OUTOFMEMORY : S_OK;
         }
 
@@ -245,6 +253,7 @@ namespace
         std::atomic<ULONG> references_{1};
         std::vector<rightagent::AgentDefinition> agents_;
         IUnknown* site_{};
+        bool useDirectTitles_{};
         std::size_t index_{};
     };
 
@@ -256,8 +265,8 @@ namespace
             AddModuleReference();
         }
 
-        ExplorerCommand(rightagent::AgentDefinition agent, IUnknown* site)
-            : agent_(std::move(agent)), site_(site)
+        ExplorerCommand(rightagent::AgentDefinition agent, IUnknown* site, const bool useDirectTitle)
+            : agent_(std::move(agent)), useDirectTitle_(useDirectTitle), site_(site)
         {
             AddModuleReference();
             if (site_ != nullptr)
@@ -311,7 +320,18 @@ namespace
                 return E_POINTER;
             }
             *title = nullptr;
-            const auto text = agent_ ? agent_->name : RootTitle(rightagent::LoadSettings());
+            std::wstring text;
+            if (agent_)
+            {
+                text = useDirectTitle_
+                    ? DirectTitle(rightagent::LoadSettings(), *agent_)
+                    : agent_->name;
+            }
+            else
+            {
+                const auto settings = rightagent::LoadSettings();
+                text = RootTitle(settings);
+            }
             return text.empty() ? E_FAIL : SHStrDupW(text.c_str(), title);
         }
 
@@ -328,12 +348,9 @@ namespace
             {
                 iconKey = agent_->iconPath;
             }
-            else if (settings.menuMode == rightagent::MenuMode::Direct)
+            else if (const auto* selectedAgent = ResolveSelectedAgent(settings))
             {
-                if (const auto* direct = rightagent::FindDirectAgent(settings))
-                {
-                    iconKey = direct->iconPath;
-                }
+                iconKey = selectedAgent->iconPath;
             }
 
             const auto path = rightagent::ResolveIconPath(iconKey, rightagent::GetModuleDirectory(g_module));
@@ -349,7 +366,7 @@ namespace
             }
             *tooltip = nullptr;
             const auto settings = rightagent::LoadSettings();
-            const auto* selectedAgent = agent_ ? &*agent_ : rightagent::FindDirectAgent(settings);
+            const auto* selectedAgent = ResolveSelectedAgent(settings);
             const auto text = selectedAgent == nullptr
                 ? (rightagent::IsChinese(settings) ? L"在此文件夹中打开编程 Agent" : L"Open a coding agent in this folder")
                 : (rightagent::IsChinese(settings)
@@ -364,7 +381,9 @@ namespace
             {
                 return E_POINTER;
             }
-            *commandName = agent_ ? CanonicalGuidForAgent(agent_->id) : CLSID_RightAgentExplorerCommand;
+            *commandName = agent_
+                ? CanonicalGuidForAgent(agent_->id)
+                : CLSID_RightAgentExplorerCommand;
             return S_OK;
         }
 
@@ -388,7 +407,17 @@ namespace
                     return S_OK;
                 }
             }
-            else if (rightagent::FindDirectAgent(settings) == nullptr)
+            else if (settings.menuMode == rightagent::MenuMode::Direct)
+            {
+                if (rightagent::FindDirectAgent(settings) == nullptr)
+                {
+                    return S_OK;
+                }
+            }
+            else if (std::none_of(settings.agents.begin(), settings.agents.end(), [](const auto& candidate)
+            {
+                return candidate.enabled;
+            }))
             {
                 return S_OK;
             }
@@ -404,15 +433,7 @@ namespace
         HRESULT STDMETHODCALLTYPE Invoke(IShellItemArray* selection, IBindCtx*) override
         {
             const auto settings = rightagent::LoadSettings();
-            const rightagent::AgentDefinition* selectedAgent = nullptr;
-            if (agent_)
-            {
-                selectedAgent = rightagent::FindEnabledAgent(settings, agent_->id);
-            }
-            else if (settings.menuMode == rightagent::MenuMode::Direct)
-            {
-                selectedAgent = rightagent::FindDirectAgent(settings);
-            }
+            const auto* selectedAgent = ResolveSelectedAgent(settings);
             if (selectedAgent == nullptr)
             {
                 return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
@@ -452,7 +473,11 @@ namespace
                 return S_OK;
             }
             const auto settings = rightagent::LoadSettings();
-            *flags = settings.menuMode == rightagent::MenuMode::Grouped ? ECF_HASSUBCOMMANDS : ECF_DEFAULT;
+            *flags = settings.menuMode == rightagent::MenuMode::Grouped
+                ? ECF_HASSUBCOMMANDS
+                : settings.menuMode == rightagent::MenuMode::MultiDirect
+                    ? ECF_ISSEPARATOR
+                    : ECF_DEFAULT;
             return S_OK;
         }
 
@@ -469,7 +494,8 @@ namespace
             }
 
             const auto settings = rightagent::LoadSettings();
-            if (settings.menuMode != rightagent::MenuMode::Grouped)
+            if (settings.menuMode != rightagent::MenuMode::Grouped
+                && settings.menuMode != rightagent::MenuMode::MultiDirect)
             {
                 return E_NOTIMPL;
             }
@@ -483,8 +509,13 @@ namespace
             {
                 return S_FALSE;
             }
+            const bool useDirectTitles = settings.menuMode == rightagent::MenuMode::MultiDirect;
+            if (useDirectTitles && enabled.size() > MaxMultiDirectCommands)
+            {
+                enabled.resize(MaxMultiDirectCommands);
+            }
 
-            *enumerator = new (std::nothrow) ExplorerCommandEnumerator(std::move(enabled), site_);
+            *enumerator = new (std::nothrow) ExplorerCommandEnumerator(std::move(enabled), site_, useDirectTitles);
             return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
         }
 
@@ -513,6 +544,15 @@ namespace
         }
 
     private:
+        [[nodiscard]] const rightagent::AgentDefinition* ResolveSelectedAgent(const rightagent::Settings& settings) const
+        {
+            if (agent_)
+            {
+                return rightagent::FindEnabledAgent(settings, agent_->id);
+            }
+            return settings.menuMode == rightagent::MenuMode::Direct ? rightagent::FindDirectAgent(settings) : nullptr;
+        }
+
         ~ExplorerCommand()
         {
             if (site_ != nullptr)
@@ -524,6 +564,7 @@ namespace
 
         std::atomic<ULONG> references_{1};
         std::optional<rightagent::AgentDefinition> agent_;
+        bool useDirectTitle_{};
         IUnknown* site_{};
     };
 
@@ -542,7 +583,7 @@ namespace
         ULONG produced = 0;
         while (produced < count && index_ < agents_.size())
         {
-            commands[produced] = new (std::nothrow) ExplorerCommand(agents_[index_], site_);
+            commands[produced] = new (std::nothrow) ExplorerCommand(agents_[index_], site_, useDirectTitles_);
             if (commands[produced] == nullptr)
             {
                 for (ULONG rollback = 0; rollback < produced; ++rollback)

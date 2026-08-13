@@ -10,6 +10,8 @@ public static class SettingsContract
     public const string EnglishLanguage = "en-US";
     public const string GroupedMenu = "grouped";
     public const string DirectMenu = "direct";
+    public const string MultiDirectMenu = "multiDirect";
+    public const int MaxMultiDirectAgents = 16;
     public const string AutomaticTerminalShell = "auto";
     public const string PowerShell7TerminalShell = "pwsh";
     public const string WindowsPowerShellTerminalShell = "windowsPowerShell";

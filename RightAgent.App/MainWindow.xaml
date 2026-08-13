@@ -591,7 +591,8 @@
                         Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
-                        CornerRadius="8">
+                        CornerRadius="8"
+                        Visibility="{x:Bind app:VisibilityConverters.CollapsedIf(ViewModel.PreviewShowsMultipleRoots), Mode=OneWay}">
                         <Grid
                             MinHeight="40"
                             Padding="8,0"
@@ -630,6 +631,43 @@
                                 Glyph="&#xE76C;"
                                 Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.PreviewIsGrouped), Mode=OneWay}" />
                         </Grid>
+                    </Border>
+                    <Border
+                        Padding="4"
+                        HorizontalAlignment="Stretch"
+                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Visibility="{x:Bind app:VisibilityConverters.VisibleIf(ViewModel.PreviewShowsMultipleRoots), Mode=OneWay}">
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.PreviewEntries, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:AgentItemViewModel">
+                                    <Grid
+                                        MinHeight="40"
+                                        Padding="8,0"
+                                        ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Image
+                                            Width="16"
+                                            Height="16"
+                                            VerticalAlignment="Center"
+                                            AutomationProperties.AccessibilityView="Raw"
+                                            Source="{x:Bind IconDisplayPath, Mode=OneWay}"
+                                            Stretch="Uniform" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Text="{x:Bind MenuTitle, Mode=OneWay}"
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTipService.ToolTip="{x:Bind MenuTitle, Mode=OneWay}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </Border>
                     <Border
                         Margin="24,0,0,0"

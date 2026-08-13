@@ -33,9 +33,9 @@ determinate progress bar.
 
 ## Explorer contract
 
-The MSIX manifest registers one CLSID for `Directory` and `Directory\Background` through `windows.fileExplorerContextMenus` and registers the DLL as a `windows.comServer` surrogate class.
+The MSIX manifest registers one root CLSID for both `Directory` and `Directory\Background` through `windows.fileExplorerContextMenus`. The class is served by the Shell DLL through one `windows.comServer` surrogate registration.
 
-The root command returns `ECF_HASSUBCOMMANDS` in grouped mode and enumerates enabled agents in configured order. In direct mode it returns `ECF_DEFAULT` and invokes the selected enabled agent. With no enabled agent, or when the target is not one local file-system folder, the state is hidden.
+The root command returns `ECF_HASSUBCOMMANDS` in grouped mode and enumerates enabled agents in configured order. In direct mode it returns `ECF_DEFAULT` and invokes the selected enabled agent. In multi-direct mode it returns `ECF_ISSEPARATOR` and enumerates enabled agents with full direct-action titles, allowing the Windows 11 menu to expand those commands at the same menu level. Multi-direct mode is limited to 16 enabled agents to stay within the modern menu's practical command bound. With no enabled agent, or when the target is not one local file-system folder, the relevant state is hidden.
 
 For a selected folder, the path comes from `IShellItemArray` with `SIGDN_FILESYSPATH`. For a folder background, the handler resolves the current `IFolderView` through `IObjectWithSite`. The launcher path is resolved next to the loaded DLL; no registry lookup or current-directory assumption is used.
 

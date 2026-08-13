@@ -163,6 +163,20 @@ namespace
         return TerminalShell::Automatic;
     }
 
+    MenuMode ParseMenuMode(std::wstring value)
+    {
+        value = ToLower(Trim(std::move(value)));
+        if (value == L"direct")
+        {
+            return MenuMode::Direct;
+        }
+        if (value == L"multidirect")
+        {
+            return MenuMode::MultiDirect;
+        }
+        return MenuMode::Grouped;
+    }
+
     std::wstring NormalizeIcon(std::wstring value)
     {
         value = Trim(std::move(value));
@@ -316,7 +330,7 @@ namespace rightagent
             settings.schemaVersion = GetInteger(root, L"schemaVersion", kSettingsSchemaVersion);
             settings.menuEnabled = GetBoolean(root, L"menuEnabled", true);
             settings.language = GetString(root, L"language", L"system");
-            settings.menuMode = GetString(root, L"menuMode", L"grouped") == L"direct" ? MenuMode::Direct : MenuMode::Grouped;
+            settings.menuMode = ParseMenuMode(GetString(root, L"menuMode", L"grouped"));
             settings.directAgentId = GetString(root, L"directAgentId");
             settings.terminalShell = ParseTerminalShell(GetString(root, L"terminalShell", L"auto"));
             settings.terminalProfile = GetString(root, L"terminalProfile");

@@ -161,6 +161,7 @@ public sealed class AgentItemViewModel : BindableBase
     ];
 
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? localization["UnnamedAgent"] : Name;
+    public string MenuTitle => Format("OpenWithAgent");
 
     public string NameLabel => localization["Name"];
     public string ActionTypeLabel => localization["ActionType"];
@@ -202,6 +203,7 @@ public sealed class AgentItemViewModel : BindableBase
         OnPropertyChanged(nameof(MoveUpLabel));
         OnPropertyChanged(nameof(MoveDownLabel));
         OnPropertyChanged(nameof(DeleteLabel));
+        OnPropertyChanged(nameof(MenuTitle));
         RefreshValidation();
         NotifyAutomationNames();
     }
@@ -226,6 +228,7 @@ public sealed class AgentItemViewModel : BindableBase
     private void NotifyAutomationNames()
     {
         OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(MenuTitle));
         OnPropertyChanged(nameof(EnabledAutomationName));
         OnPropertyChanged(nameof(MoveUpAutomationName));
         OnPropertyChanged(nameof(MoveDownAutomationName));

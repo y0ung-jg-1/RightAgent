@@ -2,9 +2,9 @@
 
 ## Automated gates
 
-- Managed tests: defaults detect commands, Windows Terminal detection covers PATH/WindowsApps/missing cases, terminal-shell values normalize safely, IDs/order/direct target are repaired, URL schemes are restricted, and Unicode settings save/load atomically.
+- Managed tests: defaults detect commands, Windows Terminal detection covers PATH/WindowsApps/missing cases, menu-mode and terminal-shell values normalize safely, IDs/order/direct target are repaired, URL schemes are restricted, and Unicode settings save/load atomically.
 - Native tests: Windows argument round-trip covers spaces, Chinese, parentheses, single quotes, ampersands, quotes, and trailing backslashes.
-- Native COM smoke test: loads `RightAgent.Shell.dll` without registration, creates its class factory, checks the grouped title/flag, and enumerates agent subcommands.
+- Native COM smoke test: loads `RightAgent.Shell.dll` without registration, checks grouped and single-direct behavior, then verifies the multi-direct separator flag and its ordered, root-style child titles.
 - Release build: x64 Launcher and Shell compile with warnings as errors; WAP produces one unsigned package before signing.
 - Release installer: the pinned Inno Setup compiler hash is verified; the final Setup EXE and embedded MSIX use the expected certificate and RFC 3161 timestamps; the external SHA-256 covers the exact EXE. The tag workflow runs the final Setup on its clean hosted runner and rejects installer exceptions, elevated install mode, missing completed deployment progress, a wrong package version, or an incorrect certificate store.
 
@@ -17,7 +17,7 @@
 5. Right-click a folder background and confirm the command is in the modern menu, not only under `Show more options`.
 6. Right-click one selected folder and confirm the same behavior.
 7. Confirm no command appears for files, multiple selected folders, This PC, Libraries, ZIP virtual folders, or non-file-system locations.
-8. Test grouped and direct mode; toggle, rename, reorder, add, delete, and change the direct agent.
+8. Test grouped, single-direct, and multi-direct modes; toggle, rename, reorder, add, delete, and change the direct agent. In multi-direct mode, confirm every enabled agent appears at the menu root in configured order, disabled agents stay hidden, and more than 16 enabled agents cannot be saved.
 9. Verify Chinese, English, and system language, including menu title and launcher errors.
 10. With command shell set to **Automatic**, launch an agent and run `$PSVersionTable.PSVersion`; confirm PowerShell 7 is used when `pwsh.exe` is installed, otherwise Windows PowerShell 5.1 is used.
 11. Select PowerShell 7, Windows PowerShell 5.1, and CMD explicitly; launch an agent in each and confirm the selected shell opens. For CMD, verify the working directory with `cd`; for PowerShell, use `Get-Location`.

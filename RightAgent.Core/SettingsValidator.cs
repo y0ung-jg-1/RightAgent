@@ -11,8 +11,8 @@ public static partial class SettingsValidator
         input.Language = input.Language is SettingsContract.SystemLanguage or SettingsContract.ChineseLanguage or SettingsContract.EnglishLanguage
             ? input.Language
             : SettingsContract.SystemLanguage;
-        input.MenuMode = input.MenuMode == SettingsContract.DirectMenu
-            ? SettingsContract.DirectMenu
+        input.MenuMode = input.MenuMode is SettingsContract.DirectMenu or SettingsContract.MultiDirectMenu
+            ? input.MenuMode
             : SettingsContract.GroupedMenu;
         input.TerminalShell = input.TerminalShell is SettingsContract.PowerShell7TerminalShell
             or SettingsContract.WindowsPowerShellTerminalShell

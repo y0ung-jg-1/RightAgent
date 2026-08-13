@@ -41,6 +41,18 @@ public sealed class SettingsTests
     }
 
     [Theory]
+    [InlineData("grouped", "grouped")]
+    [InlineData("direct", "direct")]
+    [InlineData("multiDirect", "multiDirect")]
+    [InlineData("unknown", "grouped")]
+    public void NormalizeAcceptsKnownMenuModes(string input, string expected)
+    {
+        var settings = new RightAgentSettings { MenuMode = input };
+
+        Assert.Equal(expected, SettingsValidator.Normalize(settings).MenuMode);
+    }
+
+    [Theory]
     [InlineData("https://www.kimi.com", true)]
     [InlineData("http://localhost:3000", true)]
     [InlineData("file:///C:/secret.txt", false)]

@@ -24,6 +24,7 @@ public sealed class MainViewModel : BindableBase
     private bool previewHasEntries;
     private bool previewShowRootTitle = true;
     private bool previewShowRootHint;
+    private bool previewShowsMultipleRoots;
     private string validationSummary = string.Empty;
     private bool hasValidationErrors;
 
@@ -47,7 +48,8 @@ public sealed class MainViewModel : BindableBase
     public IReadOnlyList<OptionItem> MenuModeOptions { get; } =
     [
         new OptionItem(SettingsContract.GroupedMenu, string.Empty),
-        new OptionItem(SettingsContract.DirectMenu, string.Empty)
+        new OptionItem(SettingsContract.DirectMenu, string.Empty),
+        new OptionItem(SettingsContract.MultiDirectMenu, string.Empty)
     ];
 
     public IReadOnlyList<OptionItem> TerminalShellOptions { get; } =
@@ -103,7 +105,9 @@ public sealed class MainViewModel : BindableBase
             {
                 return;
             }
-            var normalized = value == SettingsContract.DirectMenu ? SettingsContract.DirectMenu : SettingsContract.GroupedMenu;
+            var normalized = value is SettingsContract.DirectMenu or SettingsContract.MultiDirectMenu
+                ? value
+                : SettingsContract.GroupedMenu;
             if (SetProperty(ref menuMode, normalized))
             {
                 OnPropertyChanged(nameof(IsDirectMode));
@@ -223,6 +227,12 @@ public sealed class MainViewModel : BindableBase
                 OnPropertyChanged(nameof(CanSave));
             }
         }
+    }
+
+    public bool PreviewShowsMultipleRoots
+    {
+        get => previewShowsMultipleRoots;
+        private set => SetProperty(ref previewShowsMultipleRoots, value);
     }
 
     public bool CanSave => IsLoaded && !HasValidationErrors;
@@ -409,8 +419,13 @@ public sealed class MainViewModel : BindableBase
 
         PreviewHasEntries = enabled.Count > 0;
         PreviewIsGrouped = MenuEnabled && MenuMode == SettingsContract.GroupedMenu;
-        PreviewShowRootTitle = MenuEnabled && (MenuMode == SettingsContract.GroupedMenu || enabled.Count > 0);
-        PreviewShowRootHint = !PreviewShowRootTitle;
+        PreviewShowsMultipleRoots = MenuEnabled
+                                    && MenuMode == SettingsContract.MultiDirectMenu
+                                    && enabled.Count > 0;
+        PreviewShowRootTitle = MenuEnabled
+                               && MenuMode != SettingsContract.MultiDirectMenu
+                               && (MenuMode == SettingsContract.GroupedMenu || enabled.Count > 0);
+        PreviewShowRootHint = !PreviewShowsMultipleRoots && !PreviewShowRootTitle;
         if (!MenuEnabled)
         {
             PreviewRootTitle = string.Empty;
@@ -458,6 +473,11 @@ public sealed class MainViewModel : BindableBase
         {
             lines.Add("· " + localization["ValidationDirect"]);
         }
+        if (MenuMode == SettingsContract.MultiDirectMenu
+            && Agents.Count(agent => agent.Enabled) > SettingsContract.MaxMultiDirectAgents)
+        {
+            lines.Add("· " + localization["ValidationMultiDirectLimit"]);
+        }
 
         ValidationSummary = string.Join(Environment.NewLine, lines);
         HasValidationErrors = lines.Count > 0;
@@ -471,6 +491,7 @@ public sealed class MainViewModel : BindableBase
         LanguageOptions[2].UpdateLabel(localization["English"]);
         MenuModeOptions[0].UpdateLabel(localization["Grouped"]);
         MenuModeOptions[1].UpdateLabel(localization["Direct"]);
+        MenuModeOptions[2].UpdateLabel(localization["MultiDirect"]);
         TerminalShellOptions[0].UpdateLabel(localization["TerminalShellAuto"]);
         TerminalShellOptions[1].UpdateLabel(localization["PowerShell7"]);
         TerminalShellOptions[2].UpdateLabel(localization["WindowsPowerShell"]);
