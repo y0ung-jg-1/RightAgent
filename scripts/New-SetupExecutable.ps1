@@ -59,6 +59,10 @@ try {
     if ($packages.Count -ne 1) {
         throw "Expected exactly one RightAgent MSIX in the release bundle, but found $($packages.Count)."
     }
+    $commandPackages = @(Get-ChildItem -LiteralPath $stagingDirectory -Filter 'RightAgent.Command*-x64.msix' -File)
+    if ($commandPackages.Count -ne 16) {
+        throw "Expected exactly 16 RightAgent command MSIX packages in the release bundle, but found $($commandPackages.Count)."
+    }
     $certificatePath = Join-Path $stagingDirectory 'RightAgent.cer'
     if (-not (Test-Path -LiteralPath $certificatePath -PathType Leaf)) {
         throw 'The release bundle does not contain RightAgent.cer.'
@@ -87,6 +91,12 @@ try {
     $displayVersion = "$($packageVersion.Major).$($packageVersion.Minor).$($packageVersion.Build)"
     if ($packageVersion.Revision -gt 0) {
         $displayVersion += ".$($packageVersion.Revision)"
+    }
+    for ($slot = 0; $slot -lt 16; ++$slot) {
+        $expectedCommandName = "RightAgent.Command$($slot.ToString('D2'))-$displayVersion-x64.msix"
+        if (@($commandPackages | Where-Object { $_.Name -ceq $expectedCommandName }).Count -ne 1) {
+            throw "Release bundle is missing the exact command package '$expectedCommandName'."
+        }
     }
 
     $isccCandidates = @(

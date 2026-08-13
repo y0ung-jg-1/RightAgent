@@ -2,7 +2,8 @@
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
-    [string]$PackagePath
+    [string]$PackagePath,
+    [string[]]$CommandPackagePaths
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,23 +19,41 @@ if (-not $PackagePath) {
 if (-not $PackagePath -or -not (Test-Path -LiteralPath $PackagePath -PathType Leaf)) {
     throw 'No signed package was found.'
 }
+if (-not $CommandPackagePaths) {
+    $CommandPackagePaths = @(Get-RightAgentCommandPackagePaths `
+        -RepoRoot $repoRoot `
+        -Configuration $Configuration `
+        -PackageIdentity Development)
+}
+$CommandPackagePaths = @($CommandPackagePaths)
+if ($CommandPackagePaths.Count -ne 16) {
+    throw "Expected exactly 16 signed command packages, but found $($CommandPackagePaths.Count)."
+}
+$allPackagePaths = @($PackagePath) + $CommandPackagePaths
+foreach ($candidatePackagePath in $allPackagePaths) {
+    if (-not (Test-Path -LiteralPath $candidatePackagePath -PathType Leaf)) {
+        throw "Signed development package was not found: $candidatePackagePath"
+    }
+}
 
 $expectedCertificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($cerPath)
-$signature = Get-AuthenticodeSignature -LiteralPath $PackagePath
-$signerMatchesCertificate =
-    $null -ne $signature.SignerCertificate -and
-    $signature.SignerCertificate.Thumbprint -eq $expectedCertificate.Thumbprint
+foreach ($candidatePackagePath in $allPackagePaths) {
+    $signature = Get-AuthenticodeSignature -LiteralPath $candidatePackagePath
+    $signerMatchesCertificate =
+        $null -ne $signature.SignerCertificate -and
+        $signature.SignerCertificate.Thumbprint -eq $expectedCertificate.Thumbprint
 
-# Get-AuthenticodeSignature reports UnknownError for a correctly signed MSIX
-# when its development certificate is trusted through TrustedPeople rather than
-# installed as a system root. Accept that specific case only when the embedded
-# signer exactly matches the certificate shipped alongside the package.
-$isAcceptedDevelopmentSignature =
-    $signature.Status -eq 'UnknownError' -and
-    $signerMatchesCertificate
+    # Get-AuthenticodeSignature reports UnknownError for a correctly signed MSIX
+    # when its development certificate is trusted through TrustedPeople rather than
+    # installed as a system root. Accept that specific case only when the embedded
+    # signer exactly matches the certificate shipped alongside the package.
+    $isAcceptedDevelopmentSignature =
+        $signature.Status -eq 'UnknownError' -and
+        $signerMatchesCertificate
 
-if ($signature.Status -ne 'Valid' -and -not $isAcceptedDevelopmentSignature) {
-    throw "Package signature is not valid: $($signature.Status)"
+    if ($signature.Status -ne 'Valid' -and -not $isAcceptedDevelopmentSignature) {
+        throw "Package signature is not valid for '$candidatePackagePath': $($signature.Status)"
+    }
 }
 
 $trustedPeopleStore = 'Cert:\LocalMachine\TrustedPeople'
@@ -98,9 +117,25 @@ $dependencyDirectory = Join-Path (Split-Path -Parent $PackagePath) 'Dependencies
 $dependencies = if (Test-Path -LiteralPath $dependencyDirectory -PathType Container) {
     @(Get-ChildItem -LiteralPath $dependencyDirectory -File | Where-Object { $_.Extension -in '.msix', '.appx' } | Select-Object -ExpandProperty FullName)
 } else { @() }
+$classIds = @(0..15 | ForEach-Object {
+    'F7E08D{0:X2}-676E-4D4B-950A-5B4451E19E3C' -f (0x6D + $_)
+})
+$classIdPattern = ($classIds | ForEach-Object { [Regex]::Escape($_) }) -join '|'
+$surrogates = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop |
+    Where-Object {
+        $_.Name -ieq 'dllhost.exe' -and
+        -not [string]::IsNullOrWhiteSpace($_.CommandLine) -and
+        $_.CommandLine -match $classIdPattern
+    })
+foreach ($surrogate in $surrogates) {
+    Stop-Process -Id $surrogate.ProcessId -Force -ErrorAction Stop
+}
 if ($dependencies.Count -gt 0) {
     Add-AppxPackage -Path $PackagePath -DependencyPath $dependencies -ForceApplicationShutdown -ForceUpdateFromAnyVersion
 } else {
     Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
+}
+foreach ($commandPackagePath in $CommandPackagePaths) {
+    Add-AppxPackage -Path $commandPackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
 }
 Write-Host 'RightAgent installed. If Explorer cached the old menu, close all Explorer windows or sign out once.'

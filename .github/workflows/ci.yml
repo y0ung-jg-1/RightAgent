@@ -35,22 +35,31 @@ jobs:
         shell: pwsh
         run: ./scripts/Build.ps1 -Configuration Release -PackageIdentity Release
 
-      - name: Locate unsigned package
+      - name: Locate and verify unsigned package set
         id: package
         shell: pwsh
         run: |
           . ./scripts/PackageHelpers.ps1
           $package = Get-RightAgentPackagePath -RepoRoot $env:GITHUB_WORKSPACE -Configuration Release -PackageIdentity Release
-          $signature = Get-AuthenticodeSignature -LiteralPath $package
-          if ($signature.Status -ne 'NotSigned') {
-              throw "CI package must remain unsigned, but signature status is $($signature.Status)."
+          $commandPackages = @(Get-RightAgentCommandPackagePaths -RepoRoot $env:GITHUB_WORKSPACE -Configuration Release -PackageIdentity Release)
+          $packageSet = @($package) + $commandPackages
+          if ($packageSet.Count -ne 17) {
+              throw "CI must produce one main package and 16 command packages, but found $($packageSet.Count)."
+          }
+          foreach ($packagePath in $packageSet) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $packagePath
+            if ($signature.Status -ne 'NotSigned') {
+                throw "CI package '$packagePath' must remain unsigned, but signature status is $($signature.Status)."
+            }
           }
           "path=$package" >> $env:GITHUB_OUTPUT
 
-      - name: Upload unsigned CI package
+      - name: Upload unsigned CI package set
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: RightAgent-unsigned-ci-${{ github.sha }}
-          path: ${{ steps.package.outputs.path }}
+          path: |
+            ${{ steps.package.outputs.path }}
+            artifacts/package/Release/Commands/*.msix
           if-no-files-found: error
           retention-days: 7

@@ -90,6 +90,52 @@ namespace
         return value;
     }
 
+    std::filesystem::path GetPackagedLocalStateDirectory()
+    {
+        const auto currentPackageFamilyName = GetPackageFamilyNameValue();
+        if (currentPackageFamilyName.empty())
+        {
+            return {};
+        }
+
+        const auto settingsPackageFamilyName = rightagent::GetSettingsPackageFamilyName(currentPackageFamilyName);
+        const auto localAppData = GetLocalAppDataDirectory();
+        if (settingsPackageFamilyName.empty() || localAppData.empty())
+        {
+            return {};
+        }
+        return localAppData / L"Packages" / settingsPackageFamilyName / L"LocalState";
+    }
+
+    bool IsSettingsPackageRegistered()
+    {
+        const auto currentPackageFamilyName = GetPackageFamilyNameValue();
+        if (currentPackageFamilyName.empty())
+        {
+            return true;
+        }
+
+        const auto settingsPackageFamilyName = rightagent::GetSettingsPackageFamilyName(currentPackageFamilyName);
+        if (settingsPackageFamilyName.empty())
+        {
+            return false;
+        }
+        if (settingsPackageFamilyName == currentPackageFamilyName)
+        {
+            return true;
+        }
+
+        UINT32 packageCount = 0;
+        UINT32 bufferLength = 0;
+        const LONG result = GetPackagesByPackageFamily(
+            settingsPackageFamilyName.c_str(),
+            &packageCount,
+            nullptr,
+            &bufferLength,
+            nullptr);
+        return packageCount > 0 && (result == ERROR_INSUFFICIENT_BUFFER || result == ERROR_SUCCESS);
+    }
+
     std::wstring ReadUtf8File(const std::filesystem::path& path)
     {
         std::ifstream stream(path, std::ios::binary);
@@ -281,6 +327,28 @@ namespace
 
 namespace rightagent
 {
+    std::wstring GetSettingsPackageFamilyName(const std::wstring_view currentPackageFamilyName)
+    {
+        const auto separator = currentPackageFamilyName.rfind(L'_');
+        if (separator == std::wstring_view::npos || separator == 0 || separator + 1 >= currentPackageFamilyName.size())
+        {
+            return {};
+        }
+
+        auto packageName = std::wstring(currentPackageFamilyName.substr(0, separator));
+        constexpr std::wstring_view commandMarker = L".Command";
+        const auto marker = packageName.rfind(commandMarker);
+        if (marker != std::wstring::npos &&
+            marker + commandMarker.size() + 2 == packageName.size() &&
+            std::iswdigit(packageName[marker + commandMarker.size()]) &&
+            std::iswdigit(packageName[marker + commandMarker.size() + 1]))
+        {
+            packageName.erase(marker);
+        }
+
+        return packageName + std::wstring(currentPackageFamilyName.substr(separator));
+    }
+
     std::filesystem::path GetLocalStateDirectory()
     {
         const auto overridePath = GetEnvironmentValue(L"RIGHTAGENT_SETTINGS_PATH");
@@ -290,12 +358,13 @@ namespace rightagent
             return path.has_filename() && ToLower(path.filename().wstring()) == L"settings.json" ? path.parent_path() : path;
         }
 
-        const auto localAppData = GetLocalAppDataDirectory();
-        const auto packageFamilyName = GetPackageFamilyNameValue();
-        if (!localAppData.empty() && !packageFamilyName.empty())
+        const auto packagedLocalState = GetPackagedLocalStateDirectory();
+        if (!packagedLocalState.empty())
         {
-            return localAppData / L"Packages" / packageFamilyName / L"LocalState";
+            return packagedLocalState;
         }
+
+        const auto localAppData = GetLocalAppDataDirectory();
         return localAppData / L"RightAgent";
     }
 
@@ -312,6 +381,16 @@ namespace rightagent
 
     Settings LoadSettings()
     {
+        // Companion command packages are intentionally independent so Explorer
+        // attributes each multi-direct verb at the menu root. If the visible
+        // settings package has been removed, keep any surviving command package
+        // inert instead of falling back to enabled defaults.
+        if (!IsSettingsPackageRegistered())
+        {
+            Settings settings;
+            settings.menuEnabled = false;
+            return settings;
+        }
         return LoadSettingsFromPath(GetSettingsPath());
     }
 

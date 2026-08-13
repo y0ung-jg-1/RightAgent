@@ -100,3 +100,51 @@ function Get-RightAgentPackagePath {
 
     return $packages[0].FullName
 }
+
+function Get-RightAgentCommandPackagePaths {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepoRoot,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Debug', 'Release')]
+        [string]$Configuration,
+
+        [ValidateSet('Development', 'Release')]
+        [string]$PackageIdentity = 'Development'
+    )
+
+    $manifestPath = Get-RightAgentManifestPath -RepoRoot $RepoRoot -PackageIdentity $PackageIdentity
+    [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw
+    $mainIdentity = $manifest.Package.Identity
+    $mainName = [string]$mainIdentity.Name
+    $publisher = [string]$mainIdentity.Publisher
+    $version = [string]$mainIdentity.Version
+    if ([string]::IsNullOrWhiteSpace($mainName) -or
+        [string]::IsNullOrWhiteSpace($publisher) -or
+        [string]::IsNullOrWhiteSpace($version)) {
+        throw "The main package manifest has an incomplete identity: $manifestPath"
+    }
+
+    $commandRoot = [IO.Path]::GetFullPath((Join-Path $RepoRoot "artifacts\package\$Configuration\Commands"))
+    if (-not (Test-Path -LiteralPath $commandRoot -PathType Container)) {
+        throw "Command package output directory was not found: $commandRoot"
+    }
+    $actualPackages = @(Get-ChildItem -LiteralPath $commandRoot -Filter '*.msix' -File)
+    if ($actualPackages.Count -ne 16) {
+        throw "Expected exactly 16 command packages in '$commandRoot', but found $($actualPackages.Count)."
+    }
+
+    $expectedPaths = foreach ($slot in 0..15) {
+        $slotText = $slot.ToString('D2')
+        $expectedName = "$mainName.Command$slotText`_${version}_x64.msix"
+        $matches = @($actualPackages | Where-Object { $_.Name -ceq $expectedName })
+        if ($matches.Count -ne 1) {
+            throw "Expected exactly one command package named '$expectedName', but found $($matches.Count)."
+        }
+        $matches[0].FullName
+    }
+
+    return $expectedPaths
+}

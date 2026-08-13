@@ -135,9 +135,9 @@ jobs:
           "RIGHTAGENT_IMPORTED_THUMBPRINT=$($certificate.Thumbprint)" >> $env:GITHUB_ENV
           "RIGHTAGENT_TEMP_PFX=$pfxPath" >> $env:GITHUB_ENV
 
-      - name: Sign package
+      - name: Sign complete package set
         shell: pwsh
-        run: ./scripts/Sign-Package.ps1 -Configuration Release -PackageIdentity Release -CertificateThumbprint '${{ steps.certificate.outputs.thumbprint }}'
+        run: ./scripts/Sign-PackageSet.ps1 -Configuration Release -PackageIdentity Release -CertificateThumbprint '${{ steps.certificate.outputs.thumbprint }}'
 
       - name: Create verified installer payload
         shell: pwsh
@@ -223,11 +223,23 @@ jobs:
 
           [xml]$manifest = Get-Content -LiteralPath './RightAgent.Package/Package.Release.appxmanifest' -Raw
           $expectedVersion = [version]([string]$manifest.Package.Identity.Version)
-          $installedPackage = Get-AppxPackage -Name 'RightAgent' -ErrorAction Stop |
-            Where-Object { $_.Publisher -ceq 'CN=RightAgent' } |
-            Select-Object -First 1
-          if (-not $installedPackage -or [version]$installedPackage.Version -ne $expectedVersion) {
-            throw "Setup did not register the expected RightAgent package version $expectedVersion."
+          $expectedPackageNames = @('RightAgent') + @(0..15 | ForEach-Object { "RightAgent.Command$($_.ToString('D2'))" })
+          foreach ($expectedPackageName in $expectedPackageNames) {
+            $installedPackage = Get-AppxPackage -Name $expectedPackageName -ErrorAction SilentlyContinue |
+              Where-Object {
+                $_.Name -ceq $expectedPackageName -and
+                $_.Publisher -ceq 'CN=RightAgent'
+              } |
+              Select-Object -First 1
+            if (-not $installedPackage -or [version]$installedPackage.Version -ne $expectedVersion) {
+              throw "Setup did not register package '$expectedPackageName' at version $expectedVersion."
+            }
+          }
+
+          $rightAgentStartApps = @(Get-StartApps | Where-Object { $_.Name -like 'RightAgent*' })
+          if ($rightAgentStartApps.Count -ne 1 -or $rightAgentStartApps[0].Name -cne 'RightAgent') {
+            $visibleApps = ($rightAgentStartApps | ForEach-Object { "$($_.Name) [$($_.AppID)]" }) -join ', '
+            throw "Only the main RightAgent app may be visible in Start. Found: $visibleApps"
           }
 
           $publicCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new('${{ steps.certificate.outputs.cer_path }}')

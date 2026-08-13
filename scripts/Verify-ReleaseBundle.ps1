@@ -65,6 +65,10 @@ try {
     if ($packages.Count -ne 1) {
         throw "Expected exactly one RightAgent release MSIX, but found $($packages.Count)."
     }
+    $commandPackages = @($entries.Keys | Where-Object { $_ -match '^RightAgent\.Command[0-9]{2}-[0-9.]+-x64\.msix$' })
+    if ($commandPackages.Count -ne 16) {
+        throw "Expected exactly 16 RightAgent command MSIX packages, but found $($commandPackages.Count)."
+    }
 
     $checksumReader = [IO.StreamReader]::new($entries['SHA256SUMS.txt'].Open())
     try {
@@ -158,6 +162,55 @@ try {
     if ([string]$manifest.Package.Identity.Name -cne 'RightAgent' -or
         [string]$manifest.Package.Identity.Publisher -cne $certificate.Subject) {
         throw 'The bundled MSIX identity does not match the bundled release certificate.'
+    }
+
+    $mainVersion = [string]$manifest.Package.Identity.Version
+    $parsedVersion = [version]$mainVersion
+    $displayVersion = "$($parsedVersion.Major).$($parsedVersion.Minor).$($parsedVersion.Build)"
+    if ($parsedVersion.Revision -gt 0) {
+        $displayVersion += ".$($parsedVersion.Revision)"
+    }
+    foreach ($slot in 0..15) {
+        $slotText = $slot.ToString('D2')
+        $commandEntryName = "RightAgent.Command$slotText-$displayVersion-x64.msix"
+        if (-not $entries.ContainsKey($commandEntryName)) {
+            throw "Release bundle is missing command package: $commandEntryName"
+        }
+
+        $commandMsixStream = [IO.MemoryStream]::new()
+        $sourceCommandStream = $entries[$commandEntryName].Open()
+        try {
+            $sourceCommandStream.CopyTo($commandMsixStream)
+        }
+        finally {
+            $sourceCommandStream.Dispose()
+        }
+        $commandMsixStream.Position = 0
+        $commandArchive = [IO.Compression.ZipArchive]::new($commandMsixStream, [IO.Compression.ZipArchiveMode]::Read, $false)
+        try {
+            $commandManifestEntry = $commandArchive.GetEntry('AppxManifest.xml')
+            $commandSignatureEntry = $commandArchive.GetEntry('AppxSignature.p7x')
+            if (-not $commandManifestEntry -or -not $commandSignatureEntry -or $commandSignatureEntry.Length -eq 0) {
+                throw "Command package $slotText is missing its manifest or package signature."
+            }
+            $commandManifestReader = [IO.StreamReader]::new($commandManifestEntry.Open())
+            try {
+                [xml]$commandManifest = $commandManifestReader.ReadToEnd()
+            }
+            finally {
+                $commandManifestReader.Dispose()
+            }
+        }
+        finally {
+            $commandArchive.Dispose()
+            $commandMsixStream.Dispose()
+        }
+
+        if ([string]$commandManifest.Package.Identity.Name -cne "RightAgent.Command$slotText" -or
+            [string]$commandManifest.Package.Identity.Publisher -cne $certificate.Subject -or
+            [string]$commandManifest.Package.Identity.Version -cne $mainVersion) {
+            throw "Command package $slotText identity does not match the main release package."
+        }
     }
 
     Write-Host "Verified release bundle: $ZipPath"

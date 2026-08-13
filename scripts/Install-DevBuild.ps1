@@ -27,12 +27,12 @@ if (-not $certificate -or -not (Test-Path -LiteralPath $cerPath -PathType Leaf))
     & (Join-Path $PSScriptRoot 'New-DevCertificate.ps1') -Password $password
 }
 
-# 2. Build the MSIX (managed and native tests run unless -SkipTests is given).
+# 2. Build the MSIX package set (managed and native tests run unless -SkipTests is given).
 & (Join-Path $PSScriptRoot 'Build.ps1') -Configuration $Configuration -SkipTests:$SkipTests
 
 # 3. Sign and install. The first install asks for administrator approval once to
 #    trust the development certificate in Local Computer\Trusted People.
-& (Join-Path $PSScriptRoot 'Sign-Package.ps1') -Configuration $Configuration
+& (Join-Path $PSScriptRoot 'Sign-PackageSet.ps1') -Configuration $Configuration
 
 # Windows blocks replacing a package with different contents at the same version.
 # Preserve LocalState for real upgrades/downgrades, and require an explicit opt-in
@@ -51,7 +51,14 @@ if ($installedPackages.Count -eq 1) {
             throw "RightAgent.Dev $targetVersion is already installed. Increment the manifest version to preserve LocalState, or rerun with -ResetInstalledPackage to explicitly uninstall it and erase that package's settings."
         }
 
-        Write-Warning "Resetting $($installed.PackageFullName); this erases that development package's LocalState settings."
+        Write-Warning "Resetting the RightAgent development package set; this erases the main package's LocalState settings."
+        foreach ($slot in 0..15) {
+            $commandPackageName = "RightAgent.Dev.Command$($slot.ToString('D2'))"
+            $installedCommandPackages = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue)
+            foreach ($installedCommandPackage in $installedCommandPackages) {
+                $installedCommandPackage | Remove-AppxPackage -ErrorAction Stop
+            }
+        }
         $installed | Remove-AppxPackage -ErrorAction Stop
     }
 }

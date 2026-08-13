@@ -21,21 +21,23 @@ flowchart LR
 There is no service, tray app, startup task, scheduled task, watcher, or resident broker.
 
 The GitHub Release `Setup.exe` is a distribution-only bootstrapper, not a
-RightAgent runtime process. It embeds the signed MSIX, x64 dependencies, and
-public release certificate. Setup remains under the Windows user who started
-it, validates the package, and requests elevation only when a first-install
-helper must trust the public certificate in Local Machine\Trusted People. The
-helper exits before the original user process deploys the MSIX. Fixed Setup and
+RightAgent runtime process. It embeds one signed settings MSIX, 16 signed hidden
+command MSIX packages, x64 dependencies, and the public release certificate.
+This split is internal: users still download and run one Setup executable.
+Setup remains under the Windows user who started it, validates every package,
+and requests elevation only when a first-install helper must trust the public
+certificate in Local Machine\Trusted People. The helper exits before the
+original user process deploys the 17-package set. Fixed Setup and
 package-installation mutexes reject concurrent installation attempts. During
 deployment, the PowerShell host forwards Windows `DeploymentProgress`
-percentages to Setup, which replaces its initial indeterminate animation with a
-determinate progress bar.
+percentages across the complete set to Setup, which replaces its initial
+indeterminate animation with a determinate progress bar.
 
 ## Explorer contract
 
-The MSIX manifest registers one root CLSID for both `Directory` and `Directory\Background` through `windows.fileExplorerContextMenus`. The class is served by the Shell DLL through one `windows.comServer` surrogate registration.
+RightAgent builds 16 independently identified command packages. Each package registers one ordered CLSID slot for both `Directory` and `Directory\Background` through `windows.fileExplorerContextMenus`. Separate package identities are required because Windows 11 groups multiple commands attributed to one package into an app flyout; separate `Application` elements inside one package are not sufficient. Every command application uses `AppListEntry="none"`, so only the primary settings application is visible in Start. All classes are served from identical copies of the same Shell DLL through packaged `windows.comServer` surrogates. Slot zero also owns the grouped submenu and single-direct modes; the other slots remain hidden outside multi-direct mode.
 
-The root command returns `ECF_HASSUBCOMMANDS` in grouped mode and enumerates enabled agents in configured order. In direct mode it returns `ECF_DEFAULT` and invokes the selected enabled agent. In multi-direct mode it returns `ECF_ISSEPARATOR` and enumerates enabled agents with full direct-action titles, allowing the Windows 11 menu to expand those commands at the same menu level. Multi-direct mode is limited to 16 enabled agents to stay within the modern menu's practical command bound. With no enabled agent, or when the target is not one local file-system folder, the relevant state is hidden.
+Slot zero returns `ECF_HASSUBCOMMANDS` in grouped mode and enumerates enabled agents in configured order. In single-direct mode it returns `ECF_DEFAULT` and invokes the selected enabled agent. In multi-direct mode every registered slot returns `ECF_DEFAULT`, resolves the enabled agent at the same configured index, and hides itself when that index does not exist. This produces genuine independent root commands; `EnumSubCommands` is not used to simulate flattening. Multi-direct mode is limited to the 16 registered slots. With no enabled agent, or when the target is not one local file-system folder, the relevant state is hidden.
 
 For a selected folder, the path comes from `IShellItemArray` with `SIGDN_FILESYSPATH`. For a folder background, the handler resolves the current `IFolderView` through `IObjectWithSite`. The launcher path is resolved next to the loaded DLL; no registry lookup or current-directory assumption is used.
 
@@ -59,6 +61,6 @@ Only the user-authored command is evaluated by the selected shell. RightAgent ru
 
 ## Data and assets
 
-Packaged components share `%LOCALAPPDATA%\Packages\<package-family>\LocalState\settings.json`. Unpackaged developer runs fall back to `%LOCALAPPDATA%\RightAgent\settings.json`. `RIGHTAGENT_SETTINGS_PATH` may override the location for automated tests only.
+The settings app writes its own `ApplicationData.Current.LocalFolder`. Native packaged components map a command package family such as `RightAgent.Command00_<publisher-id>` back to the main `RightAgent_<publisher-id>` family and read `%LOCALAPPDATA%\Packages\<main-package-family>\LocalState\settings.json`. This keeps the settings app, COM surrogate, and launcher on one file despite their independent package identities. A surviving command package also verifies that the main package is still registered and stays inert after the main app is removed. Unpackaged developer runs fall back to `%LOCALAPPDATA%\RightAgent\settings.json`. `RIGHTAGENT_SETTINGS_PATH` may override the location for automated tests only.
 
 Built-in icon references use `builtin:<key>` and resolve to package-local ICO/SVG files. Custom files are copied into `LocalState\Icons` and stored as `local:Icons/<file>`. Native validation rejects absolute, parent-relative, or network icon paths.

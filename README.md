@@ -46,7 +46,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 
 ## 安装
 
-请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.1.1-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。安装器始终以当前 Windows 用户运行；首次安装若尚未信任随包公共证书，会单独请求一次管理员批准，只把该证书导入“本地计算机\受信任的人”，然后继续为当前用户安装 MSIX。证书已经受信任的升级不会重复请求管理员权限，发布包也不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
+请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.1.1-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。安装器始终以当前 Windows 用户运行；首次安装若尚未信任随包公共证书，会单独请求一次管理员批准，只把该证书导入“本地计算机\受信任的人”，然后继续为当前用户安装完整包集合。为避免 Windows 11 把多个直达命令归组，Setup 内部包含 1 个主程序包和 16 个隐藏命令包，但用户仍只需下载一个 EXE，开始菜单也只显示一个 RightAgent。证书已经受信任的升级不会重复请求管理员权限，发布包也不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
 
 ### 从源码开发
 
@@ -55,7 +55,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 ```powershell
 .\scripts\New-DevCertificate.ps1
 .\scripts\Build.ps1 -Configuration Release
-.\scripts\Sign-Package.ps1 -Configuration Release
+.\scripts\Sign-PackageSet.ps1 -Configuration Release
 .\scripts\Install-DevPackage.ps1 -Configuration Release
 ```
 
@@ -94,11 +94,11 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 .\scripts\Build.ps1 -Configuration Release
 ```
 
-构建产物是 `artifacts\package\Release` 下的 x64 MSIX。解决方案包含原生核心、启动器、资源管理器扩展、COM 接口测试和托管设置测试。
+构建产物是 `artifacts\package\Release` 下的 1 个 x64 主程序 MSIX，以及 `Commands` 子目录中的 16 个隐藏命令 MSIX。解决方案包含原生核心、启动器、资源管理器扩展、COM 接口测试和托管设置测试。
 
 开发环境需要 Visual Studio 2026 Community（WinUI 应用开发、C++ 桌面开发、C++ WinUI 工具、MSIX/WAP 工具、Windows 11 SDK 10.0.26100 或更新版本）以及 .NET 10 SDK。安装完成后，先运行 `.\scripts\Validate-Environment.ps1` 检查环境。本仓库不需要 Node.js、Electron、Tauri、Rust、数据库或后台服务。
 
-GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完整测试，并构建不带签名的正式身份 MSIX。标签发布工作流会从专用发布环境读取签名机密，签名 MSIX，使用固定版本的 Inno Setup 生成并签名单文件 `Setup.exe`，再生成 SHA-256 文件和 GitHub Release 草稿。公开 Release 只包含安装器和对应校验文件；内部 MSIX、依赖和公共证书由安装器携带。发布私钥不会进入普通推送或拉取请求构建。工作流见[持续集成](.github/workflows/ci.yml)与[正式发布](.github/workflows/release.yml)。
+GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完整测试，并构建不带签名的正式身份包集合。标签发布工作流会从专用发布环境读取签名机密，签名全部 17 个 MSIX，使用固定版本的 Inno Setup 生成并签名单文件 `Setup.exe`，再生成 SHA-256 文件和 GitHub Release 草稿。公开 Release 只包含安装器和对应校验文件；内部 MSIX、依赖和公共证书由安装器携带。发布私钥不会进入普通推送或拉取请求构建。工作流见[持续集成](.github/workflows/ci.yml)与[正式发布](.github/workflows/release.yml)。
 
 ## 仓库结构
 
@@ -107,7 +107,8 @@ GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完�
 - `RightAgent.Shell`：用于 Windows 11 新右键菜单的原生 `IExplorerCommand` COM 组件。
 - `RightAgent.Launcher`：负责打开终端或网址的短生命周期原生进程。
 - `RightAgent.Native.Core`：共享的原生设置、图标、引号转义和进程辅助代码。
-- `RightAgent.Package`：WAP/MSIX 身份与资源管理器注册。
+- `RightAgent.Package`：可见设置应用的 WAP/MSIX 身份。
+- `RightAgent.CommandPackage`：16 个隐藏资源管理器命令包共用的清单模板。
 - `installer`：以当前用户运行、仅在首次信任公共证书时请求管理员批准的单文件安装器定义。
 
 实现细节见[架构文档](docs/ARCHITECTURE.md)，数据约定见[设置结构说明](docs/SETTINGS_SCHEMA.md)，人工验收范围见[测试矩阵](docs/TEST_MATRIX.md)，发布操作见[发版指南](docs/RELEASING.md)，v1 发布取舍见[发布决策记录](docs/RELEASE_DECISIONS.md)。

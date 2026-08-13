@@ -6,11 +6,14 @@ param(
     [Parameter(Mandatory)]
     [string]$CertificatePath,
 
+    [string[]]$CommandPackagePaths,
+
     [string]$OutputDirectory
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'PackageHelpers.ps1')
 
 $PackagePath = [IO.Path]::GetFullPath($PackagePath)
 $CertificatePath = [IO.Path]::GetFullPath($CertificatePath)
@@ -23,16 +26,36 @@ if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
 
 & (Join-Path $PSScriptRoot 'Verify-PackageCompliance.ps1') -PackagePath $PackagePath
 
-$certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
-$signature = Get-AuthenticodeSignature -LiteralPath $PackagePath
-$signerMatches =
-    $null -ne $signature.SignerCertificate -and
-    $signature.SignerCertificate.Thumbprint -eq $certificate.Thumbprint
-if (-not $signerMatches -or $signature.Status -notin 'Valid', 'UnknownError') {
-    throw "Release package signature verification failed: $($signature.Status)"
+if (-not $CommandPackagePaths) {
+    $CommandPackagePaths = @(Get-RightAgentCommandPackagePaths `
+        -RepoRoot $repoRoot `
+        -Configuration Release `
+        -PackageIdentity Release)
 }
-if (-not $signature.TimeStamperCertificate) {
-    throw 'The release package signature does not contain the required RFC 3161 timestamp.'
+$CommandPackagePaths = @($CommandPackagePaths | ForEach-Object { [IO.Path]::GetFullPath($_) })
+if ($CommandPackagePaths.Count -ne 16) {
+    throw "Expected exactly 16 command packages, but found $($CommandPackagePaths.Count)."
+}
+foreach ($commandPackagePath in $CommandPackagePaths) {
+    if (-not (Test-Path -LiteralPath $commandPackagePath -PathType Leaf)) {
+        throw "Command package was not found: $commandPackagePath"
+    }
+}
+& (Join-Path $PSScriptRoot 'Verify-CommandPackages.ps1') -Configuration Release -PackageIdentity Release
+
+$certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
+$allPackagePaths = @($PackagePath) + $CommandPackagePaths
+foreach ($signedPackagePath in $allPackagePaths) {
+    $signature = Get-AuthenticodeSignature -LiteralPath $signedPackagePath
+    $signerMatches =
+        $null -ne $signature.SignerCertificate -and
+        $signature.SignerCertificate.Thumbprint -eq $certificate.Thumbprint
+    if (-not $signerMatches -or $signature.Status -notin 'Valid', 'UnknownError') {
+        throw "Release package signature verification failed for '$signedPackagePath': $($signature.Status)"
+    }
+    if (-not $signature.TimeStamperCertificate) {
+        throw "Release package signature does not contain the required RFC 3161 timestamp: $signedPackagePath"
+    }
 }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -90,6 +113,11 @@ $stagingDirectory = Join-Path $OutputDirectory "RightAgent-$displayVersion-x64"
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
 $releasePackageName = "RightAgent-$displayVersion-x64.msix"
 Copy-Item -LiteralPath $PackagePath -Destination (Join-Path $stagingDirectory $releasePackageName)
+for ($slot = 0; $slot -lt $CommandPackagePaths.Count; ++$slot) {
+    $slotText = $slot.ToString('D2')
+    $commandReleaseName = "RightAgent.Command$slotText-$displayVersion-x64.msix"
+    Copy-Item -LiteralPath $CommandPackagePaths[$slot] -Destination (Join-Path $stagingDirectory $commandReleaseName)
+}
 Copy-Item -LiteralPath $CertificatePath -Destination (Join-Path $stagingDirectory 'RightAgent.cer')
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Install-Release.ps1') -Destination (Join-Path $stagingDirectory 'Install-RightAgent.ps1')
 Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENSE') -Destination $stagingDirectory

@@ -46,7 +46,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 
 ## Installation
 
-Download `RightAgent-1.1.1-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer remains under the current Windows user. On the first installation, if the bundled public certificate is not trusted yet, Setup requests administrator approval only for importing that certificate into Local Computer\Trusted People, then installs the MSIX for the current user. Upgrades do not request elevation again while the certificate remains trusted, and the private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
+Download `RightAgent-1.1.1-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer remains under the current Windows user. On the first installation, if the bundled public certificate is not trusted yet, Setup requests administrator approval only for importing that certificate into Local Computer\Trusted People, then installs the complete package set for the current user. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries one main package and 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. Upgrades do not request elevation again while the certificate remains trusted, and the private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
 
 ### Build and install from source
 
@@ -55,7 +55,7 @@ Create a per-user development certificate matching the package manifest, then bu
 ```powershell
 .\scripts\New-DevCertificate.ps1
 .\scripts\Build.ps1 -Configuration Release
-.\scripts\Sign-Package.ps1 -Configuration Release
+.\scripts\Sign-PackageSet.ps1 -Configuration Release
 .\scripts\Install-DevPackage.ps1 -Configuration Release
 ```
 
@@ -94,11 +94,11 @@ Built-in agent icons use glyphs from [@lobehub/icons](https://github.com/lobehub
 .\scripts\Build.ps1 -Configuration Release
 ```
 
-The x64 MSIX is written beneath `artifacts\package\Release`. The solution contains the native core, launcher, File Explorer extension, COM surface tests, and managed settings tests.
+The main x64 MSIX is written beneath `artifacts\package\Release`, with 16 hidden command MSIX packages in its `Commands` subdirectory. The solution contains the native core, launcher, File Explorer extension, COM surface tests, and managed settings tests.
 
 The toolchain requires Visual Studio 2026 Community with WinUI app development, C++ desktop development, C++ WinUI tools, MSIX/WAP tools, and Windows 11 SDK 10.0.26100 or newer, plus .NET 10 SDK. Run `.\scripts\Validate-Environment.ps1` after setup. The repository does not require Node.js, Electron, Tauri, Rust, a database, or a background service.
 
-GitHub Actions continuous integration runs the full test suite and builds an unsigned release-identity MSIX on the `windows-2025` hosted runner. The tag workflow reads signing secrets only from the dedicated release environment, signs the MSIX, uses a pinned Inno Setup compiler to build and sign a single-file `Setup.exe`, creates its SHA-256 file, and opens a draft GitHub Release. Public Releases contain only the installer and checksum; Setup carries the internal MSIX, dependencies, and public certificate. The signing key is never exposed to ordinary push or pull-request builds. See the [continuous integration workflow](.github/workflows/ci.yml) and [release workflow](.github/workflows/release.yml).
+GitHub Actions continuous integration runs the full test suite and builds an unsigned release-identity package set on the `windows-2025` hosted runner. The tag workflow reads signing secrets only from the dedicated release environment, signs all 17 MSIX packages, uses a pinned Inno Setup compiler to build and sign a single-file `Setup.exe`, creates its SHA-256 file, and opens a draft GitHub Release. Public Releases contain only the installer and checksum; Setup carries the internal packages, dependencies, and public certificate. The signing key is never exposed to ordinary push or pull-request builds. See the [continuous integration workflow](.github/workflows/ci.yml) and [release workflow](.github/workflows/release.yml).
 
 ## Repository map
 
@@ -107,7 +107,8 @@ GitHub Actions continuous integration runs the full test suite and builds an uns
 - `RightAgent.Shell`: native `IExplorerCommand` COM component for the modern Windows 11 menu.
 - `RightAgent.Launcher`: short-lived native process that opens Terminal or a URL.
 - `RightAgent.Native.Core`: shared native settings, icon, quoting, and process helpers.
-- `RightAgent.Package`: WAP/MSIX identity and File Explorer registration.
+- `RightAgent.Package`: WAP/MSIX identity for the visible settings app.
+- `RightAgent.CommandPackage`: shared manifest template for the 16 hidden File Explorer command packages.
 - `installer`: single-file Setup definition that stays under the current user and elevates only to trust the public certificate when required.
 
 Details: [architecture](docs/ARCHITECTURE.md) · [settings schema](docs/SETTINGS_SCHEMA.md) · [test matrix](docs/TEST_MATRIX.md) · [release guide](docs/RELEASING.md) · [v1 release decisions](docs/RELEASE_DECISIONS.md).

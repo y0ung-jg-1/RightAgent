@@ -44,6 +44,13 @@ release. It is an engineering release record, not legal advice.
   payload or waits for first-install certificate approval. Once MSIX deployment
   begins, stream the percentage reported by Windows `DeploymentProgress` into a
   determinate 0–100% progress bar; do not estimate elapsed time.
+- Multi-direct package attribution: beginning with v1.1.1, keep one public Setup
+  EXE but embed one visible settings MSIX and 16 independently identified hidden
+  command MSIX packages. Windows 11 groups verbs attributed to one package even
+  when they use separate application identities, so independent package
+  identities are required for genuine root-level commands. Every package is
+  signed, version-aligned, installed for the initiating user, and verified by
+  CI; only the settings app is visible in Start.
 
 ## Publication gate
 

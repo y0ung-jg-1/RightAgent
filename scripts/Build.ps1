@@ -66,4 +66,6 @@ finally {
 
 $packagePath = Get-RightAgentPackagePath -RepoRoot $repoRoot -Configuration $Configuration -PackageIdentity $PackageIdentity
 & (Join-Path $PSScriptRoot 'Verify-PackageCompliance.ps1') -PackagePath $packagePath
+& (Join-Path $PSScriptRoot 'New-CommandPackages.ps1') -Configuration $Configuration -PackageIdentity $PackageIdentity
+& (Join-Path $PSScriptRoot 'Verify-CommandPackages.ps1') -Configuration $Configuration -PackageIdentity $PackageIdentity
 Write-Host "Built ($PackageIdentity identity): $packagePath"

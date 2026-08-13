@@ -65,12 +65,6 @@
     <Content Include="..\RightAgent.App\Assets\Agents\*.svg">
       <Link>Assets\Agents\%(Filename)%(Extension)</Link>
     </Content>
-    <Content Include="$(SolutionDir)artifacts\bin\$(Configuration)\x64\RightAgent.Shell.dll">
-      <Link>RightAgent.Shell.dll</Link>
-    </Content>
-    <Content Include="$(SolutionDir)artifacts\bin\$(Configuration)\x64\RightAgent.Launcher.exe">
-      <Link>RightAgent.Launcher.exe</Link>
-    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RightAgent.App\RightAgent.App.csproj">

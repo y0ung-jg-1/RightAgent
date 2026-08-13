@@ -54,6 +54,7 @@ namespace rightagent
         std::vector<AgentDefinition> agents;
     };
 
+    [[nodiscard]] std::wstring GetSettingsPackageFamilyName(std::wstring_view currentPackageFamilyName);
     [[nodiscard]] std::filesystem::path GetLocalStateDirectory();
     [[nodiscard]] std::filesystem::path GetSettingsPath();
     [[nodiscard]] Settings LoadSettings();

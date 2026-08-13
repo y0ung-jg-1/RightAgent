@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$PackagePath,
+    [string[]]$CommandPackagePaths,
     [string]$CertificatePath,
     [string]$ResultPath,
     [switch]$TrustCertificateOnly
@@ -24,7 +25,13 @@ function Add-RightAgentAppxPackage {
         [Parameter(Mandatory)]
         [string]$Path,
 
-        [string[]]$DependencyPath = @()
+        [string[]]$DependencyPath = @(),
+
+        [ValidateRange(0, 100)]
+        [int]$BasePercent = 0,
+
+        [ValidateRange(0, 100)]
+        [int]$SpanPercent = 100
     )
 
     # Add-AppxPackage receives DeploymentProgress from the Windows deployment API
@@ -40,7 +47,10 @@ function Add-RightAgentAppxPackage {
             return
         }
 
-        $percentComplete = [Math]::Min(100, [Math]::Max(0, [int]$progressRecord.PercentComplete))
+        $deploymentPercent = [Math]::Min(100, [Math]::Max(0, [int]$progressRecord.PercentComplete))
+        $percentComplete = [Math]::Min(
+            100,
+            $BasePercent + [int][Math]::Round($deploymentPercent * $SpanPercent / 100.0))
         [Console]::Out.WriteLine("RIGHTAGENT_PROGRESS:$percentComplete")
         [Console]::Out.Flush()
     }
@@ -56,7 +66,7 @@ function Add-RightAgentAppxPackage {
         [void]$packageInstaller.AddParameter('ForceUpdateFromAnyVersion')
         [void]$packageInstaller.AddParameter('ErrorAction', [Management.Automation.ActionPreference]::Stop)
 
-        Write-RightAgentInstallationProgress -PercentComplete 0
+        Write-RightAgentInstallationProgress -PercentComplete $BasePercent
         [void]$packageInstaller.Invoke()
 
         if ($packageInstaller.HadErrors -or $packageInstaller.Streams.Error.Count -gt 0) {
@@ -68,11 +78,78 @@ function Add-RightAgentAppxPackage {
             throw $deploymentDetail
         }
 
-        Write-RightAgentInstallationProgress -PercentComplete 100
+        Write-RightAgentInstallationProgress -PercentComplete ([Math]::Min(100, $BasePercent + $SpanPercent))
     }
     finally {
         $packageInstaller.Streams.Progress.remove_DataAdded($progressHandler)
         $packageInstaller.Dispose()
+    }
+}
+
+function Get-RightAgentAppxManifest {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path
+    )
+
+    $archive = [IO.Compression.ZipFile]::OpenRead($Path)
+    try {
+        $manifestEntry = $archive.GetEntry('AppxManifest.xml')
+        if (-not $manifestEntry) {
+            throw "Package does not contain AppxManifest.xml: $Path"
+        }
+        $reader = [IO.StreamReader]::new($manifestEntry.Open())
+        try {
+            return [xml]$reader.ReadToEnd()
+        }
+        finally {
+            $reader.Dispose()
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+
+function Stop-RightAgentComSurrogates {
+    $installedRightAgentPackages = @(
+        @(Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ceq 'RightAgent' -and $_.Publisher -ceq 'CN=RightAgent' })
+        @(Get-AppxPackage -Name 'RightAgent.Command*' -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -match '^RightAgent\.Command(0[0-9]|1[0-5])$' -and
+                $_.Publisher -ceq 'CN=RightAgent'
+            })
+    )
+    if ($installedRightAgentPackages.Count -eq 0) {
+        return
+    }
+
+    if (-not (Get-Command -Name 'Get-CimInstance' -CommandType Cmdlet -ErrorAction SilentlyContinue)) {
+        throw 'RightAgent command packages are active, but the installer cannot inspect their COM surrogate processes. Close all File Explorer windows or sign out, then run Setup again.'
+    }
+
+    $classIds = @(0..15 | ForEach-Object {
+        'F7E08D{0:X2}-676E-4D4B-950A-5B4451E19E3C' -f (0x6D + $_)
+    })
+    $classIdPattern = ($classIds | ForEach-Object { [Regex]::Escape($_) }) -join '|'
+    $surrogates = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop |
+        Where-Object {
+            $_.Name -ieq 'dllhost.exe' -and
+            -not [string]::IsNullOrWhiteSpace($_.CommandLine) -and
+            $_.CommandLine -match $classIdPattern
+        })
+
+    foreach ($surrogate in $surrogates) {
+        try {
+            Stop-Process -Id $surrogate.ProcessId -Force -ErrorAction Stop
+        }
+        catch {
+            throw "RightAgent could not release Explorer's cached menu process $($surrogate.ProcessId). Close all File Explorer windows or sign out, then run Setup again."
+        }
+    }
+    if ($surrogates.Count -gt 0) {
+        Write-Host "Released $($surrogates.Count) cached RightAgent Explorer command process(es) before package deployment."
     }
 }
 
@@ -113,11 +190,20 @@ try {
     }
 
     if (-not $PackagePath) {
-        $packages = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.msix' -File)
+        $packages = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'RightAgent-*-x64.msix' -File)
         if ($packages.Count -ne 1) {
-            throw "Expected exactly one MSIX next to this installer, but found $($packages.Count)."
+            throw "Expected exactly one main RightAgent MSIX next to this installer, but found $($packages.Count)."
         }
         $PackagePath = $packages[0].FullName
+    }
+    if (-not $CommandPackagePaths) {
+        $CommandPackagePaths = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'RightAgent.Command*-x64.msix' -File |
+            Sort-Object Name |
+            Select-Object -ExpandProperty FullName)
+    }
+    $CommandPackagePaths = @($CommandPackagePaths)
+    if ($CommandPackagePaths.Count -ne 16) {
+        throw "Expected exactly 16 RightAgent command MSIX packages next to this installer, but found $($CommandPackagePaths.Count)."
     }
     if (-not $CertificatePath) {
         $CertificatePath = Join-Path $PSScriptRoot 'RightAgent.cer'
@@ -131,6 +217,13 @@ try {
     if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
         throw "RightAgent public certificate was not found: $CertificatePath"
     }
+    $CommandPackagePaths = @($CommandPackagePaths | ForEach-Object {
+        $resolvedCommandPackagePath = [IO.Path]::GetFullPath($_)
+        if (-not (Test-Path -LiteralPath $resolvedCommandPackagePath -PathType Leaf)) {
+            throw "RightAgent command package was not found: $resolvedCommandPackagePath"
+        }
+        $resolvedCommandPackagePath
+    })
 
     $expectedCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
     if ($expectedCertificate.Subject -cne 'CN=RightAgent') {
@@ -140,39 +233,55 @@ try {
         throw 'The RightAgent release certificate is outside its validity period.'
     }
 
-    $signature = Get-AuthenticodeSignature -LiteralPath $PackagePath
-    $signerMatchesCertificate =
-        $null -ne $signature.SignerCertificate -and
-        $signature.SignerCertificate.Thumbprint -eq $expectedCertificate.Thumbprint
-    $isAcceptedUntrustedSignature =
-        $signature.Status -eq 'UnknownError' -and
-        $signerMatchesCertificate
-    if ($signature.Status -ne 'Valid' -and -not $isAcceptedUntrustedSignature) {
-        throw "Package signature verification failed: $($signature.Status)"
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $allPackagePaths = @($PackagePath) + $CommandPackagePaths
+    foreach ($signedPackagePath in $allPackagePaths) {
+        $signature = Get-AuthenticodeSignature -LiteralPath $signedPackagePath
+        $signerMatchesCertificate =
+            $null -ne $signature.SignerCertificate -and
+            $signature.SignerCertificate.Thumbprint -eq $expectedCertificate.Thumbprint
+        $isAcceptedUntrustedSignature =
+            $signature.Status -eq 'UnknownError' -and
+            $signerMatchesCertificate
+        if ($signature.Status -ne 'Valid' -and -not $isAcceptedUntrustedSignature) {
+            throw "Package signature verification failed for '$signedPackagePath': $($signature.Status)"
+        }
     }
 
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
-    try {
-        $manifestEntry = $archive.GetEntry('AppxManifest.xml')
-        if (-not $manifestEntry) {
-            throw 'The package does not contain AppxManifest.xml.'
-        }
-        $reader = [IO.StreamReader]::new($manifestEntry.Open())
-        try {
-            [xml]$manifest = $reader.ReadToEnd()
-        }
-        finally {
-            $reader.Dispose()
-        }
-    }
-    finally {
-        $archive.Dispose()
-    }
+    [xml]$manifest = Get-RightAgentAppxManifest -Path $PackagePath
     if ([string]$manifest.Package.Identity.Name -cne 'RightAgent' -or
-        [string]$manifest.Package.Identity.Publisher -cne 'CN=RightAgent') {
+        [string]$manifest.Package.Identity.Publisher -cne 'CN=RightAgent' -or
+        [string]$manifest.Package.Identity.ProcessorArchitecture -cne 'x64') {
         throw 'The package identity is not the public RightAgent release identity.'
     }
+    $packageVersion = [version]([string]$manifest.Package.Identity.Version)
+
+    $commandPackagesBySlot = @{}
+    foreach ($commandPackagePath in $CommandPackagePaths) {
+        [xml]$commandManifest = Get-RightAgentAppxManifest -Path $commandPackagePath
+        $commandIdentity = $commandManifest.Package.Identity
+        $commandName = [string]$commandIdentity.Name
+        if ($commandName -notmatch '^RightAgent\.Command(0[0-9]|1[0-5])$') {
+            throw "Unexpected RightAgent command package identity '$commandName': $commandPackagePath"
+        }
+        $slotText = $Matches[1]
+        if ($commandPackagesBySlot.ContainsKey($slotText)) {
+            throw "Duplicate RightAgent command package slot $slotText."
+        }
+        if ([string]$commandIdentity.Publisher -cne 'CN=RightAgent' -or
+            [version]([string]$commandIdentity.Version) -ne $packageVersion -or
+            [string]$commandIdentity.ProcessorArchitecture -cne 'x64') {
+            throw "RightAgent command package $slotText does not match the main package identity."
+        }
+        $commandPackagesBySlot[$slotText] = $commandPackagePath
+    }
+    $CommandPackagePaths = @(foreach ($slot in 0..15) {
+        $slotText = $slot.ToString('D2')
+        if (-not $commandPackagesBySlot.ContainsKey($slotText)) {
+            throw "RightAgent command package slot $slotText is missing."
+        }
+        $commandPackagesBySlot[$slotText]
+    })
 
     $trustedPeopleStore = 'Cert:\LocalMachine\TrustedPeople'
     $trustedCertificate = Get-ChildItem -LiteralPath $trustedPeopleStore |
@@ -250,14 +359,19 @@ try {
         return
     }
 
-    $packageVersion = [version]([string]$manifest.Package.Identity.Version)
-    $sameVersionPackage = Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.Publisher -ceq 'CN=RightAgent' -and
-            [version]$_.Version -eq $packageVersion
-        } |
-        Select-Object -First 1
-    if ($sameVersionPackage) {
+    $expectedPackageNames = @('RightAgent') + @(0..15 | ForEach-Object { "RightAgent.Command$($_.ToString('D2'))" })
+    $sameVersionPackages = @{}
+    foreach ($expectedPackageName in $expectedPackageNames) {
+        $sameVersionPackage = Get-AppxPackage -Name $expectedPackageName -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -ceq $expectedPackageName -and
+                $_.Publisher -ceq 'CN=RightAgent' -and
+                [version]$_.Version -eq $packageVersion
+            } |
+            Select-Object -First 1
+        $sameVersionPackages[$expectedPackageName] = $null -ne $sameVersionPackage
+    }
+    if (@($sameVersionPackages.Values | Where-Object { $_ }).Count -eq $expectedPackageNames.Count) {
         Write-Host "RightAgent $packageVersion is already installed for the current user."
         Write-RightAgentInstallationProgress -PercentComplete 100
         return
@@ -272,7 +386,39 @@ try {
         @()
     }
 
-    Add-RightAgentAppxPackage -Path $PackagePath -DependencyPath $dependencies
+    Stop-RightAgentComSurrogates
+    if ($sameVersionPackages['RightAgent']) {
+        Write-RightAgentInstallationProgress -PercentComplete 36
+    }
+    else {
+        Add-RightAgentAppxPackage -Path $PackagePath -DependencyPath $dependencies -BasePercent 0 -SpanPercent 36
+    }
+    foreach ($slot in 0..15) {
+        $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
+        $basePercent = 36 + (4 * $slot)
+        if ($sameVersionPackages[$commandPackageName]) {
+            Write-RightAgentInstallationProgress -PercentComplete ($basePercent + 4)
+        }
+        else {
+            Add-RightAgentAppxPackage `
+                -Path $CommandPackagePaths[$slot] `
+                -BasePercent $basePercent `
+                -SpanPercent 4
+        }
+    }
+
+    foreach ($expectedPackageName in $expectedPackageNames) {
+        $installedPackage = Get-AppxPackage -Name $expectedPackageName -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -ceq $expectedPackageName -and
+                $_.Publisher -ceq 'CN=RightAgent' -and
+                [version]$_.Version -eq $packageVersion
+            } |
+            Select-Object -First 1
+        if (-not $installedPackage) {
+            throw "RightAgent installation verification failed for package '$expectedPackageName' version $packageVersion."
+        }
+    }
 
     Write-Host 'RightAgent installed. If Explorer cached the old menu, close all Explorer windows or sign out once.'
 }

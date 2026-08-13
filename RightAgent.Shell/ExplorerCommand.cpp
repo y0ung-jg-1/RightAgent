@@ -24,7 +24,6 @@ namespace
 {
     HMODULE g_module = nullptr;
     std::atomic<long> g_moduleReferences = 0;
-    constexpr std::size_t MaxMultiDirectCommands = 16;
 
     void AddModuleReference() noexcept
     {
@@ -51,6 +50,26 @@ namespace
     std::wstring DirectTitle(const rightagent::Settings& settings, const rightagent::AgentDefinition& agent)
     {
         return rightagent::IsChinese(settings) ? L"使用 " + agent.name + L" 打开" : L"Open with " + agent.name;
+    }
+
+    const rightagent::AgentDefinition* EnabledAgentAt(
+        const rightagent::Settings& settings,
+        const std::size_t index)
+    {
+        std::size_t enabledIndex = 0;
+        for (const auto& agent : settings.agents)
+        {
+            if (!agent.enabled)
+            {
+                continue;
+            }
+            if (enabledIndex == index)
+            {
+                return &agent;
+            }
+            ++enabledIndex;
+        }
+        return nullptr;
     }
 
     GUID CanonicalGuidForAgent(const std::wstring& id)
@@ -260,7 +279,8 @@ namespace
     class ExplorerCommand final : public IExplorerCommand, public IObjectWithSite
     {
     public:
-        ExplorerCommand()
+        explicit ExplorerCommand(const std::size_t rootSlot)
+            : rootSlot_(rootSlot)
         {
             AddModuleReference();
         }
@@ -330,7 +350,10 @@ namespace
             else
             {
                 const auto settings = rightagent::LoadSettings();
-                text = RootTitle(settings);
+                const auto* selectedAgent = ResolveSelectedAgent(settings);
+                text = settings.menuMode == rightagent::MenuMode::MultiDirect && selectedAgent != nullptr
+                    ? DirectTitle(settings, *selectedAgent)
+                    : RootTitle(settings);
             }
             return text.empty() ? E_FAIL : SHStrDupW(text.c_str(), title);
         }
@@ -383,7 +406,7 @@ namespace
             }
             *commandName = agent_
                 ? CanonicalGuidForAgent(agent_->id)
-                : CLSID_RightAgentExplorerCommand;
+                : CLSID_RightAgentExplorerCommandSlots[rootSlot_];
             return S_OK;
         }
 
@@ -406,6 +429,17 @@ namespace
                 {
                     return S_OK;
                 }
+            }
+            else if (settings.menuMode == rightagent::MenuMode::MultiDirect)
+            {
+                if (ResolveSelectedAgent(settings) == nullptr)
+                {
+                    return S_OK;
+                }
+            }
+            else if (rootSlot_ != 0)
+            {
+                return S_OK;
             }
             else if (settings.menuMode == rightagent::MenuMode::Direct)
             {
@@ -433,6 +467,10 @@ namespace
         HRESULT STDMETHODCALLTYPE Invoke(IShellItemArray* selection, IBindCtx*) override
         {
             const auto settings = rightagent::LoadSettings();
+            if (!settings.menuEnabled)
+            {
+                return HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY);
+            }
             const auto* selectedAgent = ResolveSelectedAgent(settings);
             if (selectedAgent == nullptr)
             {
@@ -473,11 +511,9 @@ namespace
                 return S_OK;
             }
             const auto settings = rightagent::LoadSettings();
-            *flags = settings.menuMode == rightagent::MenuMode::Grouped
+            *flags = rootSlot_ == 0 && settings.menuMode == rightagent::MenuMode::Grouped
                 ? ECF_HASSUBCOMMANDS
-                : settings.menuMode == rightagent::MenuMode::MultiDirect
-                    ? ECF_ISSEPARATOR
-                    : ECF_DEFAULT;
+                : ECF_DEFAULT;
             return S_OK;
         }
 
@@ -488,14 +524,13 @@ namespace
                 return E_POINTER;
             }
             *enumerator = nullptr;
-            if (agent_)
+            if (agent_ || rootSlot_ != 0)
             {
                 return E_NOTIMPL;
             }
 
             const auto settings = rightagent::LoadSettings();
-            if (settings.menuMode != rightagent::MenuMode::Grouped
-                && settings.menuMode != rightagent::MenuMode::MultiDirect)
+            if (settings.menuMode != rightagent::MenuMode::Grouped)
             {
                 return E_NOTIMPL;
             }
@@ -509,13 +544,7 @@ namespace
             {
                 return S_FALSE;
             }
-            const bool useDirectTitles = settings.menuMode == rightagent::MenuMode::MultiDirect;
-            if (useDirectTitles && enabled.size() > MaxMultiDirectCommands)
-            {
-                enabled.resize(MaxMultiDirectCommands);
-            }
-
-            *enumerator = new (std::nothrow) ExplorerCommandEnumerator(std::move(enabled), site_, useDirectTitles);
+            *enumerator = new (std::nothrow) ExplorerCommandEnumerator(std::move(enabled), site_, false);
             return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
         }
 
@@ -550,7 +579,13 @@ namespace
             {
                 return rightagent::FindEnabledAgent(settings, agent_->id);
             }
-            return settings.menuMode == rightagent::MenuMode::Direct ? rightagent::FindDirectAgent(settings) : nullptr;
+            if (settings.menuMode == rightagent::MenuMode::Direct && rootSlot_ == 0)
+            {
+                return rightagent::FindDirectAgent(settings);
+            }
+            return settings.menuMode == rightagent::MenuMode::MultiDirect
+                ? EnabledAgentAt(settings, rootSlot_)
+                : nullptr;
         }
 
         ~ExplorerCommand()
@@ -565,6 +600,7 @@ namespace
         std::atomic<ULONG> references_{1};
         std::optional<rightagent::AgentDefinition> agent_;
         bool useDirectTitle_{};
+        std::size_t rootSlot_{};
         IUnknown* site_{};
     };
 
@@ -606,7 +642,8 @@ namespace
     class ClassFactory final : public IClassFactory
     {
     public:
-        ClassFactory()
+        explicit ClassFactory(const std::size_t rootSlot)
+            : rootSlot_(rootSlot)
         {
             AddModuleReference();
         }
@@ -654,7 +691,7 @@ namespace
             }
             *object = nullptr;
 
-            auto* command = new (std::nothrow) ExplorerCommand();
+            auto* command = new (std::nothrow) ExplorerCommand(rootSlot_);
             if (command == nullptr)
             {
                 return E_OUTOFMEMORY;
@@ -677,6 +714,7 @@ namespace
         }
 
         std::atomic<ULONG> references_{1};
+        std::size_t rootSlot_{};
     };
 }
 
@@ -697,7 +735,11 @@ extern "C" HRESULT __stdcall DllCanUnloadNow()
 
 extern "C" HRESULT __stdcall DllGetClassObject(const CLSID& classId, const IID& iid, void** object)
 {
-    if (classId != CLSID_RightAgentExplorerCommand)
+    const auto classIdIterator = std::find(
+        CLSID_RightAgentExplorerCommandSlots.begin(),
+        CLSID_RightAgentExplorerCommandSlots.end(),
+        classId);
+    if (classIdIterator == CLSID_RightAgentExplorerCommandSlots.end())
     {
         return CLASS_E_CLASSNOTAVAILABLE;
     }
@@ -707,7 +749,9 @@ extern "C" HRESULT __stdcall DllGetClassObject(const CLSID& classId, const IID& 
     }
     *object = nullptr;
 
-    auto* factory = new (std::nothrow) ClassFactory();
+    const auto rootSlot = static_cast<std::size_t>(
+        std::distance(CLSID_RightAgentExplorerCommandSlots.begin(), classIdIterator));
+    auto* factory = new (std::nothrow) ClassFactory(rootSlot);
     if (factory == nullptr)
     {
         return E_OUTOFMEMORY;

@@ -131,6 +131,34 @@ namespace
         std::filesystem::remove_all(root, error);
     }
 
+    void TestUnpackagedSettingsPath()
+    {
+        Expect(
+            rightagent::GetSettingsPackageFamilyName(L"RightAgent_fqe37b9yktg1e") == L"RightAgent_fqe37b9yktg1e",
+            "Main package family name changed while resolving settings");
+        Expect(
+            rightagent::GetSettingsPackageFamilyName(L"RightAgent.Command00_fqe37b9yktg1e") == L"RightAgent_fqe37b9yktg1e",
+            "Release command package did not resolve the main package settings family");
+        Expect(
+            rightagent::GetSettingsPackageFamilyName(L"RightAgent.Dev.Command15_123456789abcd") == L"RightAgent.Dev_123456789abcd",
+            "Development command package did not resolve the main package settings family");
+        Expect(
+            rightagent::GetSettingsPackageFamilyName(L"invalid") == L"",
+            "Malformed package family names must not resolve a settings family");
+
+        const auto root = std::filesystem::temp_directory_path() / L"RightAgent.SettingsPath.Tests" / std::to_wstring(GetCurrentProcessId());
+        const auto settingsPath = root / L"settings.json";
+        SetEnvironmentVariableW(L"RIGHTAGENT_SETTINGS_PATH", settingsPath.c_str());
+        Expect(rightagent::GetLocalStateDirectory() == root, "Settings override directory was not used");
+        Expect(rightagent::GetSettingsPath() == settingsPath, "Settings override file was not used");
+        SetEnvironmentVariableW(L"RIGHTAGENT_SETTINGS_PATH", nullptr);
+
+        const auto unpackagedPath = rightagent::GetSettingsPath();
+        Expect(
+            unpackagedPath.filename() == L"settings.json" && unpackagedPath.parent_path().filename() == L"RightAgent",
+            "Unpackaged settings should use the LocalAppData RightAgent fallback");
+    }
+
     void TestSimpleTokenDetection()
     {
         Expect(rightagent::FirstSimpleCommandToken(L"  kimi web") == L"kimi", "Simple command token not detected");
@@ -165,11 +193,29 @@ namespace
         const auto getClassObject = reinterpret_cast<GetClassObject>(GetProcAddress(shell, "DllGetClassObject"));
         Expect(getClassObject != nullptr, "DllGetClassObject export is missing");
 
-        IClassFactory* factory = nullptr;
-        Expect(SUCCEEDED(getClassObject(CLSID_RightAgentExplorerCommand, IID_PPV_ARGS(&factory))), "Could not create shell class factory");
-        IExplorerCommand* command = nullptr;
-        Expect(SUCCEEDED(factory->CreateInstance(nullptr, IID_PPV_ARGS(&command))), "Could not create root explorer command");
-        factory->Release();
+        const auto createRootCommand = [&](const std::size_t slot)
+        {
+            Expect(slot < RightAgentExplorerCommandSlotCount, "Explorer command slot is out of range");
+            IClassFactory* slotFactory = nullptr;
+            Expect(SUCCEEDED(getClassObject(
+                CLSID_RightAgentExplorerCommandSlots[slot],
+                IID_PPV_ARGS(&slotFactory))), "Could not create shell class factory");
+            IExplorerCommand* result = nullptr;
+            Expect(SUCCEEDED(slotFactory->CreateInstance(nullptr, IID_PPV_ARGS(&result))),
+                "Could not create root explorer command");
+            slotFactory->Release();
+            return result;
+        };
+
+        IShellItem* folderItem = nullptr;
+        Expect(SUCCEEDED(SHCreateItemFromParsingName(root.c_str(), nullptr, IID_PPV_ARGS(&folderItem))),
+            "Could not create test folder shell item");
+        IShellItemArray* selection = nullptr;
+        Expect(SUCCEEDED(SHCreateShellItemArrayFromShellItem(folderItem, IID_PPV_ARGS(&selection))),
+            "Could not create test folder selection");
+        folderItem->Release();
+
+        IExplorerCommand* command = createRootCommand(0);
 
         PWSTR title = nullptr;
         Expect(SUCCEEDED(command->GetTitle(nullptr, &title)), "Root title failed");
@@ -204,13 +250,7 @@ namespace
 })";
         }
 
-        factory = nullptr;
-        Expect(SUCCEEDED(getClassObject(CLSID_RightAgentExplorerCommand, IID_PPV_ARGS(&factory))),
-            "Could not recreate direct-mode class factory");
-        command = nullptr;
-        Expect(SUCCEEDED(factory->CreateInstance(nullptr, IID_PPV_ARGS(&command))),
-            "Could not recreate direct-mode explorer command");
-        factory->Release();
+        command = createRootCommand(0);
         title = nullptr;
         Expect(SUCCEEDED(command->GetTitle(nullptr, &title)) && std::wstring(title) == L"Open with Codex",
             "Unexpected direct-mode title");
@@ -221,6 +261,30 @@ namespace
         IEnumExplorerCommand* directEnumerator = nullptr;
         Expect(command->EnumSubCommands(&directEnumerator) == E_NOTIMPL && directEnumerator == nullptr,
             "Direct mode should not enumerate child commands");
+        command->Release();
+
+        IExplorerCommand* hiddenDirectSlot = createRootCommand(1);
+        EXPCMDSTATE state = ECS_ENABLED;
+        Expect(SUCCEEDED(hiddenDirectSlot->GetState(selection, FALSE, &state)) && state == ECS_HIDDEN,
+            "Non-primary slots must stay hidden in single-direct mode");
+        hiddenDirectSlot->Release();
+
+        {
+            std::ofstream output(settingsPath, std::ios::binary | std::ios::trunc);
+            output << R"({
+  "schemaVersion": 1,
+  "menuEnabled": false,
+  "language": "en-US",
+  "menuMode": "direct",
+  "directAgentId": "codex",
+  "agents": [
+    {"id":"codex","name":"Codex","enabled":true,"sort":0,"iconPath":"builtin:codex","action":{"type":"terminalCommand","value":"codex"}}
+  ]
+})";
+        }
+        command = createRootCommand(0);
+        Expect(command->Invoke(selection, nullptr) == HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY),
+            "A cached command must not launch while the menu is disabled");
         command->Release();
 
         {
@@ -236,60 +300,48 @@ namespace
 })";
         }
 
-        IShellItem* folderItem = nullptr;
-        Expect(SUCCEEDED(SHCreateItemFromParsingName(root.c_str(), nullptr, IID_PPV_ARGS(&folderItem))),
-            "Could not create test folder shell item");
-        IShellItemArray* selection = nullptr;
-        Expect(SUCCEEDED(SHCreateShellItemArrayFromShellItem(folderItem, IID_PPV_ARGS(&selection))),
-            "Could not create test folder selection");
-        folderItem->Release();
-
-        factory = nullptr;
-        Expect(SUCCEEDED(getClassObject(CLSID_RightAgentExplorerCommand, IID_PPV_ARGS(&factory))),
-            "Could not recreate root class factory");
-        command = nullptr;
-        Expect(SUCCEEDED(factory->CreateInstance(nullptr, IID_PPV_ARGS(&command))),
-            "Could not recreate root explorer command");
-        factory->Release();
-        title = nullptr;
-        Expect(SUCCEEDED(command->GetTitle(nullptr, &title)) && std::wstring(title) == L"Open with RightAgent",
-            "Unexpected multi-direct root title");
-        CoTaskMemFree(title);
-        flags = ECF_DEFAULT;
-        Expect(SUCCEEDED(command->GetFlags(&flags)) && flags == ECF_ISSEPARATOR,
-            "Multi-direct root should flatten its children through a separator");
-        EXPCMDSTATE state = ECS_HIDDEN;
-        Expect(SUCCEEDED(command->GetState(selection, FALSE, &state)) && state == ECS_ENABLED,
-            "Multi-direct root should be enabled when agents are available");
-
-        enumerator = nullptr;
-        Expect(SUCCEEDED(command->EnumSubCommands(&enumerator)), "Could not enumerate multi-direct commands");
-        for (std::size_t index = 0; index < 2; ++index)
+        for (std::size_t slot = 0; slot < RightAgentExplorerCommandSlotCount; ++slot)
         {
-            child = nullptr;
-            fetched = 0;
-            Expect(enumerator->Next(1, &child, &fetched) == S_OK && fetched == 1,
-                "A multi-direct command is missing");
-            title = nullptr;
-            const std::wstring expectedTitle = index == 0 ? L"Open with Codex" : L"Open with Kimi Web";
-            Expect(SUCCEEDED(child->GetTitle(nullptr, &title)) && std::wstring(title) == expectedTitle,
-                "Unexpected multi-direct command title");
-            CoTaskMemFree(title);
-            state = ECS_HIDDEN;
-            Expect(SUCCEEDED(child->GetState(selection, FALSE, &state)) && state == ECS_ENABLED,
-                "Enabled multi-direct command was not visible");
-            child->Release();
+            IClassFactory* registeredFactory = nullptr;
+            Expect(SUCCEEDED(getClassObject(
+                CLSID_RightAgentExplorerCommandSlots[slot],
+                IID_PPV_ARGS(&registeredFactory))), "A multi-direct class slot is not registered");
+            registeredFactory->Release();
         }
-        child = nullptr;
-        fetched = 1;
-        Expect(enumerator->Next(1, &child, &fetched) == S_FALSE && fetched == 0,
-            "Multi-direct enumeration returned an unexpected command");
-        enumerator->Release();
-        command->Release();
+
+        for (std::size_t slot = 0; slot < 2; ++slot)
+        {
+            command = createRootCommand(slot);
+            title = nullptr;
+            const std::wstring expectedTitle = slot == 0 ? L"Open with Codex" : L"Open with Kimi Web";
+            Expect(SUCCEEDED(command->GetTitle(nullptr, &title)) && std::wstring(title) == expectedTitle,
+                "Unexpected multi-direct root title");
+            CoTaskMemFree(title);
+            flags = ECF_HASSUBCOMMANDS;
+            Expect(SUCCEEDED(command->GetFlags(&flags)) && flags == ECF_DEFAULT,
+                "Multi-direct slots must be independent invokable root commands");
+            state = ECS_HIDDEN;
+            Expect(SUCCEEDED(command->GetState(selection, FALSE, &state)) && state == ECS_ENABLED,
+                "Enabled multi-direct root command was not visible");
+            GUID canonicalName{};
+            Expect(SUCCEEDED(command->GetCanonicalName(&canonicalName))
+                && canonicalName == CLSID_RightAgentExplorerCommandSlots[slot],
+                "Multi-direct root command canonical name changed");
+            enumerator = nullptr;
+            Expect(command->EnumSubCommands(&enumerator) == E_NOTIMPL && enumerator == nullptr,
+                "Multi-direct root commands must not enumerate children");
+            command->Release();
+        }
+
+        IExplorerCommand* unusedSlot = createRootCommand(2);
+        state = ECS_ENABLED;
+        Expect(SUCCEEDED(unusedSlot->GetState(selection, FALSE, &state)) && state == ECS_HIDDEN,
+            "Unused multi-direct slots must stay hidden");
+        unusedSlot->Release();
 
         GUID unknownClassId = CLSID_RightAgentExplorerCommand;
-        ++unknownClassId.Data1;
-        factory = nullptr;
+        unknownClassId.Data1 += static_cast<unsigned long>(RightAgentExplorerCommandSlotCount);
+        IClassFactory* factory = nullptr;
         Expect(getClassObject(unknownClassId, IID_PPV_ARGS(&factory)) == CLASS_E_CLASSNOTAVAILABLE,
             "An unregistered shell class should not expose a class factory");
         selection->Release();
@@ -308,6 +360,7 @@ int wmain()
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
         TestQuoting();
         TestSettingsParsing();
+        TestUnpackagedSettingsPath();
         TestSimpleTokenDetection();
         TestShellComSurface();
         std::wcout << L"RightAgent native tests passed.\n";
