@@ -71,6 +71,7 @@ public sealed class AgentItemViewModel : BindableBase
             SetProperty(ref iconPath, value);
             iconRevision = DateTime.UtcNow.Ticks;
             OnPropertyChanged(nameof(IconDisplayPath));
+            OnPropertyChanged(nameof(HasCustomIcon));
         }
     }
 
@@ -175,7 +176,10 @@ public sealed class AgentItemViewModel : BindableBase
     public string NameLabel => localization["Name"];
     public string ActionTypeLabel => localization["ActionType"];
     public string ActionValueLabel => localization["ActionValue"];
+    public bool HasCustomIcon => IconPath.StartsWith("local:", StringComparison.OrdinalIgnoreCase);
+
     public string ChooseIconLabel => localization["ChooseIcon"];
+    public string ResetIconLabel => localization["ResetIcon"];
     public string MoveUpLabel => localization["MoveUp"];
     public string MoveDownLabel => localization["MoveDown"];
     public string DeleteLabel => localization["Delete"];
@@ -186,6 +190,7 @@ public sealed class AgentItemViewModel : BindableBase
     public string MoveDownAutomationName => Format("MoveDownFor");
     public string DeleteAutomationName => Format("DeleteFor");
     public string ChooseIconAutomationName => Format("ChooseIconFor");
+    public string ResetIconAutomationName => Format("ResetIconFor");
     public string IconPreviewAutomationName => Format("IconFor");
 
     public AgentDefinition ToDefinition() => new()
@@ -210,6 +215,7 @@ public sealed class AgentItemViewModel : BindableBase
         OnPropertyChanged(nameof(ActionTypeLabel));
         OnPropertyChanged(nameof(ActionValueLabel));
         OnPropertyChanged(nameof(ChooseIconLabel));
+        OnPropertyChanged(nameof(ResetIconLabel));
         OnPropertyChanged(nameof(MoveUpLabel));
         OnPropertyChanged(nameof(MoveDownLabel));
         OnPropertyChanged(nameof(DeleteLabel));
@@ -245,6 +251,7 @@ public sealed class AgentItemViewModel : BindableBase
         OnPropertyChanged(nameof(MoveDownAutomationName));
         OnPropertyChanged(nameof(DeleteAutomationName));
         OnPropertyChanged(nameof(ChooseIconAutomationName));
+        OnPropertyChanged(nameof(ResetIconAutomationName));
         OnPropertyChanged(nameof(IconPreviewAutomationName));
     }
 

@@ -50,16 +50,18 @@ $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($C
 if ($certificate.Subject -cne 'CN=RightAgent') {
     throw "Unexpected release certificate subject: $($certificate.Subject)"
 }
-foreach ($signedPackagePath in $CommandPackagePaths) {
-    $signature = Get-AuthenticodeSignature -LiteralPath $signedPackagePath
-    $signerMatches =
-        $null -ne $signature.SignerCertificate -and
-        $signature.SignerCertificate.Thumbprint -eq $certificate.Thumbprint
-    if (-not $signerMatches -or $signature.Status -notin 'Valid', 'UnknownError') {
-        throw "Release package signature verification failed for '$signedPackagePath': $($signature.Status)"
-    }
-    if (-not $signature.TimeStamperCertificate) {
-        throw "Release package signature does not contain the required RFC 3161 timestamp: $signedPackagePath"
+if (-not $SkipSigning) {
+    foreach ($signedPackagePath in $CommandPackagePaths) {
+        $signature = Get-AuthenticodeSignature -LiteralPath $signedPackagePath
+        $signerMatches =
+            $null -ne $signature.SignerCertificate -and
+            $signature.SignerCertificate.Thumbprint -eq $certificate.Thumbprint
+        if (-not $signerMatches -or $signature.Status -notin 'Valid', 'UnknownError') {
+            throw "Release package signature verification failed for '$signedPackagePath': $($signature.Status)"
+        }
+        if (-not $signature.TimeStamperCertificate) {
+            throw "Release package signature does not contain the required RFC 3161 timestamp: $signedPackagePath"
+        }
     }
 }
 

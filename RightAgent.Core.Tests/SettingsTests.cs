@@ -1,3 +1,4 @@
+using System.Text.Json;
 using RightAgent.Core;
 using Xunit;
 
@@ -391,6 +392,7 @@ public sealed class SettingsTests
             Assert.Equal(record.AppPath, loaded.AppPath);
             Assert.Equal("1.1.4.0", loaded.Version);
             Assert.False(loaded.AppExists);
+            Assert.Empty(Directory.GetFiles(root, "*.tmp-*"));
         }
         finally
         {
@@ -399,5 +401,70 @@ public sealed class SettingsTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task NormalizeMatchesSharedGoldenFile()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "normalize-agents.json");
+        await using var stream = File.OpenRead(path);
+        var settings = await JsonSerializer.DeserializeAsync<RightAgentSettings>(stream, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+        var result = SettingsValidator.Normalize(settings);
+
+        Assert.Equal(SettingsContract.DirectMenu, result.MenuMode);
+        Assert.Equal(5, result.Agents.Count);
+        Assert.Equal("same", result.Agents[0].Id);
+        Assert.Equal("two", result.Agents[0].Action.Value);
+        Assert.Equal("same-2", result.Agents[1].Id);
+        Assert.Equal("one", result.Agents[1].Action.Value);
+        Assert.Equal("broken-empty-id", result.Agents[2].Id);
+        Assert.Equal("Broken Empty Id", result.Agents[2].Name);
+        Assert.Equal("noname", result.Agents[3].Id);
+        Assert.Equal("noname", result.Agents[3].Name);
+        Assert.Equal("bad-url", result.Agents[4].Id);
+        Assert.False(result.Agents[4].Enabled);
+        Assert.Equal("builtin:rightagent", result.Agents[4].IconPath);
+        Assert.Equal("same", result.DirectAgentId);
+    }
+
+    [Fact]
+    public void OccupancyPlanAddsMissingCachedSlotsAndRemovesExtras()
+    {
+        var installed = new Dictionary<int, string>
+        {
+            [0] = "RightAgent.Command00_1.0.0.0_x64__pub",
+            [2] = "RightAgent.Command02_1.0.0.0_x64__pub"
+        };
+        var plan = CommandSlotPlanner.Plan(2, installed, slot => slot == 1);
+
+        Assert.Equal([1], plan.SlotsToAdd);
+        Assert.Equal(["RightAgent.Command02_1.0.0.0_x64__pub"], plan.PackagesToRemove);
+        Assert.False(plan.CacheMissingRequiredSlots);
+    }
+
+    [Fact]
+    public void OccupancyPlanReportsMissingCacheInsteadOfInventingAdds()
+    {
+        var plan = CommandSlotPlanner.Plan(2, new Dictionary<int, string>(), _ => false);
+
+        Assert.Empty(plan.SlotsToAdd);
+        Assert.Empty(plan.PackagesToRemove);
+        Assert.True(plan.CacheMissingRequiredSlots);
+    }
+
+    [Fact]
+    public void OccupancyPlanIsUnchangedWhenRequiredSlotsAreInstalled()
+    {
+        var plan = CommandSlotPlanner.Plan(
+            1,
+            new Dictionary<int, string> { [0] = "RightAgent.Command00_1.0.0.0_x64__pub" },
+            _ => true);
+
+        Assert.Empty(plan.SlotsToAdd);
+        Assert.Empty(plan.PackagesToRemove);
+        Assert.False(plan.CacheMissingRequiredSlots);
     }
 }

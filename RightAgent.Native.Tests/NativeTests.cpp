@@ -510,6 +510,28 @@ namespace
         std::error_code error;
         std::filesystem::remove_all(root, error);
     }
+
+    void TestGoldenNormalize()
+    {
+        const auto path = rightagent::GetModuleDirectory(GetModuleHandleW(nullptr)) / L"normalize-agents.json";
+        Expect(std::filesystem::is_regular_file(path), "Shared normalize golden file is missing next to the native test executable");
+        const auto settings = rightagent::LoadSettingsFromPath(path);
+        Expect(settings.menuMode == rightagent::MenuMode::Direct, "Golden menu mode should be direct");
+        Expect(settings.agents.size() == 5, "Golden agent count changed");
+        Expect(settings.agents[0].id == L"same" && settings.agents[0].actionValue == L"two",
+            "First golden agent should keep the earlier sort and the original id");
+        Expect(settings.agents[1].id == L"same-2" && settings.agents[1].actionValue == L"one",
+            "Duplicate golden id should receive the same suffix as the managed writer");
+        Expect(settings.agents[2].id == L"broken-empty-id" && settings.agents[2].name == L"Broken Empty Id",
+            "Empty golden id should be generated from the name");
+        Expect(settings.agents[3].id == L"noname" && settings.agents[3].name == L"noname",
+            "Empty golden name should fall back to the id");
+        Expect(settings.agents[4].id == L"bad-url"
+                && !settings.agents[4].enabled
+                && settings.agents[4].iconPath == L"builtin:rightagent",
+            "Unsafe golden URL and icon should be disabled and rewritten");
+        Expect(settings.directAgentId == L"same", "Golden direct agent should be the first enabled id");
+    }
 }
 
 int wmain()
@@ -524,6 +546,7 @@ int wmain()
         TestSimpleTokenDetection();
         TestWindowsTerminalDefaultProfile();
         TestShellComSurface();
+        TestGoldenNormalize();
         std::wcout << L"RightAgent native tests passed.\n";
         return 0;
     }

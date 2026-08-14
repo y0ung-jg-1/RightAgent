@@ -14,7 +14,7 @@ internal enum CommandPackageSyncResult
 
 internal static class CommandPackageSynchronizer
 {
-    private const string InstallationMutexName = @"Local\RightAgent.PackageInstallation";
+    internal const string InstallationMutexName = @"Global\RightAgent.Setup";
     private const uint ShellAssociationChanged = 0x08000000;
     private const uint ShellNotifyIdList = 0x0000;
 
@@ -34,7 +34,7 @@ internal static class CommandPackageSynchronizer
         string localStateDirectory,
         CancellationToken cancellationToken)
     {
-        if (!TryGetCommandPackageIdentity(out var mainPackageName, out var publisher))
+        if (!TryGetCommandPackageIdentity(localStateDirectory, out var mainPackageName, out var publisher))
         {
             return CommandPackageSyncResult.Skipped;
         }
@@ -42,32 +42,16 @@ internal static class CommandPackageSynchronizer
         var cacheDirectory = Path.Combine(localStateDirectory, CommandSlotPlanner.CommandPackageCacheDirectoryName);
         var requiredSlots = CommandSlotPlanner.RequiredSlotCount(settings);
         var installed = ListInstalledCommandSlots(mainPackageName, publisher);
-        var toAdd = new List<int>();
-        var toRemove = new List<string>();
-        for (var slot = 0; slot < SettingsContract.MaxMultiDirectAgents; ++slot)
-        {
-            var isInstalled = installed.TryGetValue(slot, out var fullName);
-            if (slot < requiredSlots && !isInstalled)
-            {
-                if (CommandSlotPlanner.CachedPackageExists(cacheDirectory, slot))
-                {
-                    toAdd.Add(slot);
-                }
-            }
-            else if (slot >= requiredSlots && isInstalled && !string.IsNullOrWhiteSpace(fullName))
-            {
-                toRemove.Add(fullName);
-            }
-        }
-
-        var missingAdds = Enumerable.Range(0, requiredSlots).Any(slot =>
-            !installed.ContainsKey(slot) && !CommandSlotPlanner.CachedPackageExists(cacheDirectory, slot));
+        var plan = CommandSlotPlanner.Plan(
+            requiredSlots,
+            installed,
+            slot => CommandSlotPlanner.CachedPackageExists(cacheDirectory, slot));
         var stampPath = Path.Combine(localStateDirectory, "command-slots.refreshed");
         var stampMatches = File.Exists(stampPath)
             && string.Equals(File.ReadAllText(stampPath).Trim(), requiredSlots.ToString(), StringComparison.Ordinal);
-        if (toAdd.Count == 0 && toRemove.Count == 0)
+        if (plan.SlotsToAdd.Count == 0 && plan.PackagesToRemove.Count == 0)
         {
-            if (missingAdds)
+            if (plan.CacheMissingRequiredSlots)
             {
                 return CommandPackageSyncResult.Skipped;
             }
@@ -99,14 +83,14 @@ internal static class CommandPackageSynchronizer
             }
 
             var packageManager = new PackageManager();
-            foreach (var slot in toAdd)
+            foreach (var slot in plan.SlotsToAdd)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var packagePath = Path.Combine(cacheDirectory, CommandSlotPlanner.CommandPackageFileName(slot));
                 AddPackage(packageManager, packagePath, cancellationToken);
             }
 
-            foreach (var fullName in toRemove)
+            foreach (var fullName in plan.PackagesToRemove)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 RemovePackage(packageManager, fullName, cancellationToken);
@@ -130,9 +114,9 @@ internal static class CommandPackageSynchronizer
         return CommandPackageSyncResult.Refreshed;
     }
 
-    private static bool TryGetCommandPackageIdentity(out string mainPackageName, out string publisher)
+    private static bool TryGetCommandPackageIdentity(string localStateDirectory, out string mainPackageName, out string publisher)
     {
-        var record = InstallRecord.TryLoad();
+        var record = InstallRecord.TryLoad(localStateDirectory);
         if (record is not null &&
             !string.IsNullOrWhiteSpace(record.PackageName) &&
             !string.IsNullOrWhiteSpace(record.Publisher))

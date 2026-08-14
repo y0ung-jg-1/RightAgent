@@ -387,7 +387,7 @@ function Stop-RightAgentComSurrogates {
     }
 }
 
-$installationMutex = [Threading.Mutex]::new($false, 'Local\RightAgent.PackageInstallation')
+$installationMutex = [Threading.Mutex]::new($false, 'Global\RightAgent.Setup')
 $installationMutexAcquired = $false
 try {
     try {

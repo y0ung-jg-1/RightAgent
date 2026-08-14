@@ -125,4 +125,12 @@ public sealed partial class MenuPage : Page
             App.Main.ShowStatus(InfoBarSeverity.Error, exception.Message);
         }
     }
+
+    private void ResetIcon_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string id } && ViewModel.FindAgent(id) is { } agent)
+        {
+            ViewModel.ResetAgentIcon(agent);
+        }
+    }
 }

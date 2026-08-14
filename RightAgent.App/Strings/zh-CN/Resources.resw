@@ -38,6 +38,7 @@
   <data name="TerminalCommand" xml:space="preserve"><value>终端命令</value></data>
   <data name="Url" xml:space="preserve"><value>网页 URL</value></data>
   <data name="ChooseIcon" xml:space="preserve"><value>选择图标</value></data>
+  <data name="ResetIcon" xml:space="preserve"><value>改回内置</value></data>
   <data name="MoveUp" xml:space="preserve"><value>上移</value></data>
   <data name="MoveDown" xml:space="preserve"><value>下移</value></data>
   <data name="Delete" xml:space="preserve"><value>删除</value></data>
@@ -62,5 +63,6 @@
   <data name="MoveDownFor" xml:space="preserve"><value>下移 {0}</value></data>
   <data name="DeleteFor" xml:space="preserve"><value>删除 {0}</value></data>
   <data name="ChooseIconFor" xml:space="preserve"><value>为 {0} 选择图标</value></data>
+  <data name="ResetIconFor" xml:space="preserve"><value>将 {0} 改回内置图标</value></data>
   <data name="IconFor" xml:space="preserve"><value>{0} 的图标</value></data>
 </root>

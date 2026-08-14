@@ -12,6 +12,7 @@
 #include <fstream>
 #include <optional>
 #include <set>
+#include <string>
 #include <system_error>
 
 namespace
@@ -462,6 +463,56 @@ namespace
         return L"builtin:rightagent";
     }
 
+    std::wstring SanitizeAgentId(std::wstring seed)
+    {
+        seed = ToLower(Trim(std::move(seed)));
+        std::wstring sanitized;
+        sanitized.reserve(seed.size());
+        auto lastWasDash = false;
+        for (const wchar_t character : seed)
+        {
+            const bool allowed = (character >= L'a' && character <= L'z')
+                || (character >= L'0' && character <= L'9')
+                || character == L'.'
+                || character == L'_'
+                || character == L'-';
+            if (allowed)
+            {
+                sanitized.push_back(character);
+                lastWasDash = character == L'-';
+                continue;
+            }
+
+            if (!lastWasDash)
+            {
+                sanitized.push_back(L'-');
+                lastWasDash = true;
+            }
+        }
+
+        while (!sanitized.empty() && sanitized.front() == L'-')
+        {
+            sanitized.erase(sanitized.begin());
+        }
+        while (!sanitized.empty() && sanitized.back() == L'-')
+        {
+            sanitized.pop_back();
+        }
+        return sanitized.empty() ? std::wstring{L"agent"} : sanitized;
+    }
+
+    std::wstring UniqueAgentId(std::wstring id, std::wstring name, std::set<std::wstring, std::less<>>& usedIds)
+    {
+        auto candidate = SanitizeAgentId(id.empty() ? std::move(name) : std::move(id));
+        const auto stem = candidate;
+        auto suffix = 2;
+        while (!usedIds.insert(candidate).second)
+        {
+            candidate = stem + L"-" + std::to_wstring(suffix++);
+        }
+        return candidate;
+    }
+
     Settings Normalize(Settings settings)
     {
         settings.schemaVersion = kSettingsSchemaVersion;
@@ -479,14 +530,14 @@ namespace
         std::vector<AgentDefinition> normalized;
         for (auto agent : settings.agents)
         {
-            agent.id = Trim(std::move(agent.id));
+            agent.id = UniqueAgentId(Trim(std::move(agent.id)), agent.name, ids);
             agent.name = Trim(std::move(agent.name));
+            if (agent.name.empty())
+            {
+                agent.name = agent.id;
+            }
             agent.actionValue = Trim(std::move(agent.actionValue));
             agent.iconPath = NormalizeIcon(std::move(agent.iconPath));
-            if (agent.id.empty() || agent.name.empty() || !ids.insert(ToLower(agent.id)).second)
-            {
-                continue;
-            }
 
             const bool actionValid = agent.actionType == ActionType::Url
                 ? IsValidHttpUrl(agent.actionValue)

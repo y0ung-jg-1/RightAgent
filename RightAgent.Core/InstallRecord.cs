@@ -38,8 +38,8 @@ public sealed class InstallRecord
 
         try
         {
-            var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<InstallRecord>(json, JsonOptions);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return JsonSerializer.Deserialize<InstallRecord>(stream, JsonOptions);
         }
         catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
         {
@@ -52,6 +52,30 @@ public sealed class InstallRecord
         var directory = localStateDirectory ?? AppPaths.GetLocalStateDirectory();
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, AppPaths.InstallRecordFileName);
-        File.WriteAllText(path, JsonSerializer.Serialize(this, JsonOptions));
+        var tempPath = path + ".tmp-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+            {
+                JsonSerializer.Serialize(stream, this, JsonOptions);
+                stream.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(path))
+            {
+                File.Replace(tempPath, path, destinationBackupFileName: null, ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(tempPath, path);
+            }
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 }

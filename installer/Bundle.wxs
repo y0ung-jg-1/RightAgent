@@ -40,6 +40,15 @@
     <Log Prefix="$(var.LogPrefix)-$(var.Version)" />
 
     <Chain>
+      <ExePackage
+        Id="SetupInstanceGate"
+        DisplayName="RightAgent setup lock"
+        SourceFile="$(var.RepoDir)installer\check_setup_mutex.cmd"
+        DetectCondition="1 &gt; 2"
+        Permanent="yes"
+        Vital="yes"
+        Compressed="yes"
+        Protocol="none" />
       <MsiPackage
         Id="RightAgentMsi"
         DisplayName="RightAgent"

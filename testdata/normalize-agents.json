@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "menuMode": "DIRECT",
+  "directAgentId": "missing",
+  "agents": [
+    {
+      "id": "same",
+      "name": "Same Name",
+      "enabled": true,
+      "sort": 20,
+      "action": { "type": "terminalCommand", "value": "one" }
+    },
+    {
+      "id": "same",
+      "name": "Same Name",
+      "enabled": true,
+      "sort": 10,
+      "action": { "type": "terminalCommand", "value": "two" }
+    },
+    {
+      "id": "",
+      "name": "Broken Empty Id",
+      "enabled": true,
+      "sort": 30,
+      "action": { "type": "terminalCommand", "value": "three" }
+    },
+    {
+      "id": "noname",
+      "name": "  ",
+      "enabled": true,
+      "sort": 40,
+      "action": { "type": "terminalCommand", "value": "four" }
+    },
+    {
+      "id": "bad url",
+      "name": "Bad",
+      "enabled": true,
+      "sort": 50,
+      "iconPath": "local:C:/Windows/x.ico",
+      "action": { "type": "url", "value": "file:///C:/x" }
+    }
+  ]
+}

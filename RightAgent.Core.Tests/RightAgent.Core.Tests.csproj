@@ -16,4 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RightAgent.Core\RightAgent.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\testdata\normalize-agents.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

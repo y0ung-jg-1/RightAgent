@@ -18,7 +18,7 @@ jobs:
   build:
     name: Test and build unsigned release package
     runs-on: windows-2025
-    timeout-minutes: 35
+    timeout-minutes: 50
 
     steps:
       - name: Check out source
@@ -54,6 +54,31 @@ jobs:
           }
           "path=$package" >> $env:GITHUB_OUTPUT
 
+      - name: Build unsigned Setup.exe
+        shell: pwsh
+        run: |
+          $cerDirectory = Join-Path $env:GITHUB_WORKSPACE 'artifacts\ci-signing'
+          New-Item -ItemType Directory -Path $cerDirectory -Force | Out-Null
+          $cerPath = Join-Path $cerDirectory 'RightAgent.cer'
+          $cert = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject 'CN=RightAgent' `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -HashAlgorithm SHA256 `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -NotAfter (Get-Date).AddDays(1)
+          Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
+          ./scripts/New-SetupExecutable.ps1 -SkipSigning -CertificatePath $cerPath
+          $setup = @(Get-ChildItem -LiteralPath './artifacts/installer' -Filter 'RightAgent-*-x64-Setup.exe' -File)
+          if ($setup.Count -ne 1) {
+              throw "CI must produce exactly one unsigned per-machine Setup.exe, but found $($setup.Count)."
+          }
+          $userSetup = @(Get-ChildItem -LiteralPath './artifacts/installer' -Filter 'RightAgent-*-x64-UserSetup.exe' -File)
+          if ($userSetup.Count -ne 1) {
+              throw "CI must also compile the local UserSetup SKU, but found $($userSetup.Count)."
+          }
+
       - name: Upload unsigned CI package set
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -61,5 +86,7 @@ jobs:
           path: |
             ${{ steps.package.outputs.path }}
             artifacts/package/Release/Commands/*.msix
+            artifacts/installer/RightAgent-*-x64-Setup.exe
+            artifacts/installer/RightAgent-*-x64-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 7

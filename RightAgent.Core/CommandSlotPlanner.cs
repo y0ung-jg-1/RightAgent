@@ -58,4 +58,45 @@ public static class CommandSlotPlanner
 
         return true;
     }
+
+    public static OccupancyPlan Plan(
+        int requiredSlots,
+        IReadOnlyDictionary<int, string> installed,
+        Func<int, bool> cacheExists)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(requiredSlots);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(requiredSlots, SettingsContract.MaxMultiDirectAgents);
+        ArgumentNullException.ThrowIfNull(installed);
+        ArgumentNullException.ThrowIfNull(cacheExists);
+
+        var toAdd = new List<int>();
+        var toRemove = new List<string>();
+        var missingCachedAdds = false;
+        for (var slot = 0; slot < SettingsContract.MaxMultiDirectAgents; ++slot)
+        {
+            var isInstalled = installed.TryGetValue(slot, out var fullName);
+            if (slot < requiredSlots && !isInstalled)
+            {
+                if (cacheExists(slot))
+                {
+                    toAdd.Add(slot);
+                }
+                else
+                {
+                    missingCachedAdds = true;
+                }
+            }
+            else if (slot >= requiredSlots && isInstalled && !string.IsNullOrWhiteSpace(fullName))
+            {
+                toRemove.Add(fullName);
+            }
+        }
+
+        return new OccupancyPlan(toAdd, toRemove, missingCachedAdds);
+    }
 }
+
+public sealed record OccupancyPlan(
+    IReadOnlyList<int> SlotsToAdd,
+    IReadOnlyList<string> PackagesToRemove,
+    bool CacheMissingRequiredSlots);

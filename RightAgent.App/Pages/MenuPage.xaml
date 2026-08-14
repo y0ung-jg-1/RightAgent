@@ -67,20 +67,31 @@
                         </StackPanel>
                     </controls:SettingsCard>
                     <controls:SettingsCard Header="{x:Bind ChooseIconLabel, Mode=OneWay}">
-                        <Button
-                            MinHeight="44"
-                            Padding="14,0"
-                            AutomationProperties.Name="{x:Bind ChooseIconAutomationName, Mode=OneWay}"
-                            Click="ChooseIcon_Click"
-                            Tag="{x:Bind Id}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <ImageIcon
-                                    Width="16"
-                                    Height="16"
-                                    Source="{x:Bind IconDisplayPath, Mode=OneWay}" />
-                                <TextBlock Text="{x:Bind ChooseIconLabel, Mode=OneWay}" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button
+                                MinHeight="44"
+                                Padding="14,0"
+                                AutomationProperties.Name="{x:Bind ChooseIconAutomationName, Mode=OneWay}"
+                                Click="ChooseIcon_Click"
+                                Tag="{x:Bind Id}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ImageIcon
+                                        Width="16"
+                                        Height="16"
+                                        Source="{x:Bind IconDisplayPath, Mode=OneWay}" />
+                                    <TextBlock Text="{x:Bind ChooseIconLabel, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                MinHeight="44"
+                                Padding="14,0"
+                                AutomationProperties.Name="{x:Bind ResetIconAutomationName, Mode=OneWay}"
+                                Click="ResetIcon_Click"
+                                Tag="{x:Bind Id}"
+                                Visibility="{x:Bind app:VisibilityConverters.VisibleIf(HasCustomIcon), Mode=OneWay}">
+                                <TextBlock Text="{x:Bind ResetIconLabel, Mode=OneWay}" />
+                            </Button>
+                        </StackPanel>
                     </controls:SettingsCard>
                     <controls:SettingsCard Header="{x:Bind ManageLabel, Mode=OneWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -190,7 +201,7 @@
                                 MinHeight="44"
                                 AutomationProperties.Name="{x:Bind ViewModel.DirectAgentLabel, Mode=OneWay}"
                                 DisplayMemberPath="Name"
-                                ItemsSource="{x:Bind ViewModel.Agents, Mode=OneWay}"
+                                ItemsSource="{x:Bind ViewModel.EnabledAgents, Mode=OneWay}"
                                 PlaceholderText="{x:Bind ViewModel.PreviewEmptyLabel, Mode=OneWay}"
                                 SelectedValue="{x:Bind ViewModel.DirectAgentId, Mode=TwoWay}"
                                 SelectedValuePath="Id" />

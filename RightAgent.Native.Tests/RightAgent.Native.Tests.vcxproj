@@ -40,4 +40,10 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
+  <Target Name="CopyNormalizeGoldenSettings" AfterTargets="Build">
+    <Copy
+      SourceFiles="$(SolutionDir)testdata\normalize-agents.json"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true" />
+  </Target>
 </Project>

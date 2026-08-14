@@ -113,6 +113,8 @@ public sealed class MainViewModel : BindableBase
 
     public bool ShowAgentList => !IsDirectMode && !IsEmpty;
 
+    public IReadOnlyList<AgentItemViewModel> EnabledAgents => [.. Agents.Where(agent => agent.Enabled)];
+
     public AgentItemViewModel? SelectedDirectAgent => IsDirectMode ? FindAgent(DirectAgentId) : null;
 
     public bool ShowDirectAgentEditor => SelectedDirectAgent is not null;
@@ -468,6 +470,11 @@ public sealed class MainViewModel : BindableBase
         agent.IconPath = "local:" + relativePath.Replace('\\', '/');
     }
 
+    public void ResetAgentIcon(AgentItemViewModel agent)
+    {
+        agent.IconPath = "builtin:rightagent";
+    }
+
     private void Attach(AgentItemViewModel agent)
     {
         agent.PropertyChanged += AgentPropertyChanged;
@@ -479,6 +486,7 @@ public sealed class MainViewModel : BindableBase
         if (args.PropertyName is nameof(AgentItemViewModel.Name) or nameof(AgentItemViewModel.Enabled))
         {
             OnPropertyChanged(nameof(Agents));
+            OnPropertyChanged(nameof(EnabledAgents));
         }
 
         if (args.PropertyName is nameof(AgentItemViewModel.Name)
@@ -691,6 +699,7 @@ public sealed class MainViewModel : BindableBase
     private void NotifyState()
     {
         OnPropertyChanged(nameof(Agents));
+        OnPropertyChanged(nameof(EnabledAgents));
         OnPropertyChanged(nameof(IsEmpty));
         NotifyMenuModePresentation();
         RefreshPreview();
