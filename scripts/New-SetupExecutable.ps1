@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$BundlePath,
+    [string]$CertificatePath,
+    [string]$AppDirectory,
+    [string[]]$CommandPackagePaths,
     [string]$OutputDirectory,
     [string]$TimestampServer = 'http://timestamp.digicert.com',
     [switch]$SkipSigning
@@ -8,21 +10,67 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'PackageHelpers.ps1')
 
-if (-not $BundlePath) {
-    $releaseDirectory = Join-Path $repoRoot 'artifacts\release'
-    $bundles = @(Get-ChildItem -LiteralPath $releaseDirectory -Filter 'RightAgent-*-x64.zip' -File -ErrorAction Stop)
-    if ($bundles.Count -ne 1) {
-        throw "Expected exactly one release ZIP in '$releaseDirectory', but found $($bundles.Count)."
+if (-not $CertificatePath) {
+    $CertificatePath = Join-Path $repoRoot '.local\signing\RightAgent.cer'
+}
+$CertificatePath = [IO.Path]::GetFullPath($CertificatePath)
+if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
+    throw "Certificate was not found: $CertificatePath"
+}
+
+if (-not $AppDirectory) {
+    $AppDirectory = Get-RightAgentAppPublishPath -RepoRoot $repoRoot -Configuration Release
+}
+$AppDirectory = [IO.Path]::GetFullPath($AppDirectory)
+$appExecutable = Join-Path $AppDirectory 'RightAgent.App.exe'
+if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
+    throw "Unpackaged settings app was not found: $appExecutable"
+}
+
+if (-not $CommandPackagePaths) {
+    $CommandPackagePaths = @(Get-RightAgentCommandPackagePaths `
+        -RepoRoot $repoRoot `
+        -Configuration Release `
+        -PackageIdentity Release)
+}
+$CommandPackagePaths = @($CommandPackagePaths | ForEach-Object { [IO.Path]::GetFullPath($_) })
+if ($CommandPackagePaths.Count -ne 16) {
+    throw "Expected exactly 16 command packages, but found $($CommandPackagePaths.Count)."
+}
+foreach ($commandPackagePath in $CommandPackagePaths) {
+    if (-not (Test-Path -LiteralPath $commandPackagePath -PathType Leaf)) {
+        throw "Command package was not found: $commandPackagePath"
     }
-    $BundlePath = $bundles[0].FullName
 }
-$BundlePath = [IO.Path]::GetFullPath($BundlePath)
-if (-not (Test-Path -LiteralPath $BundlePath -PathType Leaf)) {
-    throw "Release ZIP was not found: $BundlePath"
+& (Join-Path $PSScriptRoot 'Verify-CommandPackages.ps1') -Configuration Release -PackageIdentity Release
+
+$certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
+if ($certificate.Subject -cne 'CN=RightAgent') {
+    throw "Unexpected release certificate subject: $($certificate.Subject)"
+}
+foreach ($signedPackagePath in $CommandPackagePaths) {
+    $signature = Get-AuthenticodeSignature -LiteralPath $signedPackagePath
+    $signerMatches =
+        $null -ne $signature.SignerCertificate -and
+        $signature.SignerCertificate.Thumbprint -eq $certificate.Thumbprint
+    if (-not $signerMatches -or $signature.Status -notin 'Valid', 'UnknownError') {
+        throw "Release package signature verification failed for '$signedPackagePath': $($signature.Status)"
+    }
+    if (-not $signature.TimeStamperCertificate) {
+        throw "Release package signature does not contain the required RFC 3161 timestamp: $signedPackagePath"
+    }
 }
 
-& (Join-Path $PSScriptRoot 'Verify-ReleaseBundle.ps1') -ZipPath $BundlePath
+$installScript = Join-Path $repoRoot 'scripts\Install-Release.ps1'
+$installScriptText = Get-Content -LiteralPath $installScript -Raw
+if ($installScriptText -notmatch '(?m)^\s*\[switch\]\$SkipAppCopy\s*$') {
+    throw 'Install-Release.ps1 is missing the -SkipAppCopy switch required by the MSI custom action.'
+}
+
+$packageVersion = Get-RightAgentPackageVersion -RepoRoot $repoRoot -PackageIdentity Release
+$displayVersion = Get-RightAgentDisplayVersion -PackageVersion $packageVersion
 
 $artifactsRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'artifacts'))
 $installerRoot = [IO.Path]::GetFullPath((Join-Path $artifactsRoot 'installer'))
@@ -38,7 +86,7 @@ $stagingDirectory = [IO.Path]::GetFullPath((Join-Path $installerRoot 'staging'))
 if (-not [IO.Directory]::GetParent($stagingDirectory).FullName.Equals($installerRoot, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to use an unexpected installer staging directory: $stagingDirectory"
 }
-foreach ($candidate in @($artifactsRoot, $installerRoot, $stagingDirectory)) {
+foreach ($candidate in @($artifactsRoot, $installerRoot, $stagingDirectory, $AppDirectory)) {
     if (Test-Path -LiteralPath $candidate) {
         $candidateItem = Get-Item -LiteralPath $candidate -Force
         if (($candidateItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
@@ -53,73 +101,16 @@ New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
 try {
-    Expand-Archive -LiteralPath $BundlePath -DestinationPath $stagingDirectory -Force
-
-    $appExecutable = Join-Path $stagingDirectory 'App\RightAgent.App.exe'
-    if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
-        throw 'The release bundle does not contain App\RightAgent.App.exe.'
-    }
-    $commandPackages = @(Get-ChildItem -LiteralPath $stagingDirectory -Filter 'RightAgent.Command*-x64.msix' -File)
-    if ($commandPackages.Count -ne 16) {
-        throw "Expected exactly 16 RightAgent command MSIX packages in the release bundle, but found $($commandPackages.Count)."
-    }
-    $certificatePath = Join-Path $stagingDirectory 'RightAgent.cer'
-    if (-not (Test-Path -LiteralPath $certificatePath -PathType Leaf)) {
-        throw 'The release bundle does not contain RightAgent.cer.'
-    }
-
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $command00 = @($commandPackages | Where-Object { $_.Name -like 'RightAgent.Command00-*-x64.msix' } | Select-Object -First 1)
-    if (-not $command00) {
-        throw 'The release bundle does not contain RightAgent.Command00.'
-    }
-    $packageArchive = [IO.Compression.ZipFile]::OpenRead($command00.FullName)
-    try {
-        $manifestEntry = $packageArchive.GetEntry('AppxManifest.xml')
-        if (-not $manifestEntry) {
-            throw 'Command package 00 does not contain AppxManifest.xml.'
-        }
-        $manifestReader = [IO.StreamReader]::new($manifestEntry.Open())
-        try {
-            [xml]$manifest = $manifestReader.ReadToEnd()
-        }
-        finally {
-            $manifestReader.Dispose()
-        }
-    }
-    finally {
-        $packageArchive.Dispose()
-    }
-
-    $packageVersion = [version]([string]$manifest.Package.Identity.Version)
-    $displayVersion = "$($packageVersion.Major).$($packageVersion.Minor).$($packageVersion.Build)"
-    if ($packageVersion.Revision -gt 0) {
-        $displayVersion += ".$($packageVersion.Revision)"
-    }
-    for ($slot = 0; $slot -lt 16; ++$slot) {
-        $expectedCommandName = "RightAgent.Command$($slot.ToString('D2'))-$displayVersion-x64.msix"
-        if (@($commandPackages | Where-Object { $_.Name -ceq $expectedCommandName }).Count -ne 1) {
-            throw "Release bundle is missing the exact command package '$expectedCommandName'."
-        }
-    }
-
     $commandPayloadDirectory = Join-Path $stagingDirectory 'CommandPackages'
     New-Item -ItemType Directory -Path $commandPayloadDirectory -Force | Out-Null
-    foreach ($commandPackage in $commandPackages) {
-        Copy-Item -LiteralPath $commandPackage.FullName -Destination (Join-Path $commandPayloadDirectory $commandPackage.Name) -Force
+    for ($slot = 0; $slot -lt $CommandPackagePaths.Count; ++$slot) {
+        $slotText = $slot.ToString('D2')
+        $commandReleaseName = "RightAgent.Command$slotText-$displayVersion-x64.msix"
+        Copy-Item -LiteralPath $CommandPackagePaths[$slot] -Destination (Join-Path $commandPayloadDirectory $commandReleaseName)
     }
+    Copy-Item -LiteralPath $CertificatePath -Destination (Join-Path $stagingDirectory 'RightAgent.cer') -Force
 
-    $repoInstallScript = Join-Path $repoRoot 'scripts\Install-Release.ps1'
-    $stagedInstallScript = Join-Path $stagingDirectory 'Install-RightAgent.ps1'
-    Copy-Item -LiteralPath $repoInstallScript -Destination $stagedInstallScript -Force
-    $stagedScriptText = Get-Content -LiteralPath $stagedInstallScript -Raw
-    if ($stagedScriptText -notmatch '(?m)^\s*\[switch\]\$SkipAppCopy\s*$') {
-        throw 'Staged Install-RightAgent.ps1 is missing the -SkipAppCopy switch required by the MSI custom action.'
-    }
-
-    $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($certificatePath)
     $certThumbprint = $certificate.Thumbprint.ToUpperInvariant()
-    $appSource = Join-Path $stagingDirectory 'App'
     $repoDir = $repoRoot.TrimEnd('\') + '\'
     $packageProject = Join-Path $repoRoot 'installer\RightAgent.Package.wixproj'
     $bundleProject = Join-Path $repoRoot 'installer\RightAgent.Bundle.wixproj'
@@ -136,7 +127,7 @@ try {
     $privateCertificate = $null
     $publicCertificate = $null
     if (-not $SkipSigning) {
-        $publicCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($certificatePath)
+        $publicCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new((Join-Path $stagingDirectory 'RightAgent.cer'))
         $privateCertificatePath = "Cert:\CurrentUser\My\$($publicCertificate.Thumbprint)"
         $privateCertificate = Get-Item -LiteralPath $privateCertificatePath -ErrorAction SilentlyContinue
         if (-not $privateCertificate -or -not $privateCertificate.HasPrivateKey) {
@@ -177,7 +168,7 @@ try {
         & dotnet build $packageProject -c Release --nologo `
             "-p:PerUser=$($sku.PerUser)" `
             "-p:Version=$packageVersion" `
-            "-p:AppSource=$appSource" `
+            "-p:AppSource=$AppDirectory" `
             "-p:CommandSource=$commandPayloadDirectory" `
             "-p:PayloadDir=$stagingDirectory" `
             "-p:RepoDir=$repoDir" `

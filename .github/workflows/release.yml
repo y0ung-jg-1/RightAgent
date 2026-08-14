@@ -107,19 +107,9 @@ jobs:
         shell: pwsh
         run: ./scripts/Sign-PackageSet.ps1 -Configuration Release -PackageIdentity Release -CertificateThumbprint '${{ steps.certificate.outputs.thumbprint }}'
 
-      - name: Create verified installer payload
-        shell: pwsh
-        run: |
-          ./scripts/New-ReleaseBundle.ps1 -CertificatePath '${{ steps.certificate.outputs.cer_path }}'
-          $releaseZip = Get-ChildItem -LiteralPath './artifacts/release' -Filter '*.zip' -File -ErrorAction Stop
-          if (@($releaseZip).Count -ne 1) {
-              throw 'Expected exactly one release ZIP.'
-          }
-          ./scripts/Verify-ReleaseBundle.ps1 -ZipPath $releaseZip.FullName
-
       - name: Build and sign setup executable
         shell: pwsh
-        run: ./scripts/New-SetupExecutable.ps1
+        run: ./scripts/New-SetupExecutable.ps1 -CertificatePath '${{ steps.certificate.outputs.cer_path }}'
 
       - name: Verify public release assets
         shell: pwsh

@@ -2,8 +2,8 @@
 
 RightAgent uses GitHub Actions to build and test every change. A version tag
 starts a separate release job that imports the project-owned signing key from
-the GitHub `release` environment, signs and timestamps the complete 17-package
-MSIX set, builds and
+the GitHub `release` environment, signs and timestamps the 16 command
+packages, publishes the unpackaged settings app, builds and
 signs a single-file per-machine Setup EXE, verifies its checksum, and
 creates a draft GitHub Release containing only the EXE and `.sha256` file.
 
@@ -53,11 +53,9 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
        .\scripts\Build.ps1 -Configuration Release -PackageIdentity Release
        .\scripts\Sign-PackageSet.ps1 -Configuration Release -PackageIdentity Release
 
-   Then create the same verified payload and signed Setup executable used by
-   GitHub Actions:
+   Then create the same signed Setup executable used by GitHub Actions:
 
-       .\scripts\New-ReleaseBundle.ps1 -CertificatePath .\.local\signing\RightAgent.cer
-       .\scripts\New-SetupExecutable.ps1
+       .\scripts\New-SetupExecutable.ps1 -CertificatePath .\.local\signing\RightAgent.cer
 
 3. Commit and push the reviewed source to `main`, then wait for CI to pass.
 4. Create and push the exact matching tag, for example `v1.0.0` for package
