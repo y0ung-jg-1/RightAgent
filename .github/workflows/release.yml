@@ -222,10 +222,24 @@ jobs:
             throw "Setup did not cache all 16 command packages. Found $($cachedPackages.Count) in '$cacheDirectory'."
           }
 
-          $rightAgentStartApps = @(Get-StartApps | Where-Object { $_.Name -like 'RightAgent*' })
-          if ($rightAgentStartApps.Count -ne 1 -or $rightAgentStartApps[0].Name -cne 'RightAgent') {
-            $visibleApps = ($rightAgentStartApps | ForEach-Object { "$($_.Name) [$($_.AppID)]" }) -join ', '
-            throw "Only the main RightAgent app may be visible in Start. Found: $visibleApps"
+          $shortcutPath = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\RightAgent\RightAgent.lnk'
+          if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) {
+            throw "Setup did not create the Start menu shortcut at '$shortcutPath'."
+          }
+          $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
+          if ($shortcut.TargetPath -cne $appExecutable) {
+            throw "Start menu shortcut target was '$($shortcut.TargetPath)', expected '$appExecutable'."
+          }
+
+          $rightAgentStartApps = @(Get-StartApps | Where-Object {
+            $_.Name -like 'RightAgent*' -or $_.AppID -like '*RightAgent*'
+          })
+          $unexpectedStart = @($rightAgentStartApps | Where-Object {
+            $_.Name -like 'RightAgent.Command*' -or $_.AppID -like '*RightAgent.Command*'
+          })
+          if ($unexpectedStart.Count -gt 0) {
+            $visibleApps = ($unexpectedStart | ForEach-Object { "$($_.Name) [$($_.AppID)]" }) -join ', '
+            throw "Command packages must not appear in Start. Found: $visibleApps"
           }
 
           $publicCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new('${{ steps.certificate.outputs.cer_path }}')
