@@ -121,7 +121,9 @@ internal static class CommandPackageSynchronizer
 
         SHChangeNotify(ShellAssociationChanged, ShellNotifyIdList, IntPtr.Zero, IntPtr.Zero);
         RestartExplorer();
-        if (!missingAdds)
+        var installedAfter = ListInstalledCommandSlots(mainPackageName, publisher);
+        var requiredInstalled = Enumerable.Range(0, requiredSlots).Count(slot => installedAfter.ContainsKey(slot));
+        if (requiredInstalled >= requiredSlots)
         {
             File.WriteAllText(stampPath, requiredSlots.ToString());
         }
@@ -183,7 +185,7 @@ internal static class CommandPackageSynchronizer
     private static void AddPackage(string packagePath, CancellationToken cancellationToken)
     {
         RunPowerShell(
-            $"Add-AppxPackage -LiteralPath '{EscapePowerShellLiteral(packagePath)}' -ForceApplicationShutdown -ForceUpdateFromAnyVersion",
+            $"Add-AppxPackage -Path '{EscapePowerShellLiteral(packagePath)}' -ForceApplicationShutdown -ForceUpdateFromAnyVersion",
             cancellationToken);
     }
 

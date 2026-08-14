@@ -124,7 +124,7 @@ function Install-RightAgentCommandPackageCache {
         throw "Expected exactly 16 command packages to cache, but found $($CommandPackagePaths.Count)."
     }
 
-    $cacheDirectory = Join-Path $env:LOCALAPPDATA 'RightAgent\CommandPackages'
+    $cacheDirectory = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\CommandPackages'
     New-Item -ItemType Directory -Path $cacheDirectory -Force | Out-Null
     for ($slot = 0; $slot -lt 16; ++$slot) {
         $destination = Join-Path $cacheDirectory ('{0:D2}.msix' -f $slot)
@@ -149,8 +149,25 @@ function Get-RightAgentMainPackage {
         Select-Object -First 1
 }
 
+function Get-RightAgentUserLocalAppData {
+    $profile = $env:USERPROFILE
+    if (-not [string]::IsNullOrWhiteSpace($profile)) {
+        $fromProfile = Join-Path $profile 'AppData\Local'
+        if (Test-Path -LiteralPath $fromProfile -PathType Container) {
+            return $fromProfile
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA) -and
+        (Test-Path -LiteralPath $env:LOCALAPPDATA -PathType Container)) {
+        return $env:LOCALAPPDATA
+    }
+
+    return [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+}
+
 function Get-RightAgentSettingsPath {
-    $unpackagedSettings = Join-Path $env:LOCALAPPDATA 'RightAgent\settings.json'
+    $unpackagedSettings = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\settings.json'
     if (Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) {
         return $unpackagedSettings
     }
@@ -176,6 +193,7 @@ function Get-RightAgentRequiredCommandSlotCount {
         $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
     }
     catch {
+        Write-Host "Could not parse settings at '$settingsPath': $($_.Exception.Message). Defaulting to one command slot."
         return 1
     }
 
@@ -269,11 +287,11 @@ try {
                 $package | Remove-AppxPackage -ErrorAction Stop
             }
         }
-        $installRecordPath = Join-Path $env:LOCALAPPDATA 'RightAgent\install.json'
+        $installRecordPath = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\install.json'
         if (Test-Path -LiteralPath $installRecordPath -PathType Leaf) {
             Remove-Item -LiteralPath $installRecordPath -Force -ErrorAction Stop
         }
-        $cacheDirectory = Join-Path $env:LOCALAPPDATA 'RightAgent\CommandPackages'
+        $cacheDirectory = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\CommandPackages'
         if (Test-Path -LiteralPath $cacheDirectory) {
             Remove-Item -LiteralPath $cacheDirectory -Recurse -Force -ErrorAction Stop
         }
@@ -492,7 +510,7 @@ try {
 
     $mainPackageName = 'RightAgent'
     $publisher = 'CN=RightAgent'
-    $dataDirectory = Join-Path $env:LOCALAPPDATA 'RightAgent'
+    $dataDirectory = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent'
     $targetExecutable = Join-Path $TargetDirectory 'RightAgent.App.exe'
 
     Stop-RightAgentComSurrogates
@@ -548,6 +566,7 @@ try {
     Write-RightAgentInstallationProgress -PercentComplete 50
 
     $requiredSlots = Get-RightAgentRequiredCommandSlotCount
+    Write-Host "Registering $requiredSlots command package slot(s) from '$(Get-RightAgentSettingsPath)' (LOCALAPPDATA='$($env:LOCALAPPDATA)' USERPROFILE='$($env:USERPROFILE)')."
     $slotSpan = if ($requiredSlots -gt 0) { [int][Math]::Floor(40 / $requiredSlots) } else { 0 }
     for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
