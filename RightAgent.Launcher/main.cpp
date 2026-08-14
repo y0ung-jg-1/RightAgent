@@ -223,7 +223,7 @@ namespace
         // and only adds the agent command. -- stops wt from parsing -NoLogo as its flag.
         arguments.emplace_back(L"--appendCommandLine");
         arguments.emplace_back(L"--");
-        arguments.push_back(appended);
+        arguments.insert(arguments.end(), appended.begin(), appended.end());
 
         DWORD error = ERROR_SUCCESS;
         if (!rightagent::LaunchProcess(terminal, arguments, workingDirectory, CREATE_NEW_PROCESS_GROUP, &error))

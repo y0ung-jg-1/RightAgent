@@ -279,25 +279,27 @@ namespace
         Expect(
             rightagent::BuildWindowsTerminalAppendCommandLine(
                 rightagent::WindowsTerminalShellFamily::CommandPrompt, L"hostname", L"cmd.exe")
-                == L"/D /K hostname",
+                == std::vector<std::wstring>({L"/D", L"/K", L"hostname"}),
             "A bare CMD profile should keep the agent alive with /K");
         Expect(
             rightagent::BuildWindowsTerminalAppendCommandLine(
                 rightagent::WindowsTerminalShellFamily::CommandPrompt,
                 L"hostname",
                 L"cmd.exe /k VsDevCmd.bat")
-                == L"&& hostname",
+                == std::vector<std::wstring>({L"&&", L"hostname"}),
             "A VS CMD profile should append the agent after VsDevCmd");
         Expect(
             rightagent::BuildWindowsTerminalAppendCommandLine(
                 rightagent::WindowsTerminalShellFamily::Bash, L"hostname", L"bash.exe -i -l")
-                == L"-c \"hostname; exec bash -i -l\"",
+                == std::vector<std::wstring>({L"-c", L"hostname; exec bash -i -l"}),
             "Bash should run the agent then keep an interactive shell");
         const auto powershellAppend = rightagent::BuildWindowsTerminalAppendCommandLine(
             rightagent::WindowsTerminalShellFamily::PowerShell, L"hostname", L"");
         Expect(
-            powershellAppend == L"-NoLogo -NoExit -EncodedCommand " + rightagent::EncodePowerShellCommand(L"hostname"),
-            "PowerShell profiles should append an encoded keep-alive command");
+            powershellAppend
+                == std::vector<std::wstring>(
+                    {L"-NoLogo", L"-NoExit", L"-EncodedCommand", rightagent::EncodePowerShellCommand(L"hostname")}),
+            "PowerShell profiles should append encoded keep-alive flags as separate tokens");
 
         std::error_code error;
         std::filesystem::remove_all(root, error);

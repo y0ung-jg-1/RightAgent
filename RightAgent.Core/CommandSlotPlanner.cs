@@ -30,6 +30,17 @@ public static class CommandSlotPlanner
         return $"{slot:D2}.msix";
     }
 
+    public static bool CachedPackageExists(string cacheDirectory, int slot)
+    {
+        if (string.IsNullOrWhiteSpace(cacheDirectory))
+        {
+            return false;
+        }
+
+        var info = new FileInfo(Path.Combine(cacheDirectory, CommandPackageFileName(slot)));
+        return info.Exists && info.Length > 0;
+    }
+
     public static bool CacheIsComplete(string cacheDirectory)
     {
         if (string.IsNullOrWhiteSpace(cacheDirectory) || !Directory.Exists(cacheDirectory))
@@ -39,8 +50,7 @@ public static class CommandSlotPlanner
 
         for (var slot = 0; slot < SettingsContract.MaxMultiDirectAgents; ++slot)
         {
-            var info = new FileInfo(Path.Combine(cacheDirectory, CommandPackageFileName(slot)));
-            if (!info.Exists || info.Length == 0)
+            if (!CachedPackageExists(cacheDirectory, slot))
             {
                 return false;
             }

@@ -104,7 +104,7 @@ namespace rightagent
         std::wstring_view name,
         std::wstring_view source,
         std::wstring_view commandline);
-    [[nodiscard]] std::wstring BuildWindowsTerminalAppendCommandLine(
+    [[nodiscard]] std::vector<std::wstring> BuildWindowsTerminalAppendCommandLine(
         WindowsTerminalShellFamily family,
         std::wstring_view command,
         std::wstring_view profileCommandline);

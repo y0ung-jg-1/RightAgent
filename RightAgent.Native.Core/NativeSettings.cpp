@@ -845,21 +845,6 @@ namespace rightagent
         return haystack.find(needle) != std::wstring::npos;
     }
 
-    std::wstring QuoteDoubleQuoted(std::wstring_view value)
-    {
-        std::wstring result(1, L'"');
-        for (const wchar_t character : value)
-        {
-            if (character == L'\\' || character == L'"')
-            {
-                result.push_back(L'\\');
-            }
-            result.push_back(character);
-        }
-        result.push_back(L'"');
-        return result;
-    }
-
     std::wstring ReadWindowsTerminalDefaultProfile(const std::filesystem::path& settingsPath)
     {
         if (settingsPath.empty())
@@ -1022,7 +1007,7 @@ namespace rightagent
         return WindowsTerminalShellFamily::PowerShell;
     }
 
-    std::wstring BuildWindowsTerminalAppendCommandLine(
+    std::vector<std::wstring> BuildWindowsTerminalAppendCommandLine(
         const WindowsTerminalShellFamily family,
         const std::wstring_view command,
         const std::wstring_view profileCommandline)
@@ -1035,19 +1020,19 @@ namespace rightagent
             const auto lowerCommandline = ToLower(std::wstring(profileCommandline));
             if (ContainsToken(lowerCommandline, L"/k") || ContainsToken(lowerCommandline, L"/c"))
             {
-                return L"&& " + commandText;
+                return {L"&&", commandText};
             }
-            return L"/D /K " + commandText;
+            return {L"/D", L"/K", commandText};
         }
         case WindowsTerminalShellFamily::Bash:
-            return L"-c " + QuoteDoubleQuoted(commandText + L"; exec bash -i -l");
+            return {L"-c", commandText + L"; exec bash -i -l"};
         case WindowsTerminalShellFamily::Wsl:
-            return L"-- bash -lc " + QuoteDoubleQuoted(commandText + L"; exec bash");
+            return {L"--", L"bash", L"-lc", commandText + L"; exec bash"};
         case WindowsTerminalShellFamily::PowerShell:
         default:
-            // Windows Terminal treats semicolons as its own command separators.
-            // Base64 keeps the PowerShell script opaque until the profile shell decodes it.
-            return L"-NoLogo -NoExit -EncodedCommand " + EncodePowerShellCommand(commandText);
+            // Separate tokens so pwsh 7 does not treat the whole suffix as -File.
+            // EncodedCommand keeps semicolons out of Windows Terminal's splitter.
+            return {L"-NoLogo", L"-NoExit", L"-EncodedCommand", EncodePowerShellCommand(commandText)};
         }
     }
 }

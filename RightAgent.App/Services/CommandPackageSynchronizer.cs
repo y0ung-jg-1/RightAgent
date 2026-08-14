@@ -42,7 +42,6 @@ internal static class CommandPackageSynchronizer
         }
 
         var cacheDirectory = Path.Combine(localStateDirectory, CommandSlotPlanner.CommandPackageCacheDirectoryName);
-        var cacheComplete = CommandSlotPlanner.CacheIsComplete(cacheDirectory);
         var requiredSlots = CommandSlotPlanner.RequiredSlotCount(settings);
         var installed = ListInstalledCommandSlots(mainPackageName, publisher);
         var toAdd = new List<int>();
@@ -52,7 +51,7 @@ internal static class CommandPackageSynchronizer
             var isInstalled = installed.TryGetValue(slot, out var fullName);
             if (slot < requiredSlots && !isInstalled)
             {
-                if (cacheComplete)
+                if (CommandSlotPlanner.CachedPackageExists(cacheDirectory, slot))
                 {
                     toAdd.Add(slot);
                 }
@@ -63,8 +62,8 @@ internal static class CommandPackageSynchronizer
             }
         }
 
-        var missingAdds = !cacheComplete
-            && Enumerable.Range(0, requiredSlots).Any(slot => !installed.ContainsKey(slot));
+        var missingAdds = Enumerable.Range(0, requiredSlots).Any(slot =>
+            !installed.ContainsKey(slot) && !CommandSlotPlanner.CachedPackageExists(cacheDirectory, slot));
         var stampPath = Path.Combine(localStateDirectory, "command-slots.refreshed");
         var stampMatches = File.Exists(stampPath)
             && string.Equals(File.ReadAllText(stampPath).Trim(), requiredSlots.ToString(), StringComparison.Ordinal);
@@ -81,7 +80,7 @@ internal static class CommandPackageSynchronizer
             {
                 try
                 {
-                    acquired = mutex.WaitOne(0);
+                    acquired = mutex.WaitOne(TimeSpan.FromSeconds(15));
                 }
                 catch (AbandonedMutexException)
                 {

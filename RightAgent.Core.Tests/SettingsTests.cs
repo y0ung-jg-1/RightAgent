@@ -159,14 +159,20 @@ public sealed class SettingsTests
         try
         {
             Assert.False(CommandSlotPlanner.CacheIsComplete(root));
+            Assert.False(CommandSlotPlanner.CachedPackageExists(root, 0));
             Directory.CreateDirectory(root);
-            for (var slot = 0; slot < SettingsContract.MaxMultiDirectAgents; ++slot)
+            File.WriteAllBytes(Path.Combine(root, CommandSlotPlanner.CommandPackageFileName(0)), [1]);
+            Assert.True(CommandSlotPlanner.CachedPackageExists(root, 0));
+            Assert.False(CommandSlotPlanner.CachedPackageExists(root, 1));
+            Assert.False(CommandSlotPlanner.CacheIsComplete(root));
+            for (var slot = 1; slot < SettingsContract.MaxMultiDirectAgents; ++slot)
             {
                 File.WriteAllBytes(Path.Combine(root, CommandSlotPlanner.CommandPackageFileName(slot)), [1]);
             }
             Assert.True(CommandSlotPlanner.CacheIsComplete(root));
             File.Delete(Path.Combine(root, "07.msix"));
             Assert.False(CommandSlotPlanner.CacheIsComplete(root));
+            Assert.False(CommandSlotPlanner.CachedPackageExists(root, 7));
         }
         finally
         {
