@@ -15,8 +15,8 @@
       AllowSameVersionUpgrades="yes"
       DowngradeErrorMessage="A later version of RightAgent is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
-    <Icon Id="RightAgentIcon" SourceFile="$(var.RepoDir)RightAgent.Package\Assets\Agents\rightagent.ico" />
-    <Property Id="ARPPRODUCTICON" Value="RightAgentIcon" />
+    <Icon Id="RightAgent.exe" SourceFile="$(var.RepoDir)RightAgent.Package\Assets\Agents\rightagent.ico" />
+    <Property Id="ARPPRODUCTICON" Value="RightAgent.exe" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/y0ung-jg-1/RightAgent" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
@@ -50,21 +50,14 @@
     </ComponentGroup>
 
     <Component Id="AppExecutable" Directory="INSTALLFOLDER" Guid="$(var.AppExeGuid)">
-      <RegistryValue
-        Root="$(var.RegistryRoot)"
-        Key="Software\RightAgent"
-        Name="AppExecutable"
-        Type="string"
-        Value="[INSTALLFOLDER]RightAgent.App.exe"
-        KeyPath="yes" />
-      <File Id="RightAgentAppExe" Source="$(var.AppSource)\RightAgent.App.exe">
+      <File Id="RightAgentAppExe" Source="$(var.AppSource)\RightAgent.App.exe" KeyPath="yes">
         <Shortcut
           Id="StartMenuShortcut"
           Name="RightAgent"
           Directory="ApplicationProgramsFolder"
           WorkingDirectory="INSTALLFOLDER"
-          Icon="RightAgentIcon"
-          Advertise="no" />
+          Icon="RightAgent.exe"
+          Advertise="yes" />
       </File>
       <RemoveFolder Id="RemoveStartMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
       <RemoveFolder Id="RemoveCommandPayloadFolder" Directory="CommandPayloadFolder" On="uninstall" />
@@ -102,6 +95,12 @@
         Type="string"
         Value="[INSTALLFOLDER]"
         KeyPath="yes" />
+      <RegistryValue
+        Root="$(var.RegistryRoot)"
+        Key="Software\RightAgent"
+        Name="AppExecutable"
+        Type="string"
+        Value="[INSTALLFOLDER]RightAgent.App.exe" />
     </Component>
 
     <Component Id="ProtocolRegistration" Directory="INSTALLFOLDER" Guid="*">

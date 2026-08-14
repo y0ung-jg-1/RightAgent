@@ -1,14 +1,16 @@
-<Project Sdk="WixToolset.Sdk/5.0.2">
+<Project Sdk="WixToolset.Sdk/7.0.0">
   <PropertyGroup>
     <OutputType>Package</OutputType>
     <PerUser Condition="'$(PerUser)' == ''">true</PerUser>
     <OutputName Condition="'$(PerUser)' == 'true'">RightAgentUser</OutputName>
     <OutputName Condition="'$(PerUser)' != 'true'">RightAgent</OutputName>
     <InstallerPlatform>x64</InstallerPlatform>
+    <AcceptEula>wix7</AcceptEula>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
-    <SuppressIces Condition="'$(PerUser)' == 'true'">ICE38;ICE43;ICE57;ICE61;ICE64;ICE91</SuppressIces>
-    <SuppressIces Condition="'$(PerUser)' != 'true'">ICE61</SuppressIces>
+    <!-- ICE03: WinAppSDK/.mui PE language IDs overflow or fail MSI LANGID checks. ICE61: AllowSameVersionUpgrades. Per-user ICEs are HKCU/LocalAppData layout. -->
+    <SuppressIces Condition="'$(PerUser)' == 'true'">ICE03;ICE38;ICE43;ICE57;ICE61;ICE64;ICE91</SuppressIces>
+    <SuppressIces Condition="'$(PerUser)' != 'true'">ICE03;ICE61</SuppressIces>
     <DefineConstants>PerUser=$(PerUser);Version=$(Version);AppSource=$(AppSource);CommandSource=$(CommandSource);PayloadDir=$(PayloadDir);RepoDir=$(RepoDir)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
@@ -18,7 +20,7 @@
     <None Remove="loc\**\*" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
-    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
   </ItemGroup>
 </Project>

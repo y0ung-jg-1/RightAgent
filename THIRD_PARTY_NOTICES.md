@@ -31,7 +31,7 @@ The original license text is in `ThirdPartyNotices/CommunityToolkit/LICENSE.md`.
 
 ## Installer technology
 
-The GitHub Release Setup executable is generated with WiX Toolset 5.0.2
+The GitHub Release Setup executable is generated with WiX Toolset 7.0.0
 (per-machine Burn Setup.exe, per-user UserSetup.exe, and the embedded MSI). WiX Toolset is Copyright (c) .NET Foundation
 and contributors and is available from
 [wixtoolset.org](https://wixtoolset.org/) under the Microsoft Reciprocal

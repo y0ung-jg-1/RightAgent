@@ -96,7 +96,7 @@ The main x64 MSIX is written beneath `artifacts\package\Release`, with 16 hidden
 
 The toolchain requires Visual Studio 2026 Community with WinUI app development, C++ desktop development, C++ WinUI tools, MSIX/WAP tools, and Windows 11 SDK 10.0.26100 or newer, plus .NET 10 SDK. Run `.\scripts\Validate-Environment.ps1` after setup. The repository does not require Node.js, Electron, Tauri, Rust, a database, or a background service.
 
-GitHub Actions continuous integration runs the full test suite and builds an unsigned release-identity package set on the `windows-2025` hosted runner. The tag workflow reads signing secrets only from the dedicated release environment, signs the 16 command MSIX packages, uses WiX 5 to build and sign the per-machine `Setup.exe`, creates its SHA-256 file, and opens a draft GitHub Release. Public Releases contain only the installer and checksum; Setup carries the internal packages, dependencies, and public certificate. The signing key is never exposed to ordinary push or pull-request builds. See the [continuous integration workflow](.github/workflows/ci.yml) and [release workflow](.github/workflows/release.yml).
+GitHub Actions continuous integration runs the full test suite and builds an unsigned release-identity package set on the `windows-2025` hosted runner. The tag workflow reads signing secrets only from the dedicated release environment, signs the 16 command MSIX packages, uses WiX 7 to build and sign the per-machine `Setup.exe`, creates its SHA-256 file, and opens a draft GitHub Release. Public Releases contain only the installer and checksum; Setup carries the internal packages, dependencies, and public certificate. The signing key is never exposed to ordinary push or pull-request builds. See the [continuous integration workflow](.github/workflows/ci.yml) and [release workflow](.github/workflows/release.yml).
 
 ## Repository map
 
@@ -107,7 +107,7 @@ GitHub Actions continuous integration runs the full test suite and builds an uns
 - `RightAgent.Native.Core`: shared native settings, icon, quoting, and process helpers.
 - `RightAgent.Package`: WAP identity used for command-package version and assets, not the settings app users install.
 - `RightAgent.CommandPackage`: shared manifest template for the 16 hidden File Explorer command packages.
-- `installer`: WiX 5 Burn definition for the public per-machine `Setup.exe`.
+- `installer`: WiX 7 Burn definition for the public per-machine `Setup.exe`.
 
 Details: [architecture](docs/ARCHITECTURE.md) · [settings schema](docs/SETTINGS_SCHEMA.md) · [test matrix](docs/TEST_MATRIX.md) · [release guide](docs/RELEASING.md) · [v1 release decisions](docs/RELEASE_DECISIONS.md).
 

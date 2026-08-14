@@ -20,7 +20,7 @@ flowchart LR
 
 There is no service, tray app, startup task, scheduled task, watcher, or resident broker.
 
-The public GitHub Release installer is a WiX 5 Burn `Setup.exe` (the same
+The public GitHub Release installer is a WiX 7 Burn `Setup.exe` (the same
 shape as PowerToysSetup): one executable that embeds a per-machine MSI. It
 requires administrator approval and installs the unpackaged settings app into
 `%ProgramFiles%\RightAgent`. A per-user `UserSetup.exe` can still be built

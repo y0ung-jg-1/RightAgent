@@ -146,9 +146,17 @@ try {
 
         $wixCli = Get-Command -Name wix -CommandType Application -ErrorAction SilentlyContinue
         if (-not $wixCli) {
-            throw 'The WiX CLI (wix.exe 5.0.2) is required to sign Setup.exe. Install it with: dotnet tool install --global wix --version 5.0.2'
+            throw 'The WiX CLI (wix.exe 7.0.0) is required to sign Setup.exe. Install it with: dotnet tool install --global wix --version 7.0.0'
         }
         $wixCli = $wixCli.Source
+        $wixVersion = (& $wixCli --version 2>$null | Select-Object -First 1)
+        if ($wixVersion -notmatch '^7\.') {
+            throw "The WiX CLI must be 7.x (found '$wixVersion'). Install it with: dotnet tool install --global wix --version 7.0.0"
+        }
+        & $wixCli eula accept wix7
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Accepting the WiX 7 OSMF EULA failed.'
+        }
 
         $timestampUri = $null
         if (-not [Uri]::TryCreate($TimestampServer, [UriKind]::Absolute, [ref]$timestampUri) -or

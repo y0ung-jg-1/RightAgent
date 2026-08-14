@@ -33,10 +33,12 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
    `RIGHTAGENT_SIGNING_PFX_PASSWORD`. Never use them in the ordinary CI
    workflow.
 
-4. The release workflow restores WiX Toolset 5.0.2 through the installer
-   `.wixproj` files. Local release builds need the same .NET 10 SDK used by
-   the rest of the repo; `New-SetupExecutable.ps1` restores and compiles the
-   per-machine Setup.exe and per-user UserSetup.exe Burn bundles.
+4. The release workflow restores WiX Toolset 7.0.0 through the installer
+   `.wixproj` files (`AcceptEula` is `wix7`). Local release builds need the
+   same .NET 10 SDK used by the rest of the repo; `New-SetupExecutable.ps1`
+   restores and compiles the per-machine Setup.exe and per-user UserSetup.exe
+   Burn bundles. Signing also needs the WiX CLI 7.0.0 (`dotnet tool install
+   --global wix --version 7.0.0`).
 
 ## Release checklist
 

@@ -31,12 +31,13 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Restore WiX Toolset 5.0.2
+      - name: Restore WiX Toolset 7.0.0
         shell: pwsh
         run: |
           dotnet restore ./installer/RightAgent.Package.wixproj
           dotnet restore ./installer/RightAgent.Bundle.wixproj
-          dotnet tool update --global wix --version 5.0.2
+          dotnet tool update --global wix --version 7.0.0
+          wix eula accept wix7
 
       - name: Validate tag and manifest version
         shell: pwsh

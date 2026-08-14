@@ -96,7 +96,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 
 开发环境需要 Visual Studio 2026 Community（WinUI 应用开发、C++ 桌面开发、C++ WinUI 工具、MSIX/WAP 工具、Windows 11 SDK 10.0.26100 或更新版本）以及 .NET 10 SDK。安装完成后，先运行 `.\scripts\Validate-Environment.ps1` 检查环境。本仓库不需要 Node.js、Electron、Tauri、Rust、数据库或后台服务。
 
-GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完整测试，并构建不带签名的正式身份包集合。标签发布工作流会从专用发布环境读取签名机密，签名 16 个命令 MSIX，使用 WiX 5 生成并签名本机 `Setup.exe`，再生成 SHA-256 文件和 GitHub Release 草稿。公开 Release 只包含安装器和对应校验文件；内部 MSIX、依赖和公共证书由安装器携带。发布私钥不会进入普通推送或拉取请求构建。工作流见[持续集成](.github/workflows/ci.yml)与[正式发布](.github/workflows/release.yml)。
+GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完整测试，并构建不带签名的正式身份包集合。标签发布工作流会从专用发布环境读取签名机密，签名 16 个命令 MSIX，使用 WiX 7 生成并签名本机 `Setup.exe`，再生成 SHA-256 文件和 GitHub Release 草稿。公开 Release 只包含安装器和对应校验文件；内部 MSIX、依赖和公共证书由安装器携带。发布私钥不会进入普通推送或拉取请求构建。工作流见[持续集成](.github/workflows/ci.yml)与[正式发布](.github/workflows/release.yml)。
 
 ## 仓库结构
 
@@ -107,7 +107,7 @@ GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完�
 - `RightAgent.Native.Core`：共享的原生设置、图标、引号转义和进程辅助代码。
 - `RightAgent.Package`：命令包版本与资源所用的 WAP 身份，不是用户安装的设置应用。
 - `RightAgent.CommandPackage`：16 个隐藏资源管理器命令包共用的清单模板。
-- `installer`：公开本机 `Setup.exe` 的 WiX 5 Burn 定义。
+- `installer`：公开本机 `Setup.exe` 的 WiX 7 Burn 定义。
 
 实现细节见[架构文档](docs/ARCHITECTURE.md)，数据约定见[设置结构说明](docs/SETTINGS_SCHEMA.md)，人工验收范围见[测试矩阵](docs/TEST_MATRIX.md)，发布操作见[发版指南](docs/RELEASING.md)，v1 发布取舍见[发布决策记录](docs/RELEASE_DECISIONS.md)。
 
