@@ -269,6 +269,26 @@ public sealed class SettingsTests
         Assert.Equal("builtin:rightagent", SettingsValidator.Normalize(settings).Agents[0].IconPath);
     }
 
+    [Theory]
+    [InlineData("builtin:claude", "builtin:claude")]
+    [InlineData("builtin:CLAUDE", "builtin:claude")]
+    [InlineData("builtin:nope", "builtin:rightagent")]
+    public void NormalizeIconAllowlistsBuiltInKeys(string input, string expected)
+    {
+        Assert.Equal(expected, SettingsValidator.NormalizeIconPath(input));
+    }
+
+    [Fact]
+    public void ShellImageReadsSvgThroughWindowsThumbnail()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "icon.svg");
+        Assert.True(File.Exists(path));
+        Assert.True(ShellImage.TryGetBgra32(path, 64, out var pixels, out var width, out var height));
+        Assert.True(width > 0);
+        Assert.True(height > 0);
+        Assert.Equal(width * height * 4, pixels.Length);
+    }
+
     [Fact]
     public void WindowsTerminalLocatorChecksPathAndWindowsAppsAlias()
     {

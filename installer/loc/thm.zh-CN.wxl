@@ -59,7 +59,7 @@
   <String Id="FailureRepairHeader" Value="修复失败" Overridable="yes" />
   <String Id="FailureUninstallHeader" Value="卸载失败" Overridable="yes" />
   <String Id="FailureUnsafeUninstallHeader" Value="卸载失败" Overridable="yes" />
-  <String Id="FailureHyperlinkLogText" Value="安装因一个或多个问题未能完成。请解决问题后重试。详细信息见 &lt;a href=&quot;#&quot;&gt;日志文件&lt;/a&gt;。" Overridable="yes" />
+  <String Id="FailureHyperlinkLogText" Value="安装因一个或多个问题未能完成。请解决问题后重试。详见 &lt;a href=&quot;#&quot;&gt;日志文件&lt;/a&gt; 和 %TEMP%\RightAgent-setup-error.txt。" Overridable="yes" />
   <String Id="FailureRestartText" Value="必须重新启动计算机才能完成软件回滚。" Overridable="yes" />
   <String Id="FailureRestartButton" Value="重启(&amp;R)" Overridable="yes" />
   <String Id="FailureCloseButton" Value="关闭(&amp;C)" Overridable="yes" />

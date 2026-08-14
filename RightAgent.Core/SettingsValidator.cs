@@ -30,7 +30,7 @@ public static partial class SettingsValidator
                 ? SettingsContract.Url
                 : SettingsContract.TerminalCommand;
             var actionValue = agent.Action?.Value?.Trim() ?? string.Empty;
-            var iconPath = NormalizeIcon(agent.IconPath);
+            var iconPath = NormalizeIconPath(agent.IconPath);
 
             normalized.Add(new AgentDefinition
             {
@@ -89,7 +89,7 @@ public static partial class SettingsValidator
         return candidate;
     }
 
-    private static string NormalizeIcon(string? iconPath)
+    public static string NormalizeIconPath(string? iconPath)
     {
         if (string.IsNullOrWhiteSpace(iconPath))
         {
@@ -97,9 +97,12 @@ public static partial class SettingsValidator
         }
 
         var value = iconPath.Trim();
-        if (value.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase))
+        if (value.StartsWith(SettingsContract.BuiltInIconPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            return value;
+            var key = value[SettingsContract.BuiltInIconPrefix.Length..].Trim().ToLowerInvariant();
+            return SettingsContract.IsBuiltInIconKey(key)
+                ? SettingsContract.BuiltInIconPath(key)
+                : "builtin:rightagent";
         }
 
         if (value.StartsWith("local:", StringComparison.OrdinalIgnoreCase))

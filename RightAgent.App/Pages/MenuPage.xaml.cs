@@ -103,6 +103,7 @@ public sealed partial class MenuPage : Page
         picker.FileTypeFilter.Add(".jpeg");
         picker.FileTypeFilter.Add(".bmp");
         picker.FileTypeFilter.Add(".ico");
+        picker.FileTypeFilter.Add(".svg");
         WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(App.Main));
 
         var file = await picker.PickSingleFileAsync();

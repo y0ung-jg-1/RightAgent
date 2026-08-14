@@ -151,24 +151,6 @@ function Get-RightAgentMainPackage {
         Select-Object -First 1
 }
 
-# Duplicated in PackageHelpers.ps1 because this script is harvested into Setup.exe.
-function Get-RightAgentUserLocalAppData {
-    $profile = $env:USERPROFILE
-    if (-not [string]::IsNullOrWhiteSpace($profile)) {
-        $fromProfile = Join-Path $profile 'AppData\Local'
-        if (Test-Path -LiteralPath $fromProfile -PathType Container) {
-            return $fromProfile
-        }
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA) -and
-        (Test-Path -LiteralPath $env:LOCALAPPDATA -PathType Container)) {
-        return $env:LOCALAPPDATA
-    }
-
-    return [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
-}
-
 function Get-RightAgentSettingsPath {
     $unpackagedSettings = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\settings.json'
     if (Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) {

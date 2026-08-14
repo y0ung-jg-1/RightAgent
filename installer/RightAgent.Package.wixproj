@@ -7,7 +7,8 @@
     <InstallerPlatform>x64</InstallerPlatform>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
-    <SuppressIces>ICE03;ICE38;ICE43;ICE57;ICE61;ICE64;ICE91</SuppressIces>
+    <SuppressIces Condition="'$(PerUser)' == 'true'">ICE38;ICE43;ICE57;ICE61;ICE64;ICE91</SuppressIces>
+    <SuppressIces Condition="'$(PerUser)' != 'true'">ICE61</SuppressIces>
     <DefineConstants>PerUser=$(PerUser);Version=$(Version);AppSource=$(AppSource);CommandSource=$(CommandSource);PayloadDir=$(PayloadDir);RepoDir=$(RepoDir)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>

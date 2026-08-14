@@ -18,5 +18,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\testdata\normalize-agents.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\testdata\icon.svg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

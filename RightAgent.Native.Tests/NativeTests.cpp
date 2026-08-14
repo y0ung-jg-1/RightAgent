@@ -114,6 +114,12 @@ namespace
         }
         Expect(rightagent::LoadSettingsFromPath(path).agents.empty(),
             "A missing settings payload should hide the menu instead of probing PATH");
+        {
+            std::ofstream output(path, std::ios::binary | std::ios::trunc);
+            output << R"({"schemaVersion":1,"agents":[{"id":"x","name":"X","enabled":true,"sort":0,"iconPath":"builtin:NOPE","action":{"type":"terminalCommand","value":"x"}}]})";
+        }
+        Expect(rightagent::LoadSettingsFromPath(path).agents[0].iconPath == L"builtin:rightagent",
+            "Unknown built-in icon keys must fall back to the default");
 
         {
             std::ofstream output(path, std::ios::binary | std::ios::trunc);

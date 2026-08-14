@@ -66,6 +66,27 @@
                                 Visibility="{x:Bind app:VisibilityConverters.VisibleIf(HasActionError), Mode=OneWay}" />
                         </StackPanel>
                     </controls:SettingsCard>
+                    <controls:SettingsCard Header="{x:Bind BuiltInIconLabel, Mode=OneWay}">
+                        <ComboBox
+                            MinWidth="220"
+                            MinHeight="44"
+                            AutomationProperties.Name="{x:Bind BuiltInIconLabel, Mode=OneWay}"
+                            ItemsSource="{x:Bind BuiltInIconOptions, Mode=OneWay}"
+                            SelectedValue="{x:Bind BuiltInIconSelection, Mode=TwoWay}"
+                            SelectedValuePath="Key">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:IconOptionItem">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <ImageIcon
+                                            Width="16"
+                                            Height="16"
+                                            Source="{x:Bind PreviewPath}" />
+                                        <TextBlock Text="{x:Bind Label, Mode=OneWay}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </controls:SettingsCard>
                     <controls:SettingsCard Header="{x:Bind ChooseIconLabel, Mode=OneWay}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button

@@ -50,7 +50,7 @@ The public local contract is UTF-8 JSON named `settings.json`:
 - `id`: stable, case-insensitive ID containing lower-case letters, digits, `.`, `_`, or `-`. The UI generates unique IDs and does not change them when names change.
 - `name`: user-visible menu title.
 - `enabled`: disabled or invalid actions do not appear in Explorer.
-- `iconPath`: `builtin:rightagent`, `builtin:claude`, `builtin:codex`, `builtin:kimi`, `builtin:grok`, `builtin:opencode`, `builtin:cursor`, or a safe `local:` relative path copied under LocalState.
+- `iconPath`: `builtin:rightagent`, `builtin:claude`, `builtin:codex`, `builtin:kimi`, `builtin:grok`, `builtin:opencode`, `builtin:cursor`, or a safe `local:` relative path copied under LocalState. Unknown `builtin:` keys rewrite to `builtin:rightagent`. Custom files may be PNG, JPG, BMP, ICO, or SVG; the settings app stores a 256px ICO.
 - `action.type`: `terminalCommand` or `url`.
 - `action.value`: command text run inside the selected Windows Terminal profile's shell for terminal actions, or an absolute `http`/`https` URL for web actions.
 

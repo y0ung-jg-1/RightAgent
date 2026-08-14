@@ -59,7 +59,7 @@
   <String Id="FailureRepairHeader" Value="Repair Failed" Overridable="yes" />
   <String Id="FailureUninstallHeader" Value="Uninstall Failed" Overridable="yes" />
   <String Id="FailureUnsafeUninstallHeader" Value="Uninstall Failed" Overridable="yes" />
-  <String Id="FailureHyperlinkLogText" Value="One or more issues caused the setup to fail. Please fix the issues and then retry setup. For more information see the &lt;a href=&quot;#&quot;&gt;log file&lt;/a&gt;." Overridable="yes" />
+  <String Id="FailureHyperlinkLogText" Value="One or more issues caused the setup to fail. Please fix the issues and then retry setup. See the &lt;a href=&quot;#&quot;&gt;log file&lt;/a&gt; and %TEMP%\RightAgent-setup-error.txt." Overridable="yes" />
   <String Id="FailureRestartText" Value="You must restart your computer to complete the rollback of the software." Overridable="yes" />
   <String Id="FailureRestartButton" Value="&amp;Restart" Overridable="yes" />
   <String Id="FailureCloseButton" Value="&amp;Close" Overridable="yes" />

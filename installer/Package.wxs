@@ -127,12 +127,12 @@
     <ui:WixUI Id="WixUI_InstallDir" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.RepoDir)installer\License.rtf" />
     <UI>
-      <ProgressText Action="InstallCommandPackages" Message="正在注册资源管理器命令" />
-      <ProgressText Action="RemoveCommandPackages" Message="正在移除资源管理器命令" />
-      <ProgressText Action="RemoveCommandPackagesUpgrade" Message="正在更新资源管理器命令" />
-      <ProgressText Action="RemoveTrustedCertificate" Message="正在移除证书" />
-      <ProgressText Action="WixCloseApplications" Message="正在关闭 RightAgent" />
-      <ProgressText Action="WixCloseApplicationsDeferred" Message="正在关闭 RightAgent" />
+      <ProgressText Action="InstallCommandPackages" Message="Registering Explorer commands" />
+      <ProgressText Action="RemoveCommandPackages" Message="Removing Explorer commands" />
+      <ProgressText Action="RemoveCommandPackagesUpgrade" Message="Updating Explorer commands" />
+      <ProgressText Action="RemoveTrustedCertificate" Message="Removing certificate" />
+      <ProgressText Action="WixCloseApplications" Message="Closing RightAgent" />
+      <ProgressText Action="WixCloseApplicationsDeferred" Message="Closing RightAgent" />
     </UI>
 
     <util:CloseApplication

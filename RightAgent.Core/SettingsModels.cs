@@ -18,6 +18,22 @@ public static class SettingsContract
     public const string ReleasePublisher = "CN=RightAgent";
     public const string DevelopmentPackageName = "RightAgent.Dev";
     public const string DevelopmentPublisher = "CN=RightAgent Dev";
+    public const string BuiltInIconPrefix = "builtin:";
+    public static readonly string[] BuiltInIconKeys =
+    [
+        "rightagent",
+        "claude",
+        "codex",
+        "kimi",
+        "grok",
+        "opencode",
+        "cursor"
+    ];
+
+    public static bool IsBuiltInIconKey(string? key) =>
+        key is not null && BuiltInIconKeys.Contains(key, StringComparer.OrdinalIgnoreCase);
+
+    public static string BuiltInIconPath(string key) => BuiltInIconPrefix + key.Trim().ToLowerInvariant();
 }
 
 public sealed class RightAgentSettings

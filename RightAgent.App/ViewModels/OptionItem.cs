@@ -1,6 +1,6 @@
 namespace RightAgent.App.ViewModels;
 
-public sealed class OptionItem : BindableBase
+public class OptionItem : BindableBase
 {
     private string label;
 

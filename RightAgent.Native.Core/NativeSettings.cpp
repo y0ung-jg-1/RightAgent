@@ -437,7 +437,13 @@ namespace
         const auto lower = ToLower(value);
         if (lower.starts_with(L"builtin:"))
         {
-            return value;
+            auto key = ToLower(Trim(value.substr(8)));
+            if (key == L"claude" || key == L"codex" || key == L"kimi" || key == L"grok"
+                || key == L"opencode" || key == L"cursor" || key == L"rightagent")
+            {
+                return L"builtin:" + key;
+            }
+            return L"builtin:rightagent";
         }
         if (lower.starts_with(L"local:"))
         {

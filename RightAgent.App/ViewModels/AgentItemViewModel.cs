@@ -72,6 +72,7 @@ public sealed class AgentItemViewModel : BindableBase
             iconRevision = DateTime.UtcNow.Ticks;
             OnPropertyChanged(nameof(IconDisplayPath));
             OnPropertyChanged(nameof(HasCustomIcon));
+            OnPropertyChanged(nameof(BuiltInIconSelection));
         }
     }
 
@@ -90,16 +91,40 @@ public sealed class AgentItemViewModel : BindableBase
                 }
             }
 
-            var key = IconPath.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase)
-                ? IconPath["builtin:".Length..].ToLowerInvariant()
+            var key = IconPath.StartsWith(SettingsContract.BuiltInIconPrefix, StringComparison.OrdinalIgnoreCase)
+                ? IconPath[SettingsContract.BuiltInIconPrefix.Length..].ToLowerInvariant()
                 : "rightagent";
-            if (key is not ("claude" or "codex" or "kimi" or "grok" or "opencode" or "cursor" or "rightagent"))
+            if (!SettingsContract.IsBuiltInIconKey(key))
             {
                 key = "rightagent";
             }
             return $"ms-appx:///Assets/Agents/{key}.svg";
         }
     }
+
+    public string? BuiltInIconSelection
+    {
+        get => IconPath.StartsWith(SettingsContract.BuiltInIconPrefix, StringComparison.OrdinalIgnoreCase)
+            ? SettingsValidator.NormalizeIconPath(IconPath)
+            : null;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            IconPath = value;
+        }
+    }
+
+    public IReadOnlyList<IconOptionItem> BuiltInIconOptions { get; } =
+        SettingsContract.BuiltInIconKeys
+            .Select(key => new IconOptionItem(
+                SettingsContract.BuiltInIconPath(key),
+                string.Empty,
+                $"ms-appx:///Assets/Agents/{key}.svg"))
+            .ToArray();
 
     public string ActionType
     {
@@ -178,6 +203,7 @@ public sealed class AgentItemViewModel : BindableBase
     public string ActionValueLabel => localization["ActionValue"];
     public bool HasCustomIcon => IconPath.StartsWith("local:", StringComparison.OrdinalIgnoreCase);
 
+    public string BuiltInIconLabel => localization["BuiltInIcon"];
     public string ChooseIconLabel => localization["ChooseIcon"];
     public string ResetIconLabel => localization["ResetIcon"];
     public string MoveUpLabel => localization["MoveUp"];
@@ -211,9 +237,15 @@ public sealed class AgentItemViewModel : BindableBase
     {
         ActionTypeOptions[0].UpdateLabel(localization["TerminalCommand"]);
         ActionTypeOptions[1].UpdateLabel(localization["Url"]);
+        foreach (var option in BuiltInIconOptions)
+        {
+            option.UpdateLabel(localization["IconBuiltin_" + option.Key[SettingsContract.BuiltInIconPrefix.Length..]]);
+        }
+        OnPropertyChanged(nameof(BuiltInIconOptions));
         OnPropertyChanged(nameof(NameLabel));
         OnPropertyChanged(nameof(ActionTypeLabel));
         OnPropertyChanged(nameof(ActionValueLabel));
+        OnPropertyChanged(nameof(BuiltInIconLabel));
         OnPropertyChanged(nameof(ChooseIconLabel));
         OnPropertyChanged(nameof(ResetIconLabel));
         OnPropertyChanged(nameof(MoveUpLabel));

@@ -37,6 +37,14 @@
   <data name="ActionValue" xml:space="preserve"><value>命令或 URL</value></data>
   <data name="TerminalCommand" xml:space="preserve"><value>终端命令</value></data>
   <data name="Url" xml:space="preserve"><value>网页 URL</value></data>
+  <data name="BuiltInIcon" xml:space="preserve"><value>内置图标</value></data>
+  <data name="IconBuiltin_rightagent" xml:space="preserve"><value>RightAgent</value></data>
+  <data name="IconBuiltin_claude" xml:space="preserve"><value>Claude</value></data>
+  <data name="IconBuiltin_codex" xml:space="preserve"><value>Codex</value></data>
+  <data name="IconBuiltin_kimi" xml:space="preserve"><value>Kimi</value></data>
+  <data name="IconBuiltin_grok" xml:space="preserve"><value>Grok</value></data>
+  <data name="IconBuiltin_opencode" xml:space="preserve"><value>opencode</value></data>
+  <data name="IconBuiltin_cursor" xml:space="preserve"><value>Cursor</value></data>
   <data name="ChooseIcon" xml:space="preserve"><value>选择图标</value></data>
   <data name="ResetIcon" xml:space="preserve"><value>改回内置</value></data>
   <data name="MoveUp" xml:space="preserve"><value>上移</value></data>

@@ -1,3 +1,20 @@
+function Get-RightAgentUserLocalAppData {
+    $profile = $env:USERPROFILE
+    if (-not [string]::IsNullOrWhiteSpace($profile)) {
+        $fromProfile = Join-Path $profile 'AppData\Local'
+        if (Test-Path -LiteralPath $fromProfile -PathType Container) {
+            return $fromProfile
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA) -and
+        (Test-Path -LiteralPath $env:LOCALAPPDATA -PathType Container)) {
+        return $env:LOCALAPPDATA
+    }
+
+    return [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+}
+
 # Keep this rule identical to CommandSlotPlanner.RequiredSlotCount.
 function Get-RightAgentRequiredCommandSlotCount {
     param(
