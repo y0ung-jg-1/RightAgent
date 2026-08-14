@@ -279,48 +279,21 @@ namespace
         return result;
     }
 
-    std::wstring ReadJsonStringProperty(std::wstring_view json, std::wstring_view key)
+    bool HasStandaloneSwitch(const std::wstring& haystack, const std::wstring& flag)
     {
-        const std::wstring quotedKey = L"\"" + std::wstring(key) + L"\"";
         std::size_t position = 0;
-        while ((position = json.find(quotedKey, position)) != std::wstring_view::npos)
+        while ((position = haystack.find(flag, position)) != std::wstring::npos)
         {
-            std::size_t cursor = position + quotedKey.size();
-            while (cursor < json.size() && std::iswspace(json[cursor]))
+            const bool startOk = position == 0 || std::iswspace(haystack[position - 1]);
+            const auto after = position + flag.size();
+            const bool endOk = after == haystack.size() || std::iswspace(haystack[after]);
+            if (startOk && endOk)
             {
-                ++cursor;
+                return true;
             }
-            if (cursor >= json.size() || json[cursor] != L':')
-            {
-                ++position;
-                continue;
-            }
-            ++cursor;
-            while (cursor < json.size() && std::iswspace(json[cursor]))
-            {
-                ++cursor;
-            }
-            if (cursor >= json.size() || json[cursor] != L'"')
-            {
-                return {};
-            }
-
-            std::wstring value;
-            ++cursor;
-            while (cursor < json.size() && json[cursor] != L'"')
-            {
-                if (json[cursor] == L'\\' && cursor + 1 < json.size())
-                {
-                    value.push_back(json[cursor + 1]);
-                    cursor += 2;
-                    continue;
-                }
-                value.push_back(json[cursor]);
-                ++cursor;
-            }
-            return value;
+            ++position;
         }
-        return {};
+        return false;
     }
 
     std::filesystem::path FindWindowsTerminalSettingsPath()
@@ -561,6 +534,11 @@ namespace
 
 namespace rightagent
 {
+    std::filesystem::path GetUnredirectedLocalAppData()
+    {
+        return GetLocalAppDataDirectory();
+    }
+
     std::wstring GetSettingsPackageFamilyName(const std::wstring_view currentPackageFamilyName)
     {
         const auto separator = currentPackageFamilyName.rfind(L'_');
@@ -627,7 +605,7 @@ namespace rightagent
         const auto text = ReadUtf8File(path);
         if (text.empty())
         {
-            return CreateDefaultSettings();
+            return {};
         }
 
         try
@@ -733,7 +711,7 @@ namespace rightagent
         }
 
         const auto home = GetEnvironmentValue(L"USERPROFILE");
-        const auto localAppData = GetEnvironmentValue(L"LOCALAPPDATA");
+        const auto localAppData = GetLocalAppDataDirectory();
         const std::filesystem::path extras[] =
         {
             std::filesystem::path(localAppData) / L"Microsoft" / L"WindowsApps",
@@ -841,11 +819,7 @@ namespace rightagent
 
     std::wstring ReadWindowsTerminalDefaultProfile(const std::filesystem::path& settingsPath)
     {
-        if (settingsPath.empty())
-        {
-            return {};
-        }
-        return Trim(ReadJsonStringProperty(StripJsonComments(ReadUtf8File(settingsPath)), L"defaultProfile"));
+        return Trim(ReadWindowsTerminalProfileCatalog(settingsPath).defaultProfileId);
     }
 
     std::wstring ResolveWindowsTerminalProfile(const std::wstring_view configuredProfile)
@@ -867,7 +841,6 @@ namespace rightagent
         }
 
         const auto text = StripJsonComments(ReadUtf8File(settingsPath));
-        catalog.defaultProfileId = Trim(ReadJsonStringProperty(text, L"defaultProfile"));
         if (text.empty())
         {
             return catalog;
@@ -876,6 +849,7 @@ namespace rightagent
         try
         {
             const auto root = JsonObject::Parse(text);
+            catalog.defaultProfileId = Trim(GetString(root, L"defaultProfile"));
             if (!root.HasKey(L"profiles"))
             {
                 return catalog;
@@ -1012,7 +986,7 @@ namespace rightagent
         case WindowsTerminalShellFamily::CommandPrompt:
         {
             const auto lowerCommandline = ToLower(std::wstring(profileCommandline));
-            if (ContainsToken(lowerCommandline, L"/k") || ContainsToken(lowerCommandline, L"/c"))
+            if (HasStandaloneSwitch(lowerCommandline, L"/k") || HasStandaloneSwitch(lowerCommandline, L"/c"))
             {
                 return {L"&&", commandText};
             }

@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <iterator>
 #include <filesystem>
 #include <new>
 #include <optional>
@@ -24,6 +25,23 @@ namespace
 {
     HMODULE g_module = nullptr;
     std::atomic<long> g_moduleReferences = 0;
+
+    template <typename Action>
+    HRESULT ComGuard(Action&& action) noexcept
+    {
+        try
+        {
+            return action();
+        }
+        catch (const std::bad_alloc&)
+        {
+            return E_OUTOFMEMORY;
+        }
+        catch (...)
+        {
+            return E_FAIL;
+        }
+    }
 
     void AddModuleReference() noexcept
     {
@@ -115,7 +133,7 @@ namespace
         return guid;
     }
 
-    HRESULT GetFileSystemFolderFromItem(IShellItem* item, std::filesystem::path& folder)
+    HRESULT GetFileSystemFolderFromItem(IShellItem* item, std::filesystem::path& folder, const bool verifyExists)
     {
         if (item == nullptr)
         {
@@ -135,14 +153,23 @@ namespace
         {
             return result;
         }
+        if (PathIsUNCW(rawPath) || PathIsNetworkPathW(rawPath))
+        {
+            CoTaskMemFree(rawPath);
+            return HRESULT_FROM_WIN32(ERROR_DIRECTORY);
+        }
         folder = rawPath;
         CoTaskMemFree(rawPath);
+        if (!verifyExists)
+        {
+            return S_OK;
+        }
 
         std::error_code error;
         return std::filesystem::is_directory(folder, error) ? S_OK : HRESULT_FROM_WIN32(ERROR_DIRECTORY);
     }
 
-    HRESULT GetFolderFromSite(IUnknown* site, std::filesystem::path& folder)
+    HRESULT GetFolderFromSite(IUnknown* site, std::filesystem::path& folder, const bool verifyExists)
     {
         if (site == nullptr)
         {
@@ -172,12 +199,16 @@ namespace
             return result;
         }
 
-        result = GetFileSystemFolderFromItem(folderItem, folder);
+        result = GetFileSystemFolderFromItem(folderItem, folder, verifyExists);
         folderItem->Release();
         return result;
     }
 
-    HRESULT ResolveTargetFolder(IShellItemArray* selection, IUnknown* site, std::filesystem::path& folder)
+    HRESULT ResolveTargetFolder(
+        IShellItemArray* selection,
+        IUnknown* site,
+        std::filesystem::path& folder,
+        const bool verifyExists)
     {
         if (selection != nullptr)
         {
@@ -199,12 +230,12 @@ namespace
                 {
                     return result;
                 }
-                result = GetFileSystemFolderFromItem(item, folder);
+                result = GetFileSystemFolderFromItem(item, folder, verifyExists);
                 item->Release();
                 return result;
             }
         }
-        return GetFolderFromSite(site, folder);
+        return GetFolderFromSite(site, folder, verifyExists);
     }
 
     class ExplorerCommand;
@@ -364,26 +395,29 @@ namespace
                 return E_POINTER;
             }
             *title = nullptr;
-            std::wstring text;
-            if (agent_)
+            return ComGuard([&]
             {
-                text = useDirectTitle_
-                    ? DirectTitle(rightagent::LoadSettings(), *agent_)
-                    : agent_->name;
-            }
-            else
-            {
-                const auto settings = rightagent::LoadSettings();
-                if (!IsRootSlotVisible(settings, rootSlot_))
+                std::wstring text;
+                if (agent_)
                 {
-                    return E_FAIL;
+                    text = useDirectTitle_
+                        ? DirectTitle(rightagent::LoadSettings(), *agent_)
+                        : agent_->name;
                 }
-                const auto* selectedAgent = ResolveSelectedAgent(settings);
-                text = settings.menuMode == rightagent::MenuMode::MultiDirect && selectedAgent != nullptr
-                    ? DirectTitle(settings, *selectedAgent)
-                    : RootTitle(settings);
-            }
-            return text.empty() ? E_FAIL : SHStrDupW(text.c_str(), title);
+                else
+                {
+                    const auto settings = rightagent::LoadSettings();
+                    if (!IsRootSlotVisible(settings, rootSlot_))
+                    {
+                        return E_FAIL;
+                    }
+                    const auto* selectedAgent = ResolveSelectedAgent(settings);
+                    text = settings.menuMode == rightagent::MenuMode::MultiDirect && selectedAgent != nullptr
+                        ? DirectTitle(settings, *selectedAgent)
+                        : RootTitle(settings);
+                }
+                return text.empty() ? E_FAIL : SHStrDupW(text.c_str(), title);
+            });
         }
 
         HRESULT STDMETHODCALLTYPE GetIcon(IShellItemArray*, LPWSTR* icon) override
@@ -393,24 +427,27 @@ namespace
                 return E_POINTER;
             }
             *icon = nullptr;
-            const auto settings = rightagent::LoadSettings();
-            if (!agent_ && !IsRootSlotVisible(settings, rootSlot_))
+            return ComGuard([&]
             {
-                return E_NOTIMPL;
-            }
-            std::wstring iconKey = L"builtin:rightagent";
-            if (agent_)
-            {
-                iconKey = agent_->iconPath;
-            }
-            else if (const auto* selectedAgent = ResolveSelectedAgent(settings))
-            {
-                iconKey = selectedAgent->iconPath;
-            }
+                const auto settings = rightagent::LoadSettings();
+                if (!agent_ && !IsRootSlotVisible(settings, rootSlot_))
+                {
+                    return E_NOTIMPL;
+                }
+                std::wstring iconKey = L"builtin:rightagent";
+                if (agent_)
+                {
+                    iconKey = agent_->iconPath;
+                }
+                else if (const auto* selectedAgent = ResolveSelectedAgent(settings))
+                {
+                    iconKey = selectedAgent->iconPath;
+                }
 
-            const auto path = rightagent::ResolveIconPath(iconKey, rightagent::GetModuleDirectory(g_module));
-            std::error_code error;
-            return std::filesystem::is_regular_file(path, error) ? SHStrDupW(path.c_str(), icon) : E_NOTIMPL;
+                const auto path = rightagent::ResolveIconPath(iconKey, rightagent::GetModuleDirectory(g_module));
+                std::error_code error;
+                return std::filesystem::is_regular_file(path, error) ? SHStrDupW(path.c_str(), icon) : E_NOTIMPL;
+            });
         }
 
         HRESULT STDMETHODCALLTYPE GetToolTip(IShellItemArray*, LPWSTR* tooltip) override
@@ -420,14 +457,29 @@ namespace
                 return E_POINTER;
             }
             *tooltip = nullptr;
-            const auto settings = rightagent::LoadSettings();
-            const auto* selectedAgent = ResolveSelectedAgent(settings);
-            const auto text = selectedAgent == nullptr
-                ? (rightagent::IsChinese(settings) ? L"在此文件夹中打开编程 Agent" : L"Open a coding agent in this folder")
-                : (rightagent::IsChinese(settings)
-                    ? L"在此文件夹中打开 " + selectedAgent->name
-                    : L"Open " + selectedAgent->name + L" in this folder");
-            return SHStrDupW(text.c_str(), tooltip);
+            return ComGuard([&]
+            {
+                const auto settings = rightagent::LoadSettings();
+                if (agent_)
+                {
+                    if (!settings.menuEnabled || rightagent::FindEnabledAgent(settings, agent_->id) == nullptr)
+                    {
+                        return E_FAIL;
+                    }
+                }
+                else if (!IsRootSlotVisible(settings, rootSlot_))
+                {
+                    return E_FAIL;
+                }
+
+                const auto* selectedAgent = ResolveSelectedAgent(settings);
+                const auto text = selectedAgent == nullptr
+                    ? (rightagent::IsChinese(settings) ? L"在此文件夹中打开编程 Agent" : L"Open a coding agent in this folder")
+                    : (rightagent::IsChinese(settings)
+                        ? L"在此文件夹中打开 " + selectedAgent->name
+                        : L"Open " + selectedAgent->name + L" in this folder");
+                return SHStrDupW(text.c_str(), tooltip);
+            });
         }
 
         HRESULT STDMETHODCALLTYPE GetCanonicalName(GUID* commandName) override
@@ -449,61 +501,66 @@ namespace
                 return E_POINTER;
             }
             *state = ECS_HIDDEN;
-
-            const auto settings = rightagent::LoadSettings();
-            if (agent_)
+            return ComGuard([&]
             {
-                if (!settings.menuEnabled || rightagent::FindEnabledAgent(settings, agent_->id) == nullptr)
+                const auto settings = rightagent::LoadSettings();
+                if (agent_)
+                {
+                    if (!settings.menuEnabled || rightagent::FindEnabledAgent(settings, agent_->id) == nullptr)
+                    {
+                        return S_OK;
+                    }
+                }
+                else if (!IsRootSlotVisible(settings, rootSlot_))
                 {
                     return S_OK;
                 }
-            }
-            else if (!IsRootSlotVisible(settings, rootSlot_))
-            {
-                return S_OK;
-            }
 
-            std::filesystem::path folder;
-            if (SUCCEEDED(ResolveTargetFolder(selection, site_, folder)))
-            {
-                *state = ECS_ENABLED;
-            }
-            return S_OK;
+                std::filesystem::path folder;
+                if (SUCCEEDED(ResolveTargetFolder(selection, site_, folder, false)))
+                {
+                    *state = ECS_ENABLED;
+                }
+                return S_OK;
+            });
         }
 
         HRESULT STDMETHODCALLTYPE Invoke(IShellItemArray* selection, IBindCtx*) override
         {
-            const auto settings = rightagent::LoadSettings();
-            if (!settings.menuEnabled)
+            return ComGuard([&]
             {
-                return HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY);
-            }
-            const auto* selectedAgent = ResolveSelectedAgent(settings);
-            if (selectedAgent == nullptr)
-            {
-                return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
-            }
+                const auto settings = rightagent::LoadSettings();
+                if (!settings.menuEnabled)
+                {
+                    return HRESULT_FROM_WIN32(ERROR_ACCESS_DISABLED_BY_POLICY);
+                }
+                const auto* selectedAgent = ResolveSelectedAgent(settings);
+                if (selectedAgent == nullptr)
+                {
+                    return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+                }
 
-            std::filesystem::path folder;
-            HRESULT result = ResolveTargetFolder(selection, site_, folder);
-            if (FAILED(result))
-            {
-                return result;
-            }
+                std::filesystem::path folder;
+                HRESULT result = ResolveTargetFolder(selection, site_, folder, true);
+                if (FAILED(result))
+                {
+                    return result;
+                }
 
-            const auto moduleDirectory = rightagent::GetModuleDirectory(g_module);
-            const auto launcher = moduleDirectory / L"RightAgent.Launcher.exe";
-            DWORD error = ERROR_SUCCESS;
-            if (!rightagent::LaunchProcess(
-                    launcher,
-                    {L"--agent", selectedAgent->id, L"--cwd", folder.wstring()},
-                    moduleDirectory,
-                    CREATE_NEW_PROCESS_GROUP,
-                    &error))
-            {
-                return HRESULT_FROM_WIN32(error);
-            }
-            return S_OK;
+                const auto moduleDirectory = rightagent::GetModuleDirectory(g_module);
+                const auto launcher = moduleDirectory / L"RightAgent.Launcher.exe";
+                DWORD error = ERROR_SUCCESS;
+                if (!rightagent::LaunchProcess(
+                        launcher,
+                        {L"--agent", selectedAgent->id, L"--cwd", folder.wstring()},
+                        moduleDirectory,
+                        CREATE_NEW_PROCESS_GROUP,
+                        &error))
+                {
+                    return HRESULT_FROM_WIN32(error);
+                }
+                return S_OK;
+            });
         }
 
         HRESULT STDMETHODCALLTYPE GetFlags(EXPCMDFLAGS* flags) override
@@ -512,16 +569,24 @@ namespace
             {
                 return E_POINTER;
             }
-            if (agent_)
+            return ComGuard([&]
             {
-                *flags = ECF_DEFAULT;
+                if (agent_)
+                {
+                    *flags = ECF_DEFAULT;
+                    return S_OK;
+                }
+                const auto settings = rightagent::LoadSettings();
+                if (!IsRootSlotVisible(settings, rootSlot_))
+                {
+                    *flags = ECF_DEFAULT;
+                    return S_OK;
+                }
+                *flags = rootSlot_ == 0 && settings.menuMode == rightagent::MenuMode::Grouped
+                    ? ECF_HASSUBCOMMANDS
+                    : ECF_DEFAULT;
                 return S_OK;
-            }
-            const auto settings = rightagent::LoadSettings();
-            *flags = rootSlot_ == 0 && settings.menuMode == rightagent::MenuMode::Grouped
-                ? ECF_HASSUBCOMMANDS
-                : ECF_DEFAULT;
-            return S_OK;
+            });
         }
 
         HRESULT STDMETHODCALLTYPE EnumSubCommands(IEnumExplorerCommand** enumerator) override
@@ -531,28 +596,31 @@ namespace
                 return E_POINTER;
             }
             *enumerator = nullptr;
-            if (agent_ || rootSlot_ != 0)
+            return ComGuard([&]
             {
-                return E_NOTIMPL;
-            }
+                if (agent_ || rootSlot_ != 0)
+                {
+                    return E_NOTIMPL;
+                }
 
-            const auto settings = rightagent::LoadSettings();
-            if (settings.menuMode != rightagent::MenuMode::Grouped)
-            {
-                return E_NOTIMPL;
-            }
+                const auto settings = rightagent::LoadSettings();
+                if (settings.menuMode != rightagent::MenuMode::Grouped)
+                {
+                    return E_NOTIMPL;
+                }
 
-            std::vector<rightagent::AgentDefinition> enabled;
-            std::copy_if(settings.agents.begin(), settings.agents.end(), std::back_inserter(enabled), [](const auto& agent)
-            {
-                return agent.enabled;
+                std::vector<rightagent::AgentDefinition> enabled;
+                std::copy_if(settings.agents.begin(), settings.agents.end(), std::back_inserter(enabled), [](const auto& agent)
+                {
+                    return agent.enabled;
+                });
+                if (enabled.empty())
+                {
+                    return S_FALSE;
+                }
+                *enumerator = new (std::nothrow) ExplorerCommandEnumerator(std::move(enabled), site_, false);
+                return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
             });
-            if (enabled.empty())
-            {
-                return S_FALSE;
-            }
-            *enumerator = new (std::nothrow) ExplorerCommandEnumerator(std::move(enabled), site_, false);
-            return *enumerator == nullptr ? E_OUTOFMEMORY : S_OK;
         }
 
         HRESULT STDMETHODCALLTYPE SetSite(IUnknown* site) override

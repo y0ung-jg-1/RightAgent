@@ -10,6 +10,7 @@ public sealed class AgentItemViewModel : BindableBase
     private bool enabled;
     private int sort;
     private string iconPath;
+    private long iconRevision = DateTime.UtcNow.Ticks;
     private string actionType;
     private string actionValue;
     private bool isExpanded;
@@ -67,10 +68,9 @@ public sealed class AgentItemViewModel : BindableBase
         get => iconPath;
         set
         {
-            if (SetProperty(ref iconPath, value))
-            {
-                OnPropertyChanged(nameof(IconDisplayPath));
-            }
+            SetProperty(ref iconPath, value);
+            iconRevision = DateTime.UtcNow.Ticks;
+            OnPropertyChanged(nameof(IconDisplayPath));
         }
     }
 
@@ -80,9 +80,13 @@ public sealed class AgentItemViewModel : BindableBase
         {
             if (IconPath.StartsWith("local:", StringComparison.OrdinalIgnoreCase))
             {
-                var relative = IconPath["local:".Length..].Replace('\\', '/');
-                var escaped = string.Join('/', relative.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.EscapeDataString));
-                return "ms-appdata:///local/" + escaped;
+                var relative = IconPath["local:".Length..].Replace('/', Path.DirectorySeparatorChar);
+                var fullPath = Path.GetFullPath(Path.Combine(AppPaths.GetLocalStateDirectory(), relative));
+                var root = Path.GetFullPath(AppPaths.GetLocalStateDirectory());
+                if (fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(fullPath))
+                {
+                    return new Uri(fullPath).AbsoluteUri + "?v=" + iconRevision;
+                }
             }
 
             var key = IconPath.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase)
@@ -101,6 +105,11 @@ public sealed class AgentItemViewModel : BindableBase
         get => actionType;
         set
         {
+            if (value is null)
+            {
+                return;
+            }
+
             if (SetProperty(ref actionType, value == SettingsContract.Url ? SettingsContract.Url : SettingsContract.TerminalCommand))
             {
                 RefreshValidation();
@@ -170,6 +179,7 @@ public sealed class AgentItemViewModel : BindableBase
     public string MoveUpLabel => localization["MoveUp"];
     public string MoveDownLabel => localization["MoveDown"];
     public string DeleteLabel => localization["Delete"];
+    public string ManageLabel => localization["ManageAgent"];
 
     public string EnabledAutomationName => Format("EnableFor");
     public string MoveUpAutomationName => Format("MoveUpFor");
@@ -203,6 +213,7 @@ public sealed class AgentItemViewModel : BindableBase
         OnPropertyChanged(nameof(MoveUpLabel));
         OnPropertyChanged(nameof(MoveDownLabel));
         OnPropertyChanged(nameof(DeleteLabel));
+        OnPropertyChanged(nameof(ManageLabel));
         OnPropertyChanged(nameof(MenuTitle));
         RefreshValidation();
         NotifyAutomationNames();

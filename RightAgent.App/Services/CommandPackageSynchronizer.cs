@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using RightAgent.Core;
 using Windows.ApplicationModel;
 using Windows.Management.Deployment;
@@ -100,18 +98,18 @@ internal static class CommandPackageSynchronizer
                 return CommandPackageSyncResult.Skipped;
             }
 
-            StopCommandSurrogates(cancellationToken);
+            var packageManager = new PackageManager();
             foreach (var slot in toAdd)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var packagePath = Path.Combine(cacheDirectory, CommandSlotPlanner.CommandPackageFileName(slot));
-                AddPackage(packagePath, cancellationToken);
+                AddPackage(packageManager, packagePath, cancellationToken);
             }
 
             foreach (var fullName in toRemove)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                RemovePackage(fullName, cancellationToken);
+                RemovePackage(packageManager, fullName, cancellationToken);
             }
         }
         finally
@@ -162,9 +160,7 @@ internal static class CommandPackageSynchronizer
     private static Dictionary<int, string> ListInstalledCommandSlots(string mainPackageName, string publisher)
     {
         var installed = new Dictionary<int, string>();
-        var namePattern = new Regex(
-            "^" + Regex.Escape(mainPackageName) + @"\.Command(0[0-9]|1[0-5])$",
-            RegexOptions.CultureInvariant);
+        var prefix = mainPackageName + ".Command";
         foreach (var package in new PackageManager().FindPackagesForUser(string.Empty))
         {
             if (!string.Equals(package.Id.Publisher, publisher, StringComparison.Ordinal))
@@ -172,8 +168,14 @@ internal static class CommandPackageSynchronizer
                 continue;
             }
 
-            var match = namePattern.Match(package.Id.Name);
-            if (!match.Success || !int.TryParse(match.Groups[1].Value, out var slot))
+            if (!package.Id.Name.StartsWith(prefix, StringComparison.Ordinal)
+                || package.Id.Name.Length != prefix.Length + 2)
+            {
+                continue;
+            }
+
+            var slotText = package.Id.Name[prefix.Length..];
+            if (!int.TryParse(slotText, out var slot) || slot < 0 || slot >= SettingsContract.MaxMultiDirectAgents)
             {
                 continue;
             }
@@ -184,103 +186,43 @@ internal static class CommandPackageSynchronizer
         return installed;
     }
 
-    private static void AddPackage(string packagePath, CancellationToken cancellationToken)
+    private static void AddPackage(PackageManager packageManager, string packagePath, CancellationToken cancellationToken)
     {
-        RunPowerShell(
-            $"Add-AppxPackage -Path '{EscapePowerShellLiteral(packagePath)}' -ForceApplicationShutdown -ForceUpdateFromAnyVersion",
-            cancellationToken);
-    }
-
-    private static void RemovePackage(string packageFullName, CancellationToken cancellationToken)
-    {
-        RunPowerShell(
-            $"Remove-AppxPackage -Package '{EscapePowerShellLiteral(packageFullName)}'",
-            cancellationToken);
-    }
-
-    private static void StopCommandSurrogates(CancellationToken cancellationToken)
-    {
-        var classIds = string.Join(
-            ",",
-            Enumerable.Range(0, SettingsContract.MaxMultiDirectAgents)
-                .Select(slot => $"'F7E08D{0x6D + slot:X2}-676E-4D4B-950A-5B4451E19E3C'"));
-        var command =
-            "$classIds = @(" + classIds + "); " +
-            "$pattern = ($classIds | ForEach-Object { [Regex]::Escape($_) }) -join '|'; " +
-            "Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue | " +
-            "Where-Object { $_.Name -ieq 'dllhost.exe' -and $_.CommandLine -match $pattern } | " +
-            "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
-        try
+        var options = new AddPackageOptions
         {
-            RunPowerShell(command, cancellationToken);
-        }
-        catch (InvalidOperationException)
-        {
-            // Explorer may still hold a surrogate; package add/remove can continue.
-        }
-    }
-
-    private static void RunPowerShell(string command, CancellationToken cancellationToken)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe"),
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
+            ForceAppShutdown = true,
+            ForceUpdateFromAnyVersion = true
         };
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-NonInteractive");
-        startInfo.ArgumentList.Add("-ExecutionPolicy");
-        startInfo.ArgumentList.Add("Bypass");
-        startInfo.ArgumentList.Add("-Command");
-        startInfo.ArgumentList.Add(command);
-
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Could not start Windows PowerShell.");
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        try
+        var result = packageManager.AddPackageByUriAsync(new Uri(packagePath), options)
+            .AsTask(cancellationToken)
+            .GetAwaiter()
+            .GetResult();
+        if (!result.IsRegistered || result.ExtendedErrorCode is not null)
         {
-            while (!process.WaitForExit(200))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-            }
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.ErrorText)
+                ? $"Could not register '{packagePath}'."
+                : result.ErrorText);
         }
-        catch
+    }
+
+    private static void RemovePackage(PackageManager packageManager, string packageFullName, CancellationToken cancellationToken)
+    {
+        var result = packageManager.RemovePackageAsync(packageFullName)
+            .AsTask(cancellationToken)
+            .GetAwaiter()
+            .GetResult();
+        if (result.ExtendedErrorCode is not null)
         {
-            try
-            {
-                process.Kill(entireProcessTree: true);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            throw;
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.ErrorText)
+                ? $"Could not remove '{packageFullName}'."
+                : result.ErrorText);
         }
-
-        var stdout = stdoutTask.GetAwaiter().GetResult();
-        var stderr = stderrTask.GetAwaiter().GetResult();
-        if (process.ExitCode == 0)
-        {
-            return;
-        }
-
-        var detail = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
-        throw new InvalidOperationException(string.IsNullOrWhiteSpace(detail)
-            ? $"Windows PowerShell exited with code {process.ExitCode}."
-            : detail.Trim());
     }
 
     private static void NotifyShellAssociationsChanged()
     {
         SHChangeNotify(ShellAssociationChanged, ShellNotifyIdList, IntPtr.Zero, IntPtr.Zero);
     }
-
-    private static string EscapePowerShellLiteral(string value) => value.Replace("'", "''", StringComparison.Ordinal);
 
     [DllImport("shell32.dll")]
     private static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);

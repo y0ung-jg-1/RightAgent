@@ -11,14 +11,7 @@ public static partial class SettingsValidator
         input.Language = input.Language is SettingsContract.SystemLanguage or SettingsContract.ChineseLanguage or SettingsContract.EnglishLanguage
             ? input.Language
             : SettingsContract.SystemLanguage;
-        input.MenuMode = input.MenuMode is SettingsContract.DirectMenu or SettingsContract.MultiDirectMenu
-            ? input.MenuMode
-            : SettingsContract.GroupedMenu;
-        input.TerminalShell = input.TerminalShell is SettingsContract.PowerShell7TerminalShell
-            or SettingsContract.WindowsPowerShellTerminalShell
-            or SettingsContract.CommandPromptTerminalShell
-            ? input.TerminalShell
-            : SettingsContract.AutomaticTerminalShell;
+        input.MenuMode = NormalizeMenuMode(input.MenuMode);
         input.TerminalProfile = CleanOptional(input.TerminalProfile);
         input.Agents ??= [];
 
@@ -112,13 +105,32 @@ public static partial class SettingsValidator
         if (value.StartsWith("local:", StringComparison.OrdinalIgnoreCase))
         {
             var relative = value["local:".Length..].Replace('\\', '/').TrimStart('/');
-            if (!relative.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment == ".."))
+            var segments = relative.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (segments.Length > 0
+                && segments.All(segment => segment != ".." && segment is not [_, ':'])
+                && !Path.IsPathRooted(relative)
+                && !Path.IsPathFullyQualified(relative.Replace('/', Path.DirectorySeparatorChar)))
             {
                 return "local:" + relative;
             }
         }
 
         return "builtin:rightagent";
+    }
+
+    private static string NormalizeMenuMode(string? value)
+    {
+        if (string.Equals(value, SettingsContract.DirectMenu, StringComparison.OrdinalIgnoreCase))
+        {
+            return SettingsContract.DirectMenu;
+        }
+
+        if (string.Equals(value, SettingsContract.MultiDirectMenu, StringComparison.OrdinalIgnoreCase))
+        {
+            return SettingsContract.MultiDirectMenu;
+        }
+
+        return SettingsContract.GroupedMenu;
     }
 
     private static string? CleanOptional(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

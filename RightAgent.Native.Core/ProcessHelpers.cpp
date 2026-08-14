@@ -1,10 +1,100 @@
 #include "ProcessHelpers.h"
 
 #include <windows.h>
+#include <wincrypt.h>
 
 #include <cstdint>
 #include <cwctype>
 #include <system_error>
+#include <unordered_map>
+
+#pragma comment(lib, "crypt32.lib")
+
+namespace
+{
+    std::wstring GetEnvironmentValue(const wchar_t* name)
+    {
+        const DWORD required = GetEnvironmentVariableW(name, nullptr, 0);
+        if (required == 0)
+        {
+            return {};
+        }
+
+        std::wstring value(required, L'\0');
+        const DWORD written = GetEnvironmentVariableW(name, value.data(), required);
+        if (written == 0 || written >= required)
+        {
+            return {};
+        }
+        value.resize(written);
+        return value;
+    }
+
+    std::filesystem::path UnredirectedProfileSubdirectory(const wchar_t* relative)
+    {
+        const auto userProfile = GetEnvironmentValue(L"USERPROFILE");
+        return userProfile.empty() ? std::filesystem::path{} : std::filesystem::path(userProfile) / relative;
+    }
+
+    std::wstring BuildUnredirectedEnvironmentBlock()
+    {
+        const auto localAppData = UnredirectedProfileSubdirectory(L"AppData\\Local");
+        const auto roamingAppData = UnredirectedProfileSubdirectory(L"AppData\\Roaming");
+        if (localAppData.empty() || roamingAppData.empty())
+        {
+            return {};
+        }
+
+        const auto tempDirectory = localAppData / L"Temp";
+        std::unordered_map<std::wstring, std::wstring> values;
+        if (LPWCH strings = GetEnvironmentStringsW())
+        {
+            for (const wchar_t* cursor = strings; *cursor != L'\0';)
+            {
+                const std::wstring entry(cursor);
+                cursor += entry.size() + 1;
+                const auto separator = entry.find(L'=');
+                if (separator == 0 || separator == std::wstring::npos)
+                {
+                    continue;
+                }
+                values[entry.substr(0, separator)] = entry.substr(separator + 1);
+            }
+            FreeEnvironmentStringsW(strings);
+        }
+
+        const auto setValue = [&](const wchar_t* name, const std::wstring& value)
+        {
+            for (auto iterator = values.begin(); iterator != values.end();)
+            {
+                if (_wcsicmp(iterator->first.c_str(), name) == 0)
+                {
+                    iterator = values.erase(iterator);
+                }
+                else
+                {
+                    ++iterator;
+                }
+            }
+            values[name] = value;
+        };
+        setValue(L"LOCALAPPDATA", localAppData.wstring());
+        setValue(L"APPDATA", roamingAppData.wstring());
+        setValue(L"TEMP", tempDirectory.wstring());
+        setValue(L"TMP", tempDirectory.wstring());
+
+        std::wstring block;
+        for (const auto& [name, value] : values)
+        {
+            block.append(name);
+            block.push_back(L'=');
+            block.append(value);
+            block.push_back(L'\0');
+        }
+        block.push_back(L'\0');
+        return block;
+    }
+}
 
 namespace rightagent
 {
@@ -60,23 +150,34 @@ namespace rightagent
     std::wstring EncodePowerShellCommand(const std::wstring_view command)
     {
         static_assert(sizeof(wchar_t) == 2, "PowerShell encoded commands require UTF-16LE input on Windows.");
-        constexpr wchar_t alphabet[] = L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        const auto* bytes = reinterpret_cast<const unsigned char*>(command.data());
-        const std::size_t byteCount = command.size() * sizeof(wchar_t);
-        std::wstring encoded;
-        encoded.reserve(((byteCount + 2) / 3) * 4);
-
-        for (std::size_t index = 0; index < byteCount; index += 3)
+        const auto* bytes = reinterpret_cast<const BYTE*>(command.data());
+        const DWORD byteCount = static_cast<DWORD>(command.size() * sizeof(wchar_t));
+        DWORD characterCount = 0;
+        if (!CryptBinaryToStringW(
+                bytes,
+                byteCount,
+                CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+                nullptr,
+                &characterCount)
+            || characterCount == 0)
         {
-            const std::uint32_t first = bytes[index];
-            const std::uint32_t second = index + 1 < byteCount ? bytes[index + 1] : 0;
-            const std::uint32_t third = index + 2 < byteCount ? bytes[index + 2] : 0;
-            const std::uint32_t value = (first << 16) | (second << 8) | third;
+            return {};
+        }
 
-            encoded.push_back(alphabet[(value >> 18) & 0x3f]);
-            encoded.push_back(alphabet[(value >> 12) & 0x3f]);
-            encoded.push_back(index + 1 < byteCount ? alphabet[(value >> 6) & 0x3f] : L'=');
-            encoded.push_back(index + 2 < byteCount ? alphabet[value & 0x3f] : L'=');
+        std::wstring encoded(characterCount, L'\0');
+        if (!CryptBinaryToStringW(
+                bytes,
+                byteCount,
+                CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+                encoded.data(),
+                &characterCount))
+        {
+            return {};
+        }
+
+        if (!encoded.empty() && encoded.back() == L'\0')
+        {
+            encoded.pop_back();
         }
         return encoded;
     }
@@ -137,6 +238,7 @@ namespace rightagent
         commandArguments.push_back(executable.wstring());
         commandArguments.insert(commandArguments.end(), arguments.begin(), arguments.end());
         auto commandLine = BuildCommandLine(commandArguments);
+        auto environment = BuildUnredirectedEnvironmentBlock();
 
         STARTUPINFOW startupInfo{};
         startupInfo.cb = sizeof(startupInfo);
@@ -149,7 +251,7 @@ namespace rightagent
             nullptr,
             FALSE,
             creationFlags | CREATE_UNICODE_ENVIRONMENT,
-            nullptr,
+            environment.empty() ? nullptr : environment.data(),
             workingDirectoryText.empty() ? nullptr : workingDirectoryText.c_str(),
             &startupInfo,
             &processInfo);

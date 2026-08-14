@@ -15,7 +15,6 @@ public sealed class MainViewModel : BindableBase
     private string language = SettingsContract.SystemLanguage;
     private string menuMode = SettingsContract.GroupedMenu;
     private string? directAgentId;
-    private string terminalShell = SettingsContract.AutomaticTerminalShell;
     private string terminalProfile = string.Empty;
     private bool menuEnabled = true;
     private bool isLoaded;
@@ -250,7 +249,6 @@ public sealed class MainViewModel : BindableBase
     public string MenuModeLabel => localization["MenuMode"];
     public string DirectAgentLabel => localization["DirectAgent"];
     public string TerminalProfileLabel => localization["TerminalProfile"];
-    public string TerminalProfileHint => localization["TerminalProfileHint"];
     public string TerminalProfileHelp => localization["TerminalProfileHelp"];
     public string TerminalRequiredTitle => localization["TerminalRequiredTitle"];
     public string TerminalRequiredBody => localization["TerminalRequiredBody"];
@@ -277,7 +275,6 @@ public sealed class MainViewModel : BindableBase
         localization.ConfiguredLanguage = language;
         menuMode = settings.MenuMode;
         directAgentId = settings.DirectAgentId;
-        terminalShell = settings.TerminalShell;
         terminalProfile = settings.TerminalProfile ?? string.Empty;
         menuEnabled = settings.MenuEnabled;
 
@@ -291,24 +288,8 @@ public sealed class MainViewModel : BindableBase
             Attach(new AgentItemViewModel(definition, localization));
         }
 
-        // Built-ins introduced after the user's settings file was written are merged in,
-        // enabled only when their command is detected on this machine.
-        var addedBuiltIn = false;
-        foreach (var builtIn in SettingsDefaults.Create().Agents)
-        {
-            if (FindAgent(builtIn.Id) is null)
-            {
-                Attach(new AgentItemViewModel(builtIn, localization));
-                addedBuiltIn = true;
-            }
-        }
-
         RefreshSort();
         var occupancy = settings;
-        if (addedBuiltIn)
-        {
-            occupancy = await PersistAsync(cancellationToken);
-        }
         try
         {
             await SynchronizeCommandPackagesAsync(occupancy, cancellationToken);
@@ -414,9 +395,6 @@ public sealed class MainViewModel : BindableBase
             Language = Language,
             MenuMode = MenuMode,
             DirectAgentId = DirectAgentId,
-            TerminalShell = string.IsNullOrWhiteSpace(terminalShell)
-                ? SettingsContract.AutomaticTerminalShell
-                : terminalShell,
             TerminalProfile = string.IsNullOrWhiteSpace(TerminalProfile) ? null : TerminalProfile,
             MenuEnabled = MenuEnabled,
             Agents = Agents.Select(agent => agent.ToDefinition()).ToList()
@@ -449,10 +427,6 @@ public sealed class MainViewModel : BindableBase
         {
             IsExpanded = true
         });
-        if (IsDirectMode)
-        {
-            DirectAgentId = id;
-        }
         NotifyState();
         ScheduleAutoSave();
     }
@@ -579,30 +553,24 @@ public sealed class MainViewModel : BindableBase
 
     private void RefreshValidation()
     {
-        if (!MenuEnabled)
-        {
-            // With the master switch off the menu never appears, so pending edits must not block saving.
-            ValidationSummary = string.Empty;
-            HasValidationErrors = false;
-            return;
-        }
-
         var lines = new List<string>();
         foreach (var agent in Agents)
         {
-            var error = agent.NameError ?? (agent.Enabled ? agent.ActionError : null);
+            var error = agent.NameError ?? (MenuEnabled && agent.Enabled ? agent.ActionError : null);
             if (error is not null)
             {
                 lines.Add($"· {agent.DisplayName}: {error}");
             }
         }
 
-        if (MenuMode == SettingsContract.DirectMenu
+        if (MenuEnabled
+            && MenuMode == SettingsContract.DirectMenu
             && !Agents.Any(agent => agent.Enabled && agent.Id.Equals(DirectAgentId, StringComparison.OrdinalIgnoreCase)))
         {
             lines.Add("· " + localization["ValidationDirect"]);
         }
-        if (MenuMode == SettingsContract.MultiDirectMenu
+        if (MenuEnabled
+            && MenuMode == SettingsContract.MultiDirectMenu
             && Agents.Count(agent => agent.Enabled) > SettingsContract.MaxMultiDirectAgents)
         {
             lines.Add("· " + localization["ValidationMultiDirectLimit"]);
@@ -682,7 +650,6 @@ public sealed class MainViewModel : BindableBase
         OnPropertyChanged(nameof(MenuModeLabel));
         OnPropertyChanged(nameof(DirectAgentLabel));
         OnPropertyChanged(nameof(TerminalProfileLabel));
-        OnPropertyChanged(nameof(TerminalProfileHint));
         OnPropertyChanged(nameof(TerminalProfileHelp));
         OnPropertyChanged(nameof(TerminalRequiredTitle));
         OnPropertyChanged(nameof(TerminalRequiredBody));
@@ -716,7 +683,7 @@ public sealed class MainViewModel : BindableBase
         {
             var assemblyVersion = typeof(App).Assembly.GetName().Version;
             return assemblyVersion is null
-                ? "1.1.4"
+                ? "1.3.0"
                 : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
         }
     }

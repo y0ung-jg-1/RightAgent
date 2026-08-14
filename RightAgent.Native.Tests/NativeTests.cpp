@@ -107,8 +107,13 @@ namespace
             std::ofstream output(path, std::ios::binary | std::ios::trunc);
             output << R"({"schemaVersion":1,"agents":[]})";
         }
-        Expect(rightagent::LoadSettingsFromPath(path).terminalShell == rightagent::TerminalShell::Automatic,
-            "Settings without terminalShell should use automatic mode");
+        Expect(rightagent::LoadSettingsFromPath(path).agents.empty(),
+            "Settings without agents should not invent built-in commands");
+        {
+            std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        }
+        Expect(rightagent::LoadSettingsFromPath(path).agents.empty(),
+            "A missing settings payload should hide the menu instead of probing PATH");
 
         {
             std::ofstream output(path, std::ios::binary | std::ios::trunc);
@@ -281,6 +286,11 @@ namespace
                 rightagent::WindowsTerminalShellFamily::CommandPrompt, L"hostname", L"cmd.exe")
                 == std::vector<std::wstring>({L"/D", L"/K", L"hostname"}),
             "A bare CMD profile should keep the agent alive with /K");
+        Expect(
+            rightagent::BuildWindowsTerminalAppendCommandLine(
+                rightagent::WindowsTerminalShellFamily::CommandPrompt, L"hostname", L"C:/kits/cmd.exe")
+                == std::vector<std::wstring>({L"/D", L"/K", L"hostname"}),
+            "A CMD path that contains /c must not be treated as /c");
         Expect(
             rightagent::BuildWindowsTerminalAppendCommandLine(
                 rightagent::WindowsTerminalShellFamily::CommandPrompt,

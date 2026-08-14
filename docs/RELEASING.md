@@ -67,22 +67,19 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
    exactly one `RightAgent-version-x64-Setup.exe` and its `.sha256`. Verify the
    Setup signature, timestamp, certificate thumbprint, and SHA-256. The release
    job also runs the final Setup silently on its clean hosted runner, rejects any
-   installer exception, requires the package-deployment
-   progress protocol to reach 100%, verifies the unpackaged settings app,
+   installer exception, verifies the unpackaged settings app,
    command slot zero at the expected version, unused command slots left
    unregistered, and all 16 command MSIX files cached, confirms only the
    settings app appears
    in Start, and verifies the certificate-store boundary before uploading assets.
-7. Run Setup on a clean Windows 11 x64 standard-user account. Confirm Setup
-   stays under that user, requests UAC only when the first installation needs
-   to trust the public certificate, adds the certificate only to Local
-   Machine\Trusted People, and installs the complete package set for the user who started
-   Setup rather than the administrator account used for UAC approval. Start a
-   second Setup while installation is active and confirm it is rejected. Run
-   Setup again after the certificate is trusted and confirm no second UAC
-   prompt appears and `%LOCALAPPDATA%\RightAgent\settings.json` is preserved. During the first
-   deployment, confirm the progress bar switches from an indeterminate animation
-   to the combined Windows-reported percentage and reaches 100%. Confirm that
+7. Run Setup on a clean Windows 11 x64 account. Confirm the per-machine Setup
+   requests administrator approval, adds the certificate only to Local
+   Machine\Trusted People, and installs the unpackaged settings app under
+   `%ProgramFiles%\RightAgent`. Start a
+   second Setup while installation is active and confirm the package-install
+   mutex rejects a concurrent command-package install. Run
+   Setup again after the certificate is trusted and confirm
+   `%LOCALAPPDATA%\RightAgent\settings.json` is preserved. Confirm that
    grouped mode has one RightAgent flyout, while multi-direct mode exposes each
    enabled agent independently at the menu root without a RightAgent wrapper.
 8. Publish the draft only after that clean-machine acceptance passes.

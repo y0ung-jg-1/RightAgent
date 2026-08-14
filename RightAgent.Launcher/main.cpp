@@ -1,6 +1,7 @@
 #include "NativeSettings.h"
 #include "ProcessHelpers.h"
 
+#include <winrt/base.h>
 #include <windows.h>
 #include <commctrl.h>
 #include <shellapi.h>
@@ -141,24 +142,6 @@ namespace
         return path;
     }
 
-    std::filesystem::path GetEnvironmentPath(const wchar_t* name)
-    {
-        const DWORD required = GetEnvironmentVariableW(name, nullptr, 0);
-        if (required == 0)
-        {
-            return {};
-        }
-
-        std::wstring value(required, L'\0');
-        const DWORD written = GetEnvironmentVariableW(name, value.data(), required);
-        if (written == 0 || written >= required)
-        {
-            return {};
-        }
-        value.resize(written);
-        return value;
-    }
-
     bool FileExists(const std::filesystem::path& path)
     {
         std::error_code error;
@@ -176,7 +159,7 @@ namespace
             return terminal;
         }
 
-        const auto alias = GetEnvironmentPath(L"LOCALAPPDATA") / L"Microsoft" / L"WindowsApps" / L"wt.exe";
+        const auto alias = rightagent::GetUnredirectedLocalAppData() / L"Microsoft" / L"WindowsApps" / L"wt.exe";
         return FileExists(alias) ? alias : std::filesystem::path{};
     }
 
@@ -259,6 +242,7 @@ namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 {
+    winrt::init_apartment(winrt::apartment_type::single_threaded);
     const auto request = ParseRequest();
     const auto settings = rightagent::LoadSettings();
     if (!request)

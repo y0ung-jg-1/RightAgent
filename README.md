@@ -6,7 +6,7 @@
 
 **把 AI 编程助手装进 Windows 11 的右键菜单。**
 
-当前版本：v1.2.0 · [MIT 许可证](LICENSE)
+当前版本：v1.3.0 · [MIT 许可证](LICENSE)
 
 ```text
 使用 RightAgent 打开  >
@@ -46,7 +46,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 
 ## 安装
 
-请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.2.0-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。默认安装器是本机版，需要管理员批准，设置应用装到 `%ProgramFiles%\RightAgent`。只要当前用户安装可用 `RightAgent-1.2.0-x64-UserSetup.exe`。安装器界面跟随 Windows 显示语言（中文 / 英文）。首次安装会把项目公共证书导入“本地计算机\受信任的人”，设置写在 `%LOCALAPPDATA%\RightAgent`，并只注册当前菜单需要的命令包。为避免 Windows 11 把多个直达命令归组，Setup 内部包含 16 个隐藏命令包，但用户仍只需下载一个 EXE，开始菜单也只显示一个 RightAgent。发布包不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
+请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.3.0-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。公开安装器是本机版，需要管理员批准，设置应用装到 `%ProgramFiles%\RightAgent`。安装器界面跟随 Windows 显示语言（中文 / 英文）。首次安装会把项目公共证书导入“本地计算机\受信任的人”，设置写在 `%LOCALAPPDATA%\RightAgent`，并只注册当前菜单需要的命令包。为避免 Windows 11 把多个直达命令归组，Setup 内部包含 16 个隐藏命令包，但用户仍只需下载一个 EXE，开始菜单也只显示一个 RightAgent。发布包不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
 
 ### 从源码开发
 
@@ -105,9 +105,9 @@ GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完�
 - `RightAgent.Shell`：用于 Windows 11 新右键菜单的原生 `IExplorerCommand` COM 组件。
 - `RightAgent.Launcher`：负责打开终端或网址的短生命周期原生进程。
 - `RightAgent.Native.Core`：共享的原生设置、图标、引号转义和进程辅助代码。
-- `RightAgent.Package`：可见设置应用的 WAP/MSIX 身份。
+- `RightAgent.Package`：命令包版本与资源所用的 WAP 身份，不是用户安装的设置应用。
 - `RightAgent.CommandPackage`：16 个隐藏资源管理器命令包共用的清单模板。
-- `installer`：以当前用户运行、仅在首次信任公共证书时请求管理员批准的单文件安装器定义。
+- `installer`：公开本机 `Setup.exe` 的 WiX 5 Burn 定义。
 
 实现细节见[架构文档](docs/ARCHITECTURE.md)，数据约定见[设置结构说明](docs/SETTINGS_SCHEMA.md)，人工验收范围见[测试矩阵](docs/TEST_MATRIX.md)，发布操作见[发版指南](docs/RELEASING.md)，v1 发布取舍见[发布决策记录](docs/RELEASE_DECISIONS.md)。
 

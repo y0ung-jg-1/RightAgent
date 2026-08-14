@@ -6,7 +6,7 @@
 
 **AI coding agents in your Windows 11 right-click menu.**
 
-Current version: v1.2.0 · [MIT License](LICENSE)
+Current version: v1.3.0 · [MIT License](LICENSE)
 
 ```text
 Open with RightAgent  >
@@ -46,7 +46,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 
 ## Installation
 
-Download `RightAgent-1.2.0-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The default installer is per-machine: it requests administrator approval and places the settings app in `%ProgramFiles%\RightAgent`. Use `RightAgent-1.2.0-x64-UserSetup.exe` for a current-user install. The Setup UI follows the Windows display language (Chinese or English). First install trusts the project public certificate in Local Computer\Trusted People, writes settings to `%LOCALAPPDATA%\RightAgent`, and registers only the command packages required by the current menu. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. The private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
+Download `RightAgent-1.3.0-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The public installer is per-machine: it requests administrator approval and places the settings app in `%ProgramFiles%\RightAgent`. The Setup UI follows the Windows display language (Chinese or English). First install trusts the project public certificate in Local Computer\Trusted People, writes settings to `%LOCALAPPDATA%\RightAgent`, and registers only the command packages required by the current menu. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. The private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
 
 ### Build and install from source
 
@@ -105,9 +105,9 @@ GitHub Actions continuous integration runs the full test suite and builds an uns
 - `RightAgent.Shell`: native `IExplorerCommand` COM component for the modern Windows 11 menu.
 - `RightAgent.Launcher`: short-lived native process that opens Terminal or a URL.
 - `RightAgent.Native.Core`: shared native settings, icon, quoting, and process helpers.
-- `RightAgent.Package`: WAP/MSIX identity for the visible settings app.
+- `RightAgent.Package`: WAP identity used for command-package version and assets, not the settings app users install.
 - `RightAgent.CommandPackage`: shared manifest template for the 16 hidden File Explorer command packages.
-- `installer`: single-file Setup definition that stays under the current user and elevates only to trust the public certificate when required.
+- `installer`: WiX 5 Burn definition for the public per-machine `Setup.exe`.
 
 Details: [architecture](docs/ARCHITECTURE.md) · [settings schema](docs/SETTINGS_SCHEMA.md) · [test matrix](docs/TEST_MATRIX.md) · [release guide](docs/RELEASING.md) · [v1 release decisions](docs/RELEASE_DECISIONS.md).
 

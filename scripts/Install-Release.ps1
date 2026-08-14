@@ -186,36 +186,7 @@ function Get-RightAgentSettingsPath {
     return $unpackagedSettings
 }
 
-# Keep this rule identical to CommandSlotPlanner.RequiredSlotCount and
-# PackageHelpers.Get-RightAgentRequiredCommandSlotCount. This script is
-# harvested into Setup.exe and must stay self-contained.
-function Get-RightAgentRequiredCommandSlotCount {
-    $settingsPath = Get-RightAgentSettingsPath
-    if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
-        return 1
-    }
-
-    try {
-        $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    }
-    catch {
-        Write-Host "Could not parse settings at '$settingsPath': $($_.Exception.Message). Defaulting to one command slot."
-        return 1
-    }
-
-    if ($settings.PSObject.Properties.Name -contains 'menuEnabled' -and -not [bool]$settings.menuEnabled) {
-        return 0
-    }
-
-    $enabled = @($settings.agents | Where-Object { $_.enabled })
-    if ($enabled.Count -eq 0) {
-        return 0
-    }
-    if ([string]$settings.menuMode -eq 'multiDirect') {
-        return [Math]::Min(16, [int]$enabled.Count)
-    }
-    return 1
-}
+. (Join-Path $PSScriptRoot 'CommandSlotCount.ps1')
 
 function Initialize-RightAgentCertificateDrive {
     if (-not (Get-PSDrive -Name 'Cert' -ErrorAction SilentlyContinue)) {
@@ -730,7 +701,7 @@ try {
     Install-RightAgentCommandPackageCache -CommandPackagePaths $CommandPackagePaths
     Write-RightAgentInstallationProgress -PercentComplete 50
 
-    $requiredSlots = Get-RightAgentRequiredCommandSlotCount
+    $requiredSlots = Get-RightAgentRequiredCommandSlotCount -SettingsPath (Get-RightAgentSettingsPath)
     Write-Host "Registering $requiredSlots command package slot(s) from '$(Get-RightAgentSettingsPath)' (LOCALAPPDATA='$($env:LOCALAPPDATA)' USERPROFILE='$($env:USERPROFILE)')."
     $slotSpan = if ($requiredSlots -gt 0) { [int][Math]::Floor(40 / $requiredSlots) } else { 0 }
     for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {

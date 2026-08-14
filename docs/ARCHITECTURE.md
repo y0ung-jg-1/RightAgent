@@ -20,23 +20,20 @@ flowchart LR
 
 There is no service, tray app, startup task, scheduled task, watcher, or resident broker.
 
-The GitHub Release installer is a WiX 5 Burn `Setup.exe` (the same shape as
-PowerToysSetup): one executable that embeds a per-machine MSI. It requires
-administrator approval and installs the unpackaged settings app into
-`%ProgramFiles%\RightAgent`. `UserSetup.exe` is the per-user variant that
-stays under `%LOCALAPPDATA%\Programs\RightAgent`. Both embed 16 signed hidden
-command MSIX packages and the public release certificate, and create a Start
-menu shortcut plus the `rightagent:` protocol. Users download and run one
-Setup executable. Setup remains under the Windows user who started it,
-validates every command package, and requests elevation only when a
-first-install helper must trust the public certificate in Local
-Machine\Trusted People. The helper exits before the original user process
-registers the command slots required by the current settings and caches all
-16 command MSIX files under `%LOCALAPPDATA%\RightAgent\CommandPackages`. Fixed
-Setup and package-installation mutexes reject concurrent installation
-attempts. During deployment, the PowerShell host forwards Windows
-`DeploymentProgress` percentages for the packages it registers to Setup, which
-replaces its initial indeterminate animation with a determinate progress bar.
+The public GitHub Release installer is a WiX 5 Burn `Setup.exe` (the same
+shape as PowerToysSetup): one executable that embeds a per-machine MSI. It
+requires administrator approval and installs the unpackaged settings app into
+`%ProgramFiles%\RightAgent`. A per-user `UserSetup.exe` can still be built
+locally into `%LOCALAPPDATA%\Programs\RightAgent`; it is not uploaded with
+the public Release. Both SKUs embed 16 signed hidden command MSIX packages
+and the public release certificate, and create a Start menu shortcut plus the
+`rightagent:` protocol. Users download and run one Setup executable. Setup
+validates every command package, imports the public certificate into Local
+Machine\Trusted People when needed, caches all 16 command MSIX files under
+`%LOCALAPPDATA%\RightAgent\CommandPackages`, and registers only the slots
+required by the current settings. A package-installation mutex serializes
+command-package work. The Burn UI shows its own progress bar while the
+embedded MSI runs.
 
 ## Explorer contract
 
@@ -64,10 +61,10 @@ wt.exe -w new new-tab -p <profile> -d <directory> --appendCommandLine -- <profil
 
 The selected Windows Terminal profile is the shell. RightAgent does not pick `pwsh`/`cmd` separately and does not replace the profile command line. `--appendCommandLine` keeps that profile's executable (PowerShell, CMD, Git Bash, VsDevCmd, WSL) and only appends the agent command as separate argv tokens. PowerShell families get `-NoLogo`, `-NoExit`, `-EncodedCommand`, and the payload; a bare `cmd.exe` profile gets `/D`, `/K`, and the command; a profile that already runs `cmd /k` (including Developer Command Prompt) gets `&&` then the command; Bash gets `-c` and `<command>; exec bash -i -l`. PowerShell command text is Base64-encoded as UTF-16LE so Windows Terminal cannot reinterpret semicolons inside the user command. Each flag stays its own argument so PowerShell 7 does not treat the suffix as a `-File` path. The settings app lists visible profiles from the user's Terminal `settings.json` and stores either `null` for “use Terminal default” or the selected profile GUID. When `terminalProfile` is empty, the launcher still passes `-p` with Terminal's `defaultProfile`.
 
-Only the user-authored command is evaluated by the selected shell. RightAgent runs without elevation and inherits the current user's environment.
+Only the user-authored command is evaluated by the selected shell. RightAgent runs without elevation. The launcher resets `LOCALAPPDATA`, `APPDATA`, `TEMP`, and `TMP` to the real user profile so packaged command hosts do not pass a redirected AppData hive into Windows Terminal.
 
 ## Data and assets
 
-The settings app and native command packages share `%LOCALAPPDATA%\RightAgent\settings.json`. Setup writes `%LOCALAPPDATA%\RightAgent\install.json` with the unpackaged `RightAgent.App.exe` path and the command-package identity (`RightAgent` / `CN=RightAgent` for release). A surviving command package stays inert unless that app still exists, so removing the settings app hides the menu. A full uninstall from Apps & features removes the registered command packages, the `%LOCALAPPDATA%\RightAgent` data directory, and the public certificate from Local Machine\Trusted People, then restarts Explorer. A major upgrade keeps settings and the certificate so the new Setup can reuse them. `RIGHTAGENT_SETTINGS_PATH` may override the location for automated tests only. An older packaged settings install is migrated off `Packages\<family>\LocalState` the first time the new Setup runs, then the leftover main MSIX is removed.
+The settings app and native command packages share `%LOCALAPPDATA%\RightAgent\settings.json`. Setup writes `%LOCALAPPDATA%\RightAgent\install.json` with the unpackaged `RightAgent.App.exe` path and the command-package identity (`RightAgent` / `CN=RightAgent` for release). A surviving command package stays inert unless that app still exists, so removing the settings app hides the menu. A full uninstall from Apps & features removes the registered command packages, the `%LOCALAPPDATA%\RightAgent` data directory, and the public certificate from Local Machine\Trusted People, then broadcasts `SHChangeNotify`. It does not terminate `explorer.exe`. A major upgrade keeps settings and the certificate so the new Setup can reuse them. `RIGHTAGENT_SETTINGS_PATH` may override the location for automated tests only. An older packaged settings install is migrated off `Packages\<family>\LocalState` the first time the new Setup runs, then the leftover main MSIX is removed.
 
-Built-in icon references use `builtin:<key>` and resolve to package-local ICO/SVG files. Custom files are copied into `LocalState\Icons` and stored as `local:Icons/<file>`. Native validation rejects absolute, parent-relative, or network icon paths.
+Built-in icon references use `builtin:<key>` and resolve to package-local ICO/SVG files. Custom files are copied into `%LOCALAPPDATA%\RightAgent\Icons` and stored as `local:Icons/<file>`. Native validation rejects absolute, parent-relative, or network icon paths.

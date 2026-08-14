@@ -78,6 +78,13 @@
         Name="Install-RightAgent.ps1"
         KeyPath="yes" />
     </Component>
+    <Component Id="CommandSlotCountScript" Directory="INSTALLFOLDER" Guid="*">
+      <File
+        Id="CommandSlotCountScriptFile"
+        Source="$(var.RepoDir)scripts\CommandSlotCount.ps1"
+        Name="CommandSlotCount.ps1"
+        KeyPath="yes" />
+    </Component>
     <Component Id="InstallCommandsCmd" Directory="INSTALLFOLDER" Guid="*">
       <File Id="InstallCommandsCmdFile" Source="$(var.RepoDir)installer\install_commands.cmd" KeyPath="yes" />
     </Component>
@@ -109,6 +116,7 @@
       <ComponentGroupRef Id="CommandPayloadFiles" />
       <ComponentRef Id="AppExecutable" />
       <ComponentRef Id="InstallScript" />
+      <ComponentRef Id="CommandSlotCountScript" />
       <ComponentRef Id="InstallCommandsCmd" />
       <ComponentRef Id="UninstallCommandsCmd" />
       <ComponentRef Id="ReleaseCertificate" />

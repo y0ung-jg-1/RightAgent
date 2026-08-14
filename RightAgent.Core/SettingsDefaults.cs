@@ -22,7 +22,6 @@ public static class SettingsDefaults
             Language = SettingsContract.SystemLanguage,
             MenuMode = SettingsContract.GroupedMenu,
             DirectAgentId = agents.FirstOrDefault(agent => agent.Enabled)?.Id,
-            TerminalShell = SettingsContract.AutomaticTerminalShell,
             Agents = agents
         };
     }

@@ -5,12 +5,8 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="WindowTitle" xml:space="preserve"><value>RightAgent Settings</value></data>
-  <data name="Title" xml:space="preserve"><value>RightAgent</value></data>
   <data name="MasterSwitch" xml:space="preserve"><value>Enable RightAgent</value></data>
   <data name="MenuOff" xml:space="preserve"><value>(Menu is off)</value></data>
-  <data name="Save" xml:space="preserve"><value>Save settings</value></data>
-  <data name="Saved" xml:space="preserve"><value>Settings saved.</value></data>
-  <data name="SavedMenuUpdated" xml:space="preserve"><value>Settings saved. The context menu has been updated.</value></data>
   <data name="SaveFailed" xml:space="preserve"><value>Could not save settings</value></data>
   <data name="MenuSection" xml:space="preserve"><value>Context menu</value></data>
   <data name="MenuMode" xml:space="preserve"><value>Menu mode</value></data>
@@ -19,7 +15,6 @@
   <data name="MultiDirect" xml:space="preserve"><value>Open with multiple agents (multi-direct)</value></data>
   <data name="DirectAgent" xml:space="preserve"><value>Direct agent</value></data>
   <data name="TerminalProfile" xml:space="preserve"><value>Windows Terminal profile</value></data>
-  <data name="TerminalProfileHint" xml:space="preserve"><value>Follows the Startup default profile in Terminal</value></data>
   <data name="TerminalProfileHelp" xml:space="preserve"><value>Opens that Terminal profile, including its own shell, icon, and colors.</value></data>
   <data name="TerminalProfileDefault" xml:space="preserve"><value>Use Terminal default</value></data>
   <data name="TerminalProfileDefaultNamed" xml:space="preserve"><value>Use Terminal default ({0})</value></data>
@@ -46,16 +41,15 @@
   <data name="MoveUp" xml:space="preserve"><value>Move up</value></data>
   <data name="MoveDown" xml:space="preserve"><value>Move down</value></data>
   <data name="Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="ManageAgent" xml:space="preserve"><value>Arrange</value></data>
   <data name="DeleteTitle" xml:space="preserve"><value>Delete agent?</value></data>
   <data name="DeleteBody" xml:space="preserve"><value>This removes the agent from the RightAgent configuration.</value></data>
   <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
   <data name="NewAgent" xml:space="preserve"><value>New agent</value></data>
-  <data name="ValidationName" xml:space="preserve"><value>Every agent needs a name.</value></data>
-  <data name="ValidationAction" xml:space="preserve"><value>Every enabled agent needs a valid command or an http/https URL.</value></data>
   <data name="ValidationDirect" xml:space="preserve"><value>Direct mode requires an enabled agent.</value></data>
   <data name="ValidationMultiDirectLimit" xml:space="preserve"><value>Multi-direct mode supports up to 16 enabled agents.</value></data>
   <data name="VersionFormat" xml:space="preserve"><value>Version {0}</value></data>
-  <data name="ValidationTitle" xml:space="preserve"><value>Fix the following before saving</value></data>
+  <data name="ValidationTitle" xml:space="preserve"><value>Fix the following</value></data>
   <data name="ErrorNameRequired" xml:space="preserve"><value>Enter a name.</value></data>
   <data name="ErrorActionRequired" xml:space="preserve"><value>An enabled agent needs a command or URL.</value></data>
   <data name="ErrorUrlInvalid" xml:space="preserve"><value>The URL must start with http:// or https://.</value></data>
@@ -69,5 +63,4 @@
   <data name="DeleteFor" xml:space="preserve"><value>Delete {0}</value></data>
   <data name="ChooseIconFor" xml:space="preserve"><value>Choose icon for {0}</value></data>
   <data name="IconFor" xml:space="preserve"><value>Icon for {0}</value></data>
-  <data name="IconFilter" xml:space="preserve"><value>Icon files</value></data>
 </root>

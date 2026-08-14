@@ -56,6 +56,7 @@ namespace rightagent
     };
 
     [[nodiscard]] std::wstring GetSettingsPackageFamilyName(std::wstring_view currentPackageFamilyName);
+    [[nodiscard]] std::filesystem::path GetUnredirectedLocalAppData();
     [[nodiscard]] std::filesystem::path GetLocalStateDirectory();
     [[nodiscard]] std::filesystem::path GetSettingsPath();
     [[nodiscard]] Settings LoadSettings();

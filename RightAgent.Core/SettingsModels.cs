@@ -12,10 +12,6 @@ public static class SettingsContract
     public const string DirectMenu = "direct";
     public const string MultiDirectMenu = "multiDirect";
     public const int MaxMultiDirectAgents = 16;
-    public const string AutomaticTerminalShell = "auto";
-    public const string PowerShell7TerminalShell = "pwsh";
-    public const string WindowsPowerShellTerminalShell = "windowsPowerShell";
-    public const string CommandPromptTerminalShell = "cmd";
     public const string TerminalCommand = "terminalCommand";
     public const string Url = "url";
     public const string ReleasePackageName = "RightAgent";
@@ -40,9 +36,6 @@ public sealed class RightAgentSettings
 
     [JsonPropertyName("directAgentId")]
     public string? DirectAgentId { get; set; }
-
-    [JsonPropertyName("terminalShell")]
-    public string TerminalShell { get; set; } = SettingsContract.AutomaticTerminalShell;
 
     [JsonPropertyName("terminalProfile")]
     public string? TerminalProfile { get; set; }

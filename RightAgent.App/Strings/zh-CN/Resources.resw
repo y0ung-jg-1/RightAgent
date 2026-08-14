@@ -5,12 +5,8 @@
   <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <data name="WindowTitle" xml:space="preserve"><value>RightAgent 设置</value></data>
-  <data name="Title" xml:space="preserve"><value>RightAgent</value></data>
   <data name="MasterSwitch" xml:space="preserve"><value>启用 RightAgent</value></data>
   <data name="MenuOff" xml:space="preserve"><value>（菜单已关闭）</value></data>
-  <data name="Save" xml:space="preserve"><value>保存设置</value></data>
-  <data name="Saved" xml:space="preserve"><value>设置已保存。</value></data>
-  <data name="SavedMenuUpdated" xml:space="preserve"><value>设置已保存。右键菜单已更新。</value></data>
   <data name="SaveFailed" xml:space="preserve"><value>保存失败</value></data>
   <data name="MenuSection" xml:space="preserve"><value>右键菜单</value></data>
   <data name="MenuMode" xml:space="preserve"><value>菜单模式</value></data>
@@ -19,7 +15,6 @@
   <data name="MultiDirect" xml:space="preserve"><value>使用多个 Agent 打开（多个直达）</value></data>
   <data name="DirectAgent" xml:space="preserve"><value>直达 Agent</value></data>
   <data name="TerminalProfile" xml:space="preserve"><value>Windows Terminal 配置文件</value></data>
-  <data name="TerminalProfileHint" xml:space="preserve"><value>跟随 Terminal 启动页里的默认配置文件</value></data>
   <data name="TerminalProfileHelp" xml:space="preserve"><value>用这个配置文件打开标签页，包括它自己的 Shell、图标和配色。</value></data>
   <data name="TerminalProfileDefault" xml:space="preserve"><value>使用 Terminal 默认</value></data>
   <data name="TerminalProfileDefaultNamed" xml:space="preserve"><value>使用 Terminal 默认（{0}）</value></data>
@@ -46,16 +41,15 @@
   <data name="MoveUp" xml:space="preserve"><value>上移</value></data>
   <data name="MoveDown" xml:space="preserve"><value>下移</value></data>
   <data name="Delete" xml:space="preserve"><value>删除</value></data>
+  <data name="ManageAgent" xml:space="preserve"><value>调整</value></data>
   <data name="DeleteTitle" xml:space="preserve"><value>删除 Agent？</value></data>
   <data name="DeleteBody" xml:space="preserve"><value>此操作会从 RightAgent 配置中删除该 Agent。</value></data>
   <data name="Cancel" xml:space="preserve"><value>取消</value></data>
   <data name="NewAgent" xml:space="preserve"><value>新 Agent</value></data>
-  <data name="ValidationName" xml:space="preserve"><value>每个 Agent 都必须有名称。</value></data>
-  <data name="ValidationAction" xml:space="preserve"><value>每个启用的 Agent 都必须有有效命令，或 http/https URL。</value></data>
   <data name="ValidationDirect" xml:space="preserve"><value>直达模式需要选择一个已启用的 Agent。</value></data>
   <data name="ValidationMultiDirectLimit" xml:space="preserve"><value>多个直达模式最多支持 16 个已启用的 Agent。</value></data>
   <data name="VersionFormat" xml:space="preserve"><value>版本 {0}</value></data>
-  <data name="ValidationTitle" xml:space="preserve"><value>请先解决以下问题再保存</value></data>
+  <data name="ValidationTitle" xml:space="preserve"><value>请先解决以下问题</value></data>
   <data name="ErrorNameRequired" xml:space="preserve"><value>输入名称。</value></data>
   <data name="ErrorActionRequired" xml:space="preserve"><value>已启用的 Agent 需要命令或 URL。</value></data>
   <data name="ErrorUrlInvalid" xml:space="preserve"><value>URL 必须以 http:// 或 https:// 开头。</value></data>
@@ -69,5 +63,4 @@
   <data name="DeleteFor" xml:space="preserve"><value>删除 {0}</value></data>
   <data name="ChooseIconFor" xml:space="preserve"><value>为 {0} 选择图标</value></data>
   <data name="IconFor" xml:space="preserve"><value>{0} 的图标</value></data>
-  <data name="IconFilter" xml:space="preserve"><value>图标文件</value></data>
 </root>

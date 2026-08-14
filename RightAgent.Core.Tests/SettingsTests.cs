@@ -18,7 +18,6 @@ public sealed class SettingsTests
         Assert.Equal("kimi", kimi.Action.Value);
         Assert.True(settings.Agents.Single(agent => agent.Id == "cursor-agent").Enabled);
         Assert.Equal("claude-code", settings.DirectAgentId);
-        Assert.Equal(SettingsContract.AutomaticTerminalShell, settings.TerminalShell);
     }
 
     [Fact]
@@ -60,6 +59,8 @@ public sealed class SettingsTests
     [InlineData("grouped", "grouped")]
     [InlineData("direct", "direct")]
     [InlineData("multiDirect", "multiDirect")]
+    [InlineData("MULTIDIRECT", "multiDirect")]
+    [InlineData("Direct", "direct")]
     [InlineData("unknown", "grouped")]
     public void NormalizeAcceptsKnownMenuModes(string input, string expected)
     {
@@ -86,13 +87,12 @@ public sealed class SettingsTests
         {
             var store = new SettingsStore(root);
             var settings = SettingsDefaults.Create(_ => false);
-            settings.TerminalShell = SettingsContract.CommandPromptTerminalShell;
             settings.Agents.Add(Agent("测试 Agent", "测试-agent", true, 4, "echo 路径 & 空格"));
 
             await store.SaveAsync(settings);
             var reloaded = await store.LoadAsync();
 
-            Assert.Equal(SettingsContract.CommandPromptTerminalShell, reloaded.TerminalShell);
+            Assert.DoesNotContain("terminalShell", await File.ReadAllTextAsync(store.SettingsPath));
             Assert.Contains(reloaded.Agents, agent => agent.Name == "测试 Agent" && agent.Action.Value == "echo 路径 & 空格");
             Assert.Empty(Directory.GetFiles(root, "*.tmp-*"));
         }
@@ -148,6 +148,12 @@ public sealed class SettingsTests
             ]
         };
         Assert.Equal(3, CommandSlotPlanner.RequiredSlotCount(multiDirect));
+        var tooMany = new RightAgentSettings
+        {
+            MenuMode = SettingsContract.MultiDirectMenu,
+            Agents = Enumerable.Range(0, 17).Select(index => Agent($"A{index}", $"a{index}", true, index)).ToList()
+        };
+        Assert.Equal(16, CommandSlotPlanner.RequiredSlotCount(tooMany));
         Assert.Equal("00.msix", CommandSlotPlanner.CommandPackageFileName(0));
         Assert.Equal("15.msix", CommandSlotPlanner.CommandPackageFileName(15));
     }
@@ -193,21 +199,8 @@ public sealed class SettingsTests
         Assert.False(SettingsValidator.Normalize(disabled).MenuEnabled);
     }
 
-    [Theory]
-    [InlineData("auto", "auto")]
-    [InlineData("pwsh", "pwsh")]
-    [InlineData("windowsPowerShell", "windowsPowerShell")]
-    [InlineData("cmd", "cmd")]
-    [InlineData("unknown", "auto")]
-    public void NormalizeAcceptsKnownTerminalShells(string input, string expected)
-    {
-        var settings = new RightAgentSettings { TerminalShell = input };
-
-        Assert.Equal(expected, SettingsValidator.Normalize(settings).TerminalShell);
-    }
-
     [Fact]
-    public async Task StoreDefaultsMissingTerminalShellToAutomatic()
+    public async Task StoreIgnoresLegacyTerminalShellAndKeepsMenuEnabled()
     {
         var root = Path.Combine(Path.GetTempPath(), "RightAgent.Tests", Guid.NewGuid().ToString("N"));
         try
@@ -215,11 +208,14 @@ public sealed class SettingsTests
             Directory.CreateDirectory(root);
             await File.WriteAllTextAsync(
                 Path.Combine(root, "settings.json"),
-                """{"schemaVersion":1,"agents":[]}""");
+                """{"schemaVersion":1,"terminalShell":"cmd","agents":[]}""");
 
-            var settings = await new SettingsStore(root).LoadAsync();
+            var store = new SettingsStore(root);
+            var settings = await store.LoadAsync();
+            await store.SaveAsync(settings);
 
-            Assert.Equal(SettingsContract.AutomaticTerminalShell, settings.TerminalShell);
+            Assert.True(settings.MenuEnabled);
+            Assert.DoesNotContain("terminalShell", await File.ReadAllTextAsync(store.SettingsPath));
         }
         finally
         {
@@ -228,6 +224,48 @@ public sealed class SettingsTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public async Task StoreDoesNotResetLockedSettingsFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "RightAgent.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new SettingsStore(root);
+            var settings = SettingsDefaults.Create(_ => false);
+            settings.Agents[0].Name = "Keep Me";
+            await store.SaveAsync(settings);
+
+            await using var locked = new FileStream(store.SettingsPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            await Assert.ThrowsAnyAsync<IOException>(() => store.LoadAsync());
+            Assert.Empty(Directory.GetFiles(root, "settings.corrupt-*.json"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void NormalizeRejectsAbsoluteLocalIcons()
+    {
+        var settings = new RightAgentSettings
+        {
+            Agents = [new AgentDefinition
+            {
+                Id = "web",
+                Name = "Web",
+                Enabled = true,
+                IconPath = "local:C:/Windows/foo.ico",
+                Action = new AgentAction { Type = SettingsContract.TerminalCommand, Value = "echo" }
+            }]
+        };
+
+        Assert.Equal("builtin:rightagent", SettingsValidator.Normalize(settings).Agents[0].IconPath);
     }
 
     [Fact]

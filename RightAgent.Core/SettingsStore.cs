@@ -37,11 +37,17 @@ public sealed class SettingsStore
 
         try
         {
-            await using var stream = File.OpenRead(SettingsPath);
+            await using var stream = new FileStream(
+                SettingsPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete,
+                4096,
+                FileOptions.Asynchronous);
             var settings = await JsonSerializer.DeserializeAsync<RightAgentSettings>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
             return SettingsValidator.Normalize(settings);
         }
-        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+        catch (JsonException)
         {
             var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmssfff");
             var backup = Path.Combine(LocalStateDirectory, $"settings.corrupt-{timestamp}.json");
@@ -76,7 +82,7 @@ public sealed class SettingsStore
 
             if (File.Exists(SettingsPath))
             {
-                File.Replace(tempPath, SettingsPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                await ReplaceWithRetryAsync(tempPath, SettingsPath, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -88,6 +94,23 @@ public sealed class SettingsStore
             if (File.Exists(tempPath))
             {
                 File.Delete(tempPath);
+            }
+        }
+    }
+
+    private static async Task ReplaceWithRetryAsync(string tempPath, string settingsPath, CancellationToken cancellationToken)
+    {
+        const int attempts = 8;
+        for (var attempt = 0; ; ++attempt)
+        {
+            try
+            {
+                File.Replace(tempPath, settingsPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                return;
+            }
+            catch (IOException) when (attempt < attempts - 1)
+            {
+                await Task.Delay(25, cancellationToken).ConfigureAwait(false);
             }
         }
     }

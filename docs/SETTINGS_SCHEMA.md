@@ -44,7 +44,7 @@ The public local contract is UTF-8 JSON named `settings.json`:
 - `language`: `system`, `zh-CN`, or `en-US`; unknown values normalize to `system`, with non-Chinese systems falling back to English.
 - `menuMode`: `grouped`, `direct`, or `multiDirect`; unknown values normalize to `grouped`. `multiDirect` exposes each enabled agent as a separate root command in configured order and supports up to 16 enabled agents. The settings writer also keeps only that many Explorer command packages installed so Windows 11 does not create unused "Loading..." placeholders.
 - `directAgentId`: ID of an enabled agent used only by `direct` mode. If absent or disabled, the first enabled agent becomes the fallback.
-- `terminalShell`: ignored leftover. Older files may still contain `auto`, `pwsh`, `windowsPowerShell`, or `cmd`. Readers accept the field; the launcher no longer uses it. The Windows Terminal profile owns the shell.
+- `terminalShell`: ignored leftover. Older files may still contain `auto`, `pwsh`, `windowsPowerShell`, or `cmd`. Readers accept the field and writers omit it. The Windows Terminal profile owns the shell.
 - `terminalProfile`: optional Windows Terminal profile GUID or name. `null` or whitespace uses Terminal's Startup `defaultProfile`. The settings app lists visible profiles from the user's Windows Terminal `settings.json`. That profile's own command line is the shell; the launcher appends the agent command instead of replacing it.
 - `agents`: ordered by `sort`; the settings writer rewrites sort values to contiguous zero-based integers.
 - `id`: stable, case-insensitive ID containing lower-case letters, digits, `.`, `_`, or `-`. The UI generates unique IDs and does not change them when names change.
