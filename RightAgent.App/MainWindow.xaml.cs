@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     private static readonly Uri WindowsTerminalStoreUri = new("ms-windows-store://pdp/?ProductId=9N0DX20HK701");
     private static readonly Uri WindowsTerminalStoreWebUri = new("https://apps.microsoft.com/detail/9n0dx20hk701");
     private bool terminalRequirementChecked;
+    private bool isClosingAfterFlush;
 
     public MainWindow()
     {
@@ -33,7 +34,7 @@ public sealed partial class MainWindow : Window
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         ViewModel.PersistFailed += (_, message) =>
             ShowStatus(InfoBarSeverity.Error, $"{ViewModel.SaveFailedLabel}: {message}");
-        Closed += MainWindow_Closed;
+        AppWindow.Closing += AppWindow_Closing;
         if (Content is FrameworkElement root)
         {
             root.Loaded += MainWindow_Loaded;
@@ -135,16 +136,25 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void MainWindow_Closed(object sender, WindowEventArgs args)
+    private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        if (isClosingAfterFlush)
+        {
+            return;
+        }
+
+        args.Cancel = true;
+        isClosingAfterFlush = true;
         try
         {
-            ViewModel.FlushAutoSaveAsync().GetAwaiter().GetResult();
+            await ViewModel.FlushAutoSaveAsync();
         }
         catch (Exception)
         {
-            // The window is already closing; the next launch reloads last valid settings.
+            // The next launch reloads last valid settings.
         }
+
+        Close();
     }
 
     private void AppTitleBar_PaneToggleRequested(TitleBar sender, object args)

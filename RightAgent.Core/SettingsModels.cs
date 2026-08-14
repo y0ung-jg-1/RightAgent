@@ -18,6 +18,10 @@ public static class SettingsContract
     public const string CommandPromptTerminalShell = "cmd";
     public const string TerminalCommand = "terminalCommand";
     public const string Url = "url";
+    public const string ReleasePackageName = "RightAgent";
+    public const string ReleasePublisher = "CN=RightAgent";
+    public const string DevelopmentPackageName = "RightAgent.Dev";
+    public const string DevelopmentPublisher = "CN=RightAgent Dev";
 }
 
 public sealed class RightAgentSettings

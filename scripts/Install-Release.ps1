@@ -1,10 +1,13 @@
 [CmdletBinding()]
 param(
-    [string]$PackagePath,
     [string[]]$CommandPackagePaths,
     [string]$CertificatePath,
+    [string]$AppDirectory,
+    [string]$TargetDirectory,
     [string]$ResultPath,
-    [switch]$TrustCertificateOnly
+    [switch]$TrustCertificateOnly,
+    [switch]$RemoveCommandPackages,
+    [switch]$SkipAppCopy
 )
 
 $ErrorActionPreference = 'Stop'
@@ -114,12 +117,6 @@ function Get-RightAgentAppxManifest {
 function Install-RightAgentCommandPackageCache {
     param(
         [Parameter(Mandatory)]
-        [string]$MainPackageName,
-
-        [Parameter(Mandatory)]
-        [string]$Publisher,
-
-        [Parameter(Mandatory)]
         [string[]]$CommandPackagePaths
     )
 
@@ -127,14 +124,7 @@ function Install-RightAgentCommandPackageCache {
         throw "Expected exactly 16 command packages to cache, but found $($CommandPackagePaths.Count)."
     }
 
-    $mainPackage = Get-AppxPackage -Name $MainPackageName -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -ceq $MainPackageName -and $_.Publisher -ceq $Publisher } |
-        Select-Object -First 1
-    if (-not $mainPackage) {
-        throw "Cannot cache command packages because '$MainPackageName' is not installed."
-    }
-
-    $cacheDirectory = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\CommandPackages"
+    $cacheDirectory = Join-Path $env:LOCALAPPDATA 'RightAgent\CommandPackages'
     New-Item -ItemType Directory -Path $cacheDirectory -Force | Out-Null
     for ($slot = 0; $slot -lt 16; ++$slot) {
         $destination = Join-Path $cacheDirectory ('{0:D2}.msix' -f $slot)
@@ -159,21 +149,25 @@ function Get-RightAgentMainPackage {
         Select-Object -First 1
 }
 
-function Get-RightAgentRequiredCommandSlotCount {
-    param(
-        [Parameter(Mandatory)]
-        [string]$MainPackageName,
-
-        [Parameter(Mandatory)]
-        [string]$Publisher
-    )
-
-    $mainPackage = Get-RightAgentMainPackage -MainPackageName $MainPackageName -Publisher $Publisher
-    if (-not $mainPackage) {
-        return 1
+function Get-RightAgentSettingsPath {
+    $unpackagedSettings = Join-Path $env:LOCALAPPDATA 'RightAgent\settings.json'
+    if (Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) {
+        return $unpackagedSettings
     }
 
-    $settingsPath = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\settings.json"
+    $mainPackage = Get-RightAgentMainPackage -MainPackageName 'RightAgent' -Publisher 'CN=RightAgent'
+    if ($mainPackage) {
+        $packagedSettings = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\settings.json"
+        if (Test-Path -LiteralPath $packagedSettings -PathType Leaf) {
+            return $packagedSettings
+        }
+    }
+
+    return $unpackagedSettings
+}
+
+function Get-RightAgentRequiredCommandSlotCount {
+    $settingsPath = Get-RightAgentSettingsPath
     if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
         return 1
     }
@@ -265,6 +259,28 @@ try {
         exit 1618
     }
 
+    if ($RemoveCommandPackages) {
+        $publisher = 'CN=RightAgent'
+        for ($slot = 0; $slot -lt 16; ++$slot) {
+            $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
+            $installed = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq $publisher })
+            foreach ($package in $installed) {
+                $package | Remove-AppxPackage -ErrorAction Stop
+            }
+        }
+        $installRecordPath = Join-Path $env:LOCALAPPDATA 'RightAgent\install.json'
+        if (Test-Path -LiteralPath $installRecordPath -PathType Leaf) {
+            Remove-Item -LiteralPath $installRecordPath -Force -ErrorAction Stop
+        }
+        $cacheDirectory = Join-Path $env:LOCALAPPDATA 'RightAgent\CommandPackages'
+        if (Test-Path -LiteralPath $cacheDirectory) {
+            Remove-Item -LiteralPath $cacheDirectory -Recurse -Force -ErrorAction Stop
+        }
+        Write-Host 'RightAgent command packages were removed.'
+        return
+    }
+
     if (-not (Get-PSDrive -Name 'Cert' -ErrorAction SilentlyContinue)) {
         $securityModulePath = Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'
         if (Test-Path -LiteralPath $securityModulePath -PathType Leaf) {
@@ -286,17 +302,39 @@ try {
         throw 'The Import-Certificate cmdlet is unavailable after loading the PKI module.'
     }
 
-    if (-not $PackagePath) {
-        $packages = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'RightAgent-*-x64.msix' -File)
-        if ($packages.Count -ne 1) {
-            throw "Expected exactly one main RightAgent MSIX next to this installer, but found $($packages.Count)."
+    if (-not $AppDirectory) {
+        $nestedApp = Join-Path $PSScriptRoot 'App'
+        if (Test-Path -LiteralPath (Join-Path $nestedApp 'RightAgent.App.exe') -PathType Leaf) {
+            $AppDirectory = $nestedApp
         }
-        $PackagePath = $packages[0].FullName
+        else {
+            $AppDirectory = $PSScriptRoot
+        }
+    }
+    if (-not $TargetDirectory) {
+        $TargetDirectory = Join-Path $env:LOCALAPPDATA 'Programs\RightAgent'
     }
     if (-not $CommandPackagePaths) {
-        $CommandPackagePaths = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter 'RightAgent.Command*-x64.msix' -File |
-            Sort-Object Name |
-            Select-Object -ExpandProperty FullName)
+        $commandSearchRoots = @(
+            (Join-Path $PSScriptRoot 'CommandPackages'),
+            $PSScriptRoot
+        )
+        if ($TargetDirectory) {
+            $commandSearchRoots = @(
+                (Join-Path $TargetDirectory 'CommandPackages')
+            ) + $commandSearchRoots
+        }
+        foreach ($commandSearchRoot in $commandSearchRoots) {
+            if (-not (Test-Path -LiteralPath $commandSearchRoot -PathType Container)) {
+                continue
+            }
+            $CommandPackagePaths = @(Get-ChildItem -LiteralPath $commandSearchRoot -Filter 'RightAgent.Command*-x64.msix' -File |
+                Sort-Object Name |
+                Select-Object -ExpandProperty FullName)
+            if ($CommandPackagePaths.Count -eq 16) {
+                break
+            }
+        }
     }
     $CommandPackagePaths = @($CommandPackagePaths)
     if ($CommandPackagePaths.Count -ne 16) {
@@ -306,10 +344,12 @@ try {
         $CertificatePath = Join-Path $PSScriptRoot 'RightAgent.cer'
     }
 
-    $PackagePath = [IO.Path]::GetFullPath($PackagePath)
+    $AppDirectory = [IO.Path]::GetFullPath($AppDirectory)
+    $TargetDirectory = [IO.Path]::GetFullPath($TargetDirectory)
     $CertificatePath = [IO.Path]::GetFullPath($CertificatePath)
-    if (-not (Test-Path -LiteralPath $PackagePath -PathType Leaf)) {
-        throw "RightAgent package was not found: $PackagePath"
+    $appExecutable = Join-Path $AppDirectory 'RightAgent.App.exe'
+    if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
+        throw "RightAgent settings app was not found: $appExecutable"
     }
     if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
         throw "RightAgent public certificate was not found: $CertificatePath"
@@ -331,8 +371,7 @@ try {
     }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $allPackagePaths = @($PackagePath) + $CommandPackagePaths
-    foreach ($signedPackagePath in $allPackagePaths) {
+    foreach ($signedPackagePath in $CommandPackagePaths) {
         $signature = Get-AuthenticodeSignature -LiteralPath $signedPackagePath
         $signerMatchesCertificate =
             $null -ne $signature.SignerCertificate -and
@@ -345,13 +384,8 @@ try {
         }
     }
 
-    [xml]$manifest = Get-RightAgentAppxManifest -Path $PackagePath
-    if ([string]$manifest.Package.Identity.Name -cne 'RightAgent' -or
-        [string]$manifest.Package.Identity.Publisher -cne 'CN=RightAgent' -or
-        [string]$manifest.Package.Identity.ProcessorArchitecture -cne 'x64') {
-        throw 'The package identity is not the public RightAgent release identity.'
-    }
-    $packageVersion = [version]([string]$manifest.Package.Identity.Version)
+    [xml]$firstCommandManifest = Get-RightAgentAppxManifest -Path $CommandPackagePaths[0]
+    $packageVersion = [version]([string]$firstCommandManifest.Package.Identity.Version)
 
     $commandPackagesBySlot = @{}
     foreach ($commandPackagePath in $CommandPackagePaths) {
@@ -458,35 +492,62 @@ try {
 
     $mainPackageName = 'RightAgent'
     $publisher = 'CN=RightAgent'
-    $sameVersionMain = $null -ne (Get-AppxPackage -Name $mainPackageName -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.Name -ceq $mainPackageName -and
-            $_.Publisher -ceq $publisher -and
-            [version]$_.Version -eq $packageVersion
-        } |
-        Select-Object -First 1)
-
-    $dependencyDirectory = Join-Path $PSScriptRoot 'Dependencies\x64'
-    $dependencies = if (Test-Path -LiteralPath $dependencyDirectory -PathType Container) {
-        @(Get-ChildItem -LiteralPath $dependencyDirectory -File |
-            Where-Object { $_.Extension -in '.msix', '.appx' } |
-            Select-Object -ExpandProperty FullName)
-    } else {
-        @()
-    }
+    $dataDirectory = Join-Path $env:LOCALAPPDATA 'RightAgent'
+    $targetExecutable = Join-Path $TargetDirectory 'RightAgent.App.exe'
 
     Stop-RightAgentComSurrogates
-    if ($sameVersionMain) {
-        Write-RightAgentInstallationProgress -PercentComplete 36
+    Get-Process -Name 'RightAgent.App' -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    Write-RightAgentInstallationProgress -PercentComplete 8
+
+    New-Item -ItemType Directory -Path $dataDirectory -Force | Out-Null
+    $newSettingsPath = Join-Path $dataDirectory 'settings.json'
+    $legacyMain = Get-RightAgentMainPackage -MainPackageName $mainPackageName -Publisher $publisher
+    if ($legacyMain -and -not (Test-Path -LiteralPath $newSettingsPath -PathType Leaf)) {
+        $legacyLocalState = Join-Path $env:LOCALAPPDATA "Packages\$($legacyMain.PackageFamilyName)\LocalState"
+        $legacySettings = Join-Path $legacyLocalState 'settings.json'
+        if (Test-Path -LiteralPath $legacySettings -PathType Leaf) {
+            Copy-Item -LiteralPath $legacySettings -Destination $newSettingsPath -Force
+            $legacyIcons = Join-Path $legacyLocalState 'Icons'
+            if (Test-Path -LiteralPath $legacyIcons -PathType Container) {
+                $newIcons = Join-Path $dataDirectory 'Icons'
+                New-Item -ItemType Directory -Path $newIcons -Force | Out-Null
+                Copy-Item -Path (Join-Path $legacyIcons '*') -Destination $newIcons -Recurse -Force
+            }
+        }
     }
-    else {
-        Add-RightAgentAppxPackage -Path $PackagePath -DependencyPath $dependencies -BasePercent 0 -SpanPercent 36
+    Write-RightAgentInstallationProgress -PercentComplete 16
+
+    if (-not $SkipAppCopy) {
+        New-Item -ItemType Directory -Path $TargetDirectory -Force | Out-Null
+        Copy-Item -Path (Join-Path $AppDirectory '*') -Destination $TargetDirectory -Recurse -Force
+    }
+    if (-not (Test-Path -LiteralPath $targetExecutable -PathType Leaf)) {
+        throw "Failed to install the settings app to '$targetExecutable'."
     }
 
-    Install-RightAgentCommandPackageCache -MainPackageName $mainPackageName -Publisher $publisher -CommandPackagePaths $CommandPackagePaths
+    $installRecord = [ordered]@{
+        packageName = $mainPackageName
+        publisher = $publisher
+        appPath = $targetExecutable
+        version = "$packageVersion"
+    }
+    $installRecordPath = Join-Path $dataDirectory 'install.json'
+    [IO.File]::WriteAllText(
+        $installRecordPath,
+        ($installRecord | ConvertTo-Json -Compress),
+        [Text.UTF8Encoding]::new($false))
+    Write-RightAgentInstallationProgress -PercentComplete 24
+
+    if ($legacyMain) {
+        $legacyMain | Remove-AppxPackage -ErrorAction Stop
+    }
+    Write-RightAgentInstallationProgress -PercentComplete 32
+
+    Install-RightAgentCommandPackageCache -CommandPackagePaths $CommandPackagePaths
     Write-RightAgentInstallationProgress -PercentComplete 50
 
-    $requiredSlots = Get-RightAgentRequiredCommandSlotCount -MainPackageName $mainPackageName -Publisher $publisher
+    $requiredSlots = Get-RightAgentRequiredCommandSlotCount
     $slotSpan = if ($requiredSlots -gt 0) { [int][Math]::Floor(40 / $requiredSlots) } else { 0 }
     for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
@@ -519,9 +580,15 @@ try {
     }
     Write-RightAgentInstallationProgress -PercentComplete 96
 
-    $installedMain = Get-RightAgentMainPackage -MainPackageName $mainPackageName -Publisher $publisher
-    if (-not $installedMain -or [version]$installedMain.Version -ne $packageVersion) {
-        throw "RightAgent installation verification failed for package '$mainPackageName' version $packageVersion."
+    if (-not (Test-Path -LiteralPath $targetExecutable -PathType Leaf)) {
+        throw "RightAgent installation verification failed for '$targetExecutable'."
+    }
+    if (-not (Test-Path -LiteralPath $installRecordPath -PathType Leaf)) {
+        throw 'RightAgent installation verification failed because install.json is missing.'
+    }
+    $leftoverMain = Get-RightAgentMainPackage -MainPackageName $mainPackageName -Publisher $publisher
+    if ($leftoverMain) {
+        throw 'RightAgent left a packaged settings app registered after the unpackaged install.'
     }
     for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"

@@ -25,6 +25,9 @@
     <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.251219" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4948" PrivateAssets="all" />
+    <PackageReference Update="Microsoft.WindowsAppSDK.AI" ExcludeAssets="all" />
+    <PackageReference Update="Microsoft.WindowsAppSDK.ML" ExcludeAssets="all" />
+    <PackageReference Update="Microsoft.WindowsAppSDK.Widgets" ExcludeAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RightAgent.Core\RightAgent.Core.csproj" />

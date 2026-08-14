@@ -324,4 +324,36 @@ public sealed class SettingsTests
             IconPath = "builtin:rightagent",
             Action = new AgentAction { Type = SettingsContract.TerminalCommand, Value = value }
         };
+
+    [Fact]
+    public void InstallRecordRoundTripsAndDetectsMissingApp()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "RightAgent.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var record = new InstallRecord
+            {
+                PackageName = SettingsContract.ReleasePackageName,
+                Publisher = SettingsContract.ReleasePublisher,
+                AppPath = Path.Combine(root, "missing", "RightAgent.App.exe"),
+                Version = "1.1.4.0"
+            };
+            record.Save(root);
+
+            var loaded = InstallRecord.TryLoad(root);
+            Assert.NotNull(loaded);
+            Assert.Equal(SettingsContract.ReleasePackageName, loaded!.PackageName);
+            Assert.Equal(SettingsContract.ReleasePublisher, loaded.Publisher);
+            Assert.Equal(record.AppPath, loaded.AppPath);
+            Assert.Equal("1.1.4.0", loaded.Version);
+            Assert.False(loaded.AppExists);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }

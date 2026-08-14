@@ -15,17 +15,13 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'PackageHelpers.ps1')
 
-$mainPackagePath = Get-RightAgentPackagePath `
-    -RepoRoot $repoRoot `
-    -Configuration $Configuration `
-    -PackageIdentity $PackageIdentity
 $commandPackagePaths = @(Get-RightAgentCommandPackagePaths `
     -RepoRoot $repoRoot `
     -Configuration $Configuration `
     -PackageIdentity $PackageIdentity)
-$packagePaths = @($mainPackagePath) + $commandPackagePaths
-if ($packagePaths.Count -ne 17) {
-    throw "Expected one main package and 16 command packages, but found $($packagePaths.Count)."
+$packagePaths = @($commandPackagePaths)
+if ($packagePaths.Count -ne 16) {
+    throw "Expected 16 command packages, but found $($packagePaths.Count)."
 }
 
 foreach ($packagePath in $packagePaths) {

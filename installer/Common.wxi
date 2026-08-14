@@ -1,0 +1,23 @@
+<Include>
+  <?if $(var.PerUser) = "true" ?>
+    <?define PackageScope="perUser" ?>
+    <?define PackageUpgradeCode="3D065FF0-D9F5-4C73-9D7E-3D6B533289B7" ?>
+    <?define BundleUpgradeCode="6FB55A6B-13BD-40DB-A834-8B0E9167CAF4" ?>
+    <?define AppExeGuid="4EBE3AC1-81BE-4574-A75C-5B2BAD390F62" ?>
+    <?define RegistryRoot="HKCU" ?>
+    <?define PerMachineYesNo="no" ?>
+    <?define DefaultInstallFolder="[LocalAppDataFolder]Programs\RightAgent" ?>
+    <?define LogPrefix="rightagent-usersetup" ?>
+    <?define PackageSummary="RightAgent per-user setup" ?>
+  <?else?>
+    <?define PackageScope="perMachine" ?>
+    <?define PackageUpgradeCode="073B79E3-F770-48AC-8273-2B573EC9BA48" ?>
+    <?define BundleUpgradeCode="1A88F633-D6DE-4F5C-AA59-EDC04C3DF6BB" ?>
+    <?define AppExeGuid="C145D90C-CA96-4D16-944D-8359DC51AECC" ?>
+    <?define RegistryRoot="HKLM" ?>
+    <?define PerMachineYesNo="yes" ?>
+    <?define DefaultInstallFolder="[ProgramFiles64Folder]RightAgent" ?>
+    <?define LogPrefix="rightagent-setup" ?>
+    <?define PackageSummary="RightAgent per-machine setup" ?>
+  <?endif?>
+</Include>

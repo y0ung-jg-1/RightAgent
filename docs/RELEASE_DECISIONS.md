@@ -24,9 +24,9 @@ release. It is an engineering release record, not legal advice.
 - Initial v1.0.2 release format (superseded on 2026-08-13): publish a single
   administrator-gated x64 Setup EXE plus its SHA-256 file. The installer embeds
   the signed MSIX, x64 dependencies, public certificate, license, and notices.
-- Installer toolchain: use the official Inno Setup 6.7.3 compiler downloaded
-  from its pinned upstream release and accepted only after an exact SHA-256
-  match. Sign and timestamp both the embedded MSIX and the final Setup EXE.
+- Installer toolchain: build a per-user WiX 5 UserSetup (Burn bootstrapper plus
+  MSI), matching the PowerToys user-install layout. Sign and timestamp the
+  command MSIX packages and the final Setup EXE.
 - Repository visibility: publish the RightAgent source repository and its GitHub
   Releases publicly. The project owner explicitly authorized the private-to-public
   change and the GitHub release-environment configuration on 2026-08-12.
@@ -45,12 +45,22 @@ release. It is an engineering release record, not legal advice.
   begins, stream the percentage reported by Windows `DeploymentProgress` into a
   determinate 0–100% progress bar; do not estimate elapsed time.
 - Multi-direct package attribution: beginning with v1.1.1, keep one public Setup
-  EXE but embed one visible settings MSIX and 16 independently identified hidden
-  command MSIX packages. Windows 11 groups verbs attributed to one package even
-  when they use separate application identities, so independent package
-  identities are required for genuine root-level commands. Every package is
-  signed, version-aligned, installed for the initiating user, and verified by
-  CI; only the settings app is visible in Start.
+  EXE but embed 16 independently identified hidden command MSIX packages.
+  Windows 11 groups verbs attributed to one package even when they use separate
+  application identities, so independent package identities are required for
+  genuine root-level commands. Every command package is signed, version-aligned,
+  installed for the initiating user, and verified by CI; only the settings app
+  is visible in Start.
+- Settings app deployment: ship the WinUI settings app as an unpackaged
+  self-contained folder copied to `%LOCALAPPDATA%\Programs\RightAgent`. Command
+  packages remain MSIX. Settings live at `%LOCALAPPDATA%\RightAgent\settings.json`.
+
+## Decision revised 2026-08-14
+
+- Public installer SKU: ship a WiX 5 Burn `Setup.exe` that embeds a per-machine MSI, matching the PowerToys Setup / UserSetup split. `UserSetup.exe` remains the per-user SKU. Inno Setup is retired.
+- Burn signing: sign the detached Burn engine, reattach it, then sign the final EXE. Signing only the outer file leaves the attached MSI container unreadable after elevation.
+- Installer UI language: follow the Windows display language with English as the default theme and a Simplified Chinese `2052` payload. Traditional Chinese locales fall back to 2052.
+- Settings and menu contract: keep the unpackaged settings app and `%LOCALAPPDATA%\RightAgent\settings.json`. Command packages must resolve that real user directory (not the packaged `LocalCache`) and must accept a UTF-8 BOM on `install.json`, because Windows PowerShell 5 `Set-Content -Encoding utf8` writes one.
 
 ## Publication gate
 

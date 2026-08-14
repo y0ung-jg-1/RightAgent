@@ -31,12 +31,12 @@ The original license text is in `ThirdPartyNotices/CommunityToolkit/LICENSE.md`.
 
 ## Installer technology
 
-The GitHub Release Setup executable is generated with Inno Setup 6.7.3.
-Inno Setup is Copyright (C) 1997-2026 Jordan Russell, with portions Copyright
-(C) 2000-2026 Martijn Laan, and is available from
-[jrsoftware.org](https://jrsoftware.org/isinfo.php) under the Inno Setup License.
-This acknowledgment is included for clarity; Inno Setup is a build tool and is
-not a resident RightAgent runtime dependency.
+The GitHub Release Setup executable is generated with WiX Toolset 5.0.2
+(per-machine Burn Setup.exe, per-user UserSetup.exe, and the embedded MSI). WiX Toolset is Copyright (c) .NET Foundation
+and contributors and is available from
+[wixtoolset.org](https://wixtoolset.org/) under the Microsoft Reciprocal
+License. This acknowledgment is included for clarity; WiX is a build tool and
+is not a resident RightAgent runtime dependency.
 
 ## Lobe Icons
 

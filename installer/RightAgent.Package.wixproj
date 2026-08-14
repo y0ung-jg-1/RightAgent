@@ -1,0 +1,23 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <PerUser Condition="'$(PerUser)' == ''">true</PerUser>
+    <OutputName Condition="'$(PerUser)' == 'true'">RightAgentUser</OutputName>
+    <OutputName Condition="'$(PerUser)' != 'true'">RightAgent</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <SuppressIces>ICE03;ICE38;ICE43;ICE57;ICE61;ICE64;ICE91</SuppressIces>
+    <DefineConstants>PerUser=$(PerUser);Version=$(Version);AppSource=$(AppSource);CommandSource=$(CommandSource);PayloadDir=$(PayloadDir);RepoDir=$(RepoDir)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Package.wxs" />
+    <EmbeddedResource Remove="loc\**\*" />
+    <WixLocalization Remove="loc\**\*" />
+    <None Remove="loc\**\*" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>

@@ -46,7 +46,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 
 ## Installation
 
-Download `RightAgent-1.1.3-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The installer remains under the current Windows user. On the first installation, if the bundled public certificate is not trusted yet, Setup requests administrator approval only for importing that certificate into Local Computer\Trusted People, then installs the complete package set for the current user. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries one main package and 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. Upgrades do not request elevation again while the certificate remains trusted, and the private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
+Download `RightAgent-1.1.4-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The default installer is per-machine: it requests administrator approval and places the settings app in `%ProgramFiles%\RightAgent`. Use `RightAgent-1.1.4-x64-UserSetup.exe` for a current-user install. The Setup UI follows the Windows display language (Chinese or English). First install trusts the project public certificate in Local Computer\Trusted People, writes settings to `%LOCALAPPDATA%\RightAgent`, and registers only the command packages required by the current menu. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. The private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
 
 ### Build and install from source
 
@@ -59,12 +59,10 @@ Create a per-user development certificate matching the package manifest, then bu
 .\scripts\Install-DevPackage.ps1 -Configuration Release
 ```
 
-You can also build, sign, and install in one step. Normal upgrades and downgrades preserve package LocalState. A same-version replacement is rejected by default; increment the manifest version, or explicitly opt into erasing that development package's settings:
+You can also build, sign, and install in one step. Settings stay in `%LOCALAPPDATA%\RightAgent`.
 
 ```powershell
 .\scripts\Install-DevBuild.ps1
-# Explicitly reset a same-version development install and erase its settings:
-.\scripts\Install-DevBuild.ps1 -ResetInstalledPackage
 ```
 
 Certificates are written beneath the ignored `.local\signing` directory. Never commit or share the PFX. On first installation, `Install-DevPackage.ps1` requests administrator approval and imports only the public CER into Local Computer\Trusted People, never Trusted Root Certification Authorities. Remove the development certificate when it is no longer needed.
@@ -83,7 +81,7 @@ To debug only the settings interface without registering the File Explorer menu,
 - On startup, the settings app checks for `wt.exe`. If Windows Terminal is unavailable, it explains the requirement and offers the official Microsoft Store installation entry.
 - URL actions permit only `http` and `https`.
 - Missing executables are detected before Terminal opens; the error dialog offers a button to open RightAgent settings.
-- Settings are atomically written to `settings.json` in package LocalState.
+- Settings are atomically written to `%LOCALAPPDATA%\RightAgent\settings.json`.
 
 Built-in agent icons use glyphs from [@lobehub/icons](https://github.com/lobehub/lobe-icons) under the MIT License. They are packaged locally and are never fetched at runtime. See the [third-party notices](THIRD_PARTY_NOTICES.md) and [brand asset policy](docs/BRAND_ASSETS.md).
 
@@ -98,7 +96,7 @@ The main x64 MSIX is written beneath `artifacts\package\Release`, with 16 hidden
 
 The toolchain requires Visual Studio 2026 Community with WinUI app development, C++ desktop development, C++ WinUI tools, MSIX/WAP tools, and Windows 11 SDK 10.0.26100 or newer, plus .NET 10 SDK. Run `.\scripts\Validate-Environment.ps1` after setup. The repository does not require Node.js, Electron, Tauri, Rust, a database, or a background service.
 
-GitHub Actions continuous integration runs the full test suite and builds an unsigned release-identity package set on the `windows-2025` hosted runner. The tag workflow reads signing secrets only from the dedicated release environment, signs all 17 MSIX packages, uses a pinned Inno Setup compiler to build and sign a single-file `Setup.exe`, creates its SHA-256 file, and opens a draft GitHub Release. Public Releases contain only the installer and checksum; Setup carries the internal packages, dependencies, and public certificate. The signing key is never exposed to ordinary push or pull-request builds. See the [continuous integration workflow](.github/workflows/ci.yml) and [release workflow](.github/workflows/release.yml).
+GitHub Actions continuous integration runs the full test suite and builds an unsigned release-identity package set on the `windows-2025` hosted runner. The tag workflow reads signing secrets only from the dedicated release environment, signs the 16 command MSIX packages, uses WiX 5 to build and sign the per-machine `Setup.exe`, creates its SHA-256 file, and opens a draft GitHub Release. Public Releases contain only the installer and checksum; Setup carries the internal packages, dependencies, and public certificate. The signing key is never exposed to ordinary push or pull-request builds. See the [continuous integration workflow](.github/workflows/ci.yml) and [release workflow](.github/workflows/release.yml).
 
 ## Repository map
 

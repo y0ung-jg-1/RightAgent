@@ -46,7 +46,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 
 ## 安装
 
-请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.1.3-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。安装器始终以当前 Windows 用户运行；首次安装若尚未信任随包公共证书，会单独请求一次管理员批准，只把该证书导入“本地计算机\受信任的人”，然后继续为当前用户安装完整包集合。为避免 Windows 11 把多个直达命令归组，Setup 内部包含 1 个主程序包和 16 个隐藏命令包，但用户仍只需下载一个 EXE，开始菜单也只显示一个 RightAgent。证书已经受信任的升级不会重复请求管理员权限，发布包也不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
+请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.1.4-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。默认安装器是本机版，需要管理员批准，设置应用装到 `%ProgramFiles%\RightAgent`。只要当前用户安装可用 `RightAgent-1.1.4-x64-UserSetup.exe`。安装器界面跟随 Windows 显示语言（中文 / 英文）。首次安装会把项目公共证书导入“本地计算机\受信任的人”，设置写在 `%LOCALAPPDATA%\RightAgent`，并只注册当前菜单需要的命令包。为避免 Windows 11 把多个直达命令归组，Setup 内部包含 16 个隐藏命令包，但用户仍只需下载一个 EXE，开始菜单也只显示一个 RightAgent。发布包不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
 
 ### 从源码开发
 
@@ -59,12 +59,10 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 .\scripts\Install-DevPackage.ps1 -Configuration Release
 ```
 
-也可以一键完成构建、签名和安装。正常升降级会保留包的本地状态；如果已经安装相同版本，脚本默认拒绝覆盖，请先提升清单版本。只有明确接受清空当前开发包设置时，才使用 `-ResetInstalledPackage`：
+也可以一键完成构建、签名和安装。设置保存在 `%LOCALAPPDATA%\RightAgent`。
 
 ```powershell
 .\scripts\Install-DevBuild.ps1
-# 明确重置同版本开发安装，会清空该包的设置：
-.\scripts\Install-DevBuild.ps1 -ResetInstalledPackage
 ```
 
 证书文件会写入已被忽略的 `.local\signing` 目录。请勿提交或分享 PFX。首次安装时，`Install-DevPackage.ps1` 会请求管理员批准，仅将公共 CER 导入“本地计算机\受信任的人”，不会加入“受信任的根证书颁发机构”。不再需要时，请移除该开发证书。
@@ -83,7 +81,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 - 设置应用启动时会检测 `wt.exe`；未检测到 Windows Terminal 时，会说明原因并提供 Microsoft Store 安装入口。
 - 网址动作只允许 `http` 和 `https`。
 - 在打开终端前会检测可执行文件；缺失时，错误窗口会提供打开 RightAgent 设置的按钮。
-- 设置会原子写入包本地状态目录中的 `settings.json`。
+- 设置会原子写入 `%LOCALAPPDATA%\RightAgent\settings.json`。
 
 内置助手图标使用 [@lobehub/icons](https://github.com/lobehub/lobe-icons)（MIT）字形，全部随应用本地打包，运行时不会联网获取。版权声明见[第三方声明](THIRD_PARTY_NOTICES.md)，商标与公开发版要求见[品牌资产策略](docs/BRAND_ASSETS.md)。
 
@@ -98,7 +96,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 
 开发环境需要 Visual Studio 2026 Community（WinUI 应用开发、C++ 桌面开发、C++ WinUI 工具、MSIX/WAP 工具、Windows 11 SDK 10.0.26100 或更新版本）以及 .NET 10 SDK。安装完成后，先运行 `.\scripts\Validate-Environment.ps1` 检查环境。本仓库不需要 Node.js、Electron、Tauri、Rust、数据库或后台服务。
 
-GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完整测试，并构建不带签名的正式身份包集合。标签发布工作流会从专用发布环境读取签名机密，签名全部 17 个 MSIX，使用固定版本的 Inno Setup 生成并签名单文件 `Setup.exe`，再生成 SHA-256 文件和 GitHub Release 草稿。公开 Release 只包含安装器和对应校验文件；内部 MSIX、依赖和公共证书由安装器携带。发布私钥不会进入普通推送或拉取请求构建。工作流见[持续集成](.github/workflows/ci.yml)与[正式发布](.github/workflows/release.yml)。
+GitHub Actions 的持续集成会在 `windows-2025` 托管运行器上执行完整测试，并构建不带签名的正式身份包集合。标签发布工作流会从专用发布环境读取签名机密，签名 16 个命令 MSIX，使用 WiX 5 生成并签名本机 `Setup.exe`，再生成 SHA-256 文件和 GitHub Release 草稿。公开 Release 只包含安装器和对应校验文件；内部 MSIX、依赖和公共证书由安装器携带。发布私钥不会进入普通推送或拉取请求构建。工作流见[持续集成](.github/workflows/ci.yml)与[正式发布](.github/workflows/release.yml)。
 
 ## 仓库结构
 

@@ -35,6 +35,9 @@ try {
     $entries = @{}
     foreach ($entry in $archive.Entries) {
         $normalizedName = $entry.FullName.Replace('\', '/')
+        if ([string]::IsNullOrEmpty($entry.Name) -or $normalizedName.EndsWith('/')) {
+            continue
+        }
         if ($normalizedName.StartsWith('/') -or
             $normalizedName -match '(^|/)\.\.(/|$)' -or
             $normalizedName -match '(?i)(\.(pfx|p12|key)$|password|dpapi)') {
@@ -61,9 +64,19 @@ try {
         }
     }
 
-    $packages = @($entries.Keys | Where-Object { $_ -match '^RightAgent-[0-9.]+-x64\.msix$' })
-    if ($packages.Count -ne 1) {
-        throw "Expected exactly one RightAgent release MSIX, but found $($packages.Count)."
+    $installScriptReader = [IO.StreamReader]::new($entries['Install-RightAgent.ps1'].Open())
+    try {
+        $installScriptText = $installScriptReader.ReadToEnd()
+    }
+    finally {
+        $installScriptReader.Dispose()
+    }
+    if ($installScriptText -notmatch '(?m)^\s*\[switch\]\$SkipAppCopy\s*$') {
+        throw 'Install-RightAgent.ps1 is missing the -SkipAppCopy switch required by the MSI custom action.'
+    }
+
+    if (-not $entries.ContainsKey('App/RightAgent.App.exe')) {
+        throw 'Required release entry is missing: App/RightAgent.App.exe'
     }
     $commandPackages = @($entries.Keys | Where-Object { $_ -match '^RightAgent\.Command[0-9]{2}-[0-9.]+-x64\.msix$' })
     if ($commandPackages.Count -ne 16) {
@@ -130,41 +143,36 @@ try {
         throw "Unexpected bundled certificate subject: $($certificate.Subject)"
     }
 
-    $msixStream = [IO.MemoryStream]::new()
-    $sourceMsixStream = $entries[$packages[0]].Open()
+    $firstCommandName = @($commandPackages | Sort-Object | Select-Object -First 1)
+    $commandMsixStream = [IO.MemoryStream]::new()
+    $sourceCommandStream = $entries[$firstCommandName].Open()
     try {
-        $sourceMsixStream.CopyTo($msixStream)
+        $sourceCommandStream.CopyTo($commandMsixStream)
     }
     finally {
-        $sourceMsixStream.Dispose()
+        $sourceCommandStream.Dispose()
     }
-    $msixStream.Position = 0
-    $msixArchive = [IO.Compression.ZipArchive]::new($msixStream, [IO.Compression.ZipArchiveMode]::Read, $false)
+    $commandMsixStream.Position = 0
+    $firstCommandArchive = [IO.Compression.ZipArchive]::new($commandMsixStream, [IO.Compression.ZipArchiveMode]::Read, $false)
     try {
-        $manifestEntry = $msixArchive.GetEntry('AppxManifest.xml')
-        $signatureEntry = $msixArchive.GetEntry('AppxSignature.p7x')
-        if (-not $manifestEntry -or -not $signatureEntry -or $signatureEntry.Length -eq 0) {
-            throw 'The bundled MSIX is missing its manifest or package signature.'
+        $firstManifestEntry = $firstCommandArchive.GetEntry('AppxManifest.xml')
+        if (-not $firstManifestEntry) {
+            throw "Command package '$firstCommandName' is missing AppxManifest.xml."
         }
-        $manifestReader = [IO.StreamReader]::new($manifestEntry.Open())
+        $firstManifestReader = [IO.StreamReader]::new($firstManifestEntry.Open())
         try {
-            [xml]$manifest = $manifestReader.ReadToEnd()
+            [xml]$firstCommandManifest = $firstManifestReader.ReadToEnd()
         }
         finally {
-            $manifestReader.Dispose()
+            $firstManifestReader.Dispose()
         }
     }
     finally {
-        $msixArchive.Dispose()
-        $msixStream.Dispose()
+        $firstCommandArchive.Dispose()
+        $commandMsixStream.Dispose()
     }
 
-    if ([string]$manifest.Package.Identity.Name -cne 'RightAgent' -or
-        [string]$manifest.Package.Identity.Publisher -cne $certificate.Subject) {
-        throw 'The bundled MSIX identity does not match the bundled release certificate.'
-    }
-
-    $mainVersion = [string]$manifest.Package.Identity.Version
+    $mainVersion = [string]$firstCommandManifest.Package.Identity.Version
     $parsedVersion = [version]$mainVersion
     $displayVersion = "$($parsedVersion.Major).$($parsedVersion.Minor).$($parsedVersion.Build)"
     if ($parsedVersion.Revision -gt 0) {
@@ -214,7 +222,7 @@ try {
     }
 
     Write-Host "Verified release bundle: $ZipPath"
-    Write-Host "Version: $([string]$manifest.Package.Identity.Version)"
+    Write-Host "Version: $mainVersion"
     Write-Host "Certificate: $($certificate.Thumbprint)"
     Write-Host "SHA256: $zipHash"
 }

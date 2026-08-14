@@ -55,9 +55,9 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 try {
     Expand-Archive -LiteralPath $BundlePath -DestinationPath $stagingDirectory -Force
 
-    $packages = @(Get-ChildItem -LiteralPath $stagingDirectory -Filter 'RightAgent-*-x64.msix' -File)
-    if ($packages.Count -ne 1) {
-        throw "Expected exactly one RightAgent MSIX in the release bundle, but found $($packages.Count)."
+    $appExecutable = Join-Path $stagingDirectory 'App\RightAgent.App.exe'
+    if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
+        throw 'The release bundle does not contain App\RightAgent.App.exe.'
     }
     $commandPackages = @(Get-ChildItem -LiteralPath $stagingDirectory -Filter 'RightAgent.Command*-x64.msix' -File)
     if ($commandPackages.Count -ne 16) {
@@ -69,11 +69,15 @@ try {
     }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $packageArchive = [IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
+    $command00 = @($commandPackages | Where-Object { $_.Name -like 'RightAgent.Command00-*-x64.msix' } | Select-Object -First 1)
+    if (-not $command00) {
+        throw 'The release bundle does not contain RightAgent.Command00.'
+    }
+    $packageArchive = [IO.Compression.ZipFile]::OpenRead($command00.FullName)
     try {
         $manifestEntry = $packageArchive.GetEntry('AppxManifest.xml')
         if (-not $manifestEntry) {
-            throw 'The bundled MSIX does not contain AppxManifest.xml.'
+            throw 'Command package 00 does not contain AppxManifest.xml.'
         }
         $manifestReader = [IO.StreamReader]::new($manifestEntry.Open())
         try {
@@ -99,56 +103,38 @@ try {
         }
     }
 
-    $isccCandidates = @(
-        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
-        (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
-        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe')
+    $commandPayloadDirectory = Join-Path $stagingDirectory 'CommandPackages'
+    New-Item -ItemType Directory -Path $commandPayloadDirectory -Force | Out-Null
+    foreach ($commandPackage in $commandPackages) {
+        Copy-Item -LiteralPath $commandPackage.FullName -Destination (Join-Path $commandPayloadDirectory $commandPackage.Name) -Force
+    }
+
+    $repoInstallScript = Join-Path $repoRoot 'scripts\Install-Release.ps1'
+    $stagedInstallScript = Join-Path $stagingDirectory 'Install-RightAgent.ps1'
+    Copy-Item -LiteralPath $repoInstallScript -Destination $stagedInstallScript -Force
+    $stagedScriptText = Get-Content -LiteralPath $stagedInstallScript -Raw
+    if ($stagedScriptText -notmatch '(?m)^\s*\[switch\]\$SkipAppCopy\s*$') {
+        throw 'Staged Install-RightAgent.ps1 is missing the -SkipAppCopy switch required by the MSI custom action.'
+    }
+
+    $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($certificatePath)
+    $certThumbprint = $certificate.Thumbprint.ToUpperInvariant()
+    $appSource = Join-Path $stagingDirectory 'App'
+    $repoDir = $repoRoot.TrimEnd('\') + '\'
+    $packageProject = Join-Path $repoRoot 'installer\RightAgent.Package.wixproj'
+    $bundleProject = Join-Path $repoRoot 'installer\RightAgent.Bundle.wixproj'
+    $skus = @(
+        @{ PerUser = 'false'; OutputName = "RightAgent-$displayVersion-x64-Setup.exe"; Label = 'per-machine' }
+        @{ PerUser = 'true'; OutputName = "RightAgent-$displayVersion-x64-UserSetup.exe"; Label = 'per-user' }
     )
-    $iscc = $isccCandidates |
-        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
-        Select-Object -First 1
-    if (-not $iscc) {
-        throw 'Inno Setup 6 compiler was not found. Install JRSoftware.InnoSetup 6.7.3 first.'
-    }
 
-    $languageCacheDirectory = Join-Path $repoRoot '.local\installer'
-    $chineseLanguageFile = Join-Path $languageCacheDirectory 'ChineseSimplified.isl'
-    $chineseLanguageUri = 'https://raw.githubusercontent.com/jrsoftware/issrc/791ae13f404dd74012fe7ad6f660521dcfb815b7/Files/Languages/ChineseSimplified.isl'
-    $expectedLanguageHash = 'e0b0b350e2245f3c5e65586dfe43d574f6e7f06f2261149aba284954b3fc9a8d'
-    $languageHash = if (Test-Path -LiteralPath $chineseLanguageFile -PathType Leaf) {
-        (Get-FileHash -LiteralPath $chineseLanguageFile -Algorithm SHA256).Hash.ToLowerInvariant()
-    } else {
-        $null
-    }
-    if ($languageHash -cne $expectedLanguageHash) {
-        New-Item -ItemType Directory -Path $languageCacheDirectory -Force | Out-Null
-        $downloadPath = "$chineseLanguageFile.download"
-        try {
-            Invoke-WebRequest -Uri $chineseLanguageUri -OutFile $downloadPath
-            $downloadHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($downloadHash -cne $expectedLanguageHash) {
-                throw "The downloaded Inno Setup language file has an unexpected SHA-256: $downloadHash"
-            }
-            Move-Item -LiteralPath $downloadPath -Destination $chineseLanguageFile -Force
-        }
-        finally {
-            if (Test-Path -LiteralPath $downloadPath -PathType Leaf) {
-                Remove-Item -LiteralPath $downloadPath -Force -ErrorAction Stop
-            }
-        }
-    }
+    Get-ChildItem -LiteralPath $OutputDirectory -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^RightAgent-.+-x64-(User)?Setup\.msi(\.sha256)?$' } |
+        Remove-Item -Force
 
-    $installerScript = Join-Path $repoRoot 'installer\RightAgent.iss'
-    & $iscc "/DPayloadDir=$stagingDirectory" "/DOutputDir=$OutputDirectory" "/DAppVersion=$displayVersion" "/DPackageVersion=$packageVersion" "/DChineseLanguageFile=$chineseLanguageFile" $installerScript
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Inno Setup compilation failed.'
-    }
-
-    $setupPath = Join-Path $OutputDirectory "RightAgent-$displayVersion-x64-Setup.exe"
-    if (-not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
-        throw "The expected setup executable was not produced: $setupPath"
-    }
-
+    $signTool = $null
+    $privateCertificate = $null
+    $publicCertificate = $null
     if (-not $SkipSigning) {
         $publicCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($certificatePath)
         $privateCertificatePath = "Cert:\CurrentUser\My\$($publicCertificate.Thumbprint)"
@@ -165,32 +151,123 @@ try {
             throw 'x64 signtool.exe was not found.'
         }
 
+        $wixCli = Get-Command -Name wix -CommandType Application -ErrorAction SilentlyContinue
+        if (-not $wixCli) {
+            throw 'The WiX CLI (wix.exe 5.0.2) is required to sign Setup.exe. Install it with: dotnet tool install --global wix --version 5.0.2'
+        }
+        $wixCli = $wixCli.Source
+
         $timestampUri = $null
         if (-not [Uri]::TryCreate($TimestampServer, [UriKind]::Absolute, [ref]$timestampUri) -or
             $timestampUri.Scheme -notin 'http', 'https') {
             throw "Invalid RFC 3161 timestamp server URL: $TimestampServer"
         }
-
-        & $signTool sign /fd SHA256 /sha1 $privateCertificate.Thumbprint /s My /tr $timestampUri.AbsoluteUri /td SHA256 $setupPath
-        if ($LASTEXITCODE -ne 0) {
-            throw 'Signing the setup executable failed.'
-        }
-
-        $signature = Get-AuthenticodeSignature -LiteralPath $setupPath
-        if ($null -eq $signature.SignerCertificate -or
-            $signature.SignerCertificate.Thumbprint -ne $publicCertificate.Thumbprint -or
-            $signature.Status -notin 'Valid', 'UnknownError' -or
-            $null -eq $signature.TimeStamperCertificate) {
-            throw "Setup signature verification failed: $($signature.Status)"
-        }
     }
 
-    $setupHash = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    $checksumPath = "$setupPath.sha256"
-    Set-Content -LiteralPath $checksumPath -Value "$setupHash  $([IO.Path]::GetFileName($setupPath))" -Encoding ascii
+    foreach ($sku in $skus) {
+        $msiOutputDirectory = Join-Path $installerRoot "obj\msi-$($sku.PerUser)"
+        $bundleOutputDirectory = Join-Path $installerRoot "obj\bundle-$($sku.PerUser)"
+        foreach ($generatedDirectory in @($msiOutputDirectory, $bundleOutputDirectory)) {
+            if (Test-Path -LiteralPath $generatedDirectory) {
+                Remove-Item -LiteralPath $generatedDirectory -Recurse -Force -ErrorAction Stop
+            }
+            New-Item -ItemType Directory -Path $generatedDirectory -Force | Out-Null
+        }
 
-    Write-Host "Setup executable: $setupPath"
-    Write-Host "SHA256: $setupHash"
+        & dotnet build $packageProject -c Release --nologo `
+            "-p:PerUser=$($sku.PerUser)" `
+            "-p:Version=$packageVersion" `
+            "-p:AppSource=$appSource" `
+            "-p:CommandSource=$commandPayloadDirectory" `
+            "-p:PayloadDir=$stagingDirectory" `
+            "-p:RepoDir=$repoDir" `
+            "-p:BaseIntermediateOutputPath=$msiOutputDirectory\obj\" `
+            "-p:OutputPath=$msiOutputDirectory\"
+        if ($LASTEXITCODE -ne 0) {
+            throw "WiX $($sku.Label) MSI build failed."
+        }
+
+        $msiName = if ($sku.PerUser -eq 'true') { 'RightAgentUser.msi' } else { 'RightAgent.msi' }
+        $msiCandidates = @(Get-ChildItem -LiteralPath $msiOutputDirectory -Filter $msiName -File -Recurse)
+        $msiPath = $msiCandidates |
+            Where-Object { $_.Directory.Name -eq 'en-us' } |
+            Select-Object -First 1
+        if (-not $msiPath) {
+            $msiPath = $msiCandidates | Select-Object -First 1
+        }
+        if (-not $msiPath) {
+            throw "Expected '$msiName' in '$msiOutputDirectory'."
+        }
+
+        if (-not $SkipSigning) {
+            & $signTool sign /fd SHA256 /sha1 $privateCertificate.Thumbprint /s My /tr $timestampUri.AbsoluteUri /td SHA256 $msiPath.FullName
+            if ($LASTEXITCODE -ne 0) {
+                throw "Signing the $($sku.Label) MSI failed."
+            }
+        }
+
+        & dotnet build $bundleProject -c Release --nologo `
+            "-p:PerUser=$($sku.PerUser)" `
+            "-p:Version=$packageVersion" `
+            "-p:MsiPath=$($msiPath.FullName)" `
+            "-p:PayloadDir=$stagingDirectory" `
+            "-p:RepoDir=$repoDir" `
+            "-p:CertThumbprint=$certThumbprint" `
+            "-p:BaseIntermediateOutputPath=$bundleOutputDirectory\obj\" `
+            "-p:OutputPath=$bundleOutputDirectory\"
+        if ($LASTEXITCODE -ne 0) {
+            throw "WiX $($sku.Label) Setup bundle build failed."
+        }
+
+        $bundleName = if ($sku.PerUser -eq 'true') { 'RightAgentUserSetup.exe' } else { 'RightAgentSetup.exe' }
+        $bundleCandidates = @(Get-ChildItem -LiteralPath $bundleOutputDirectory -Filter $bundleName -File -Recurse)
+        $builtBundle = $bundleCandidates | Select-Object -First 1
+        if (-not $builtBundle) {
+            throw "Expected '$bundleName' in '$bundleOutputDirectory'."
+        }
+
+        $setupPath = Join-Path $OutputDirectory $sku.OutputName
+        Copy-Item -LiteralPath $builtBundle.FullName -Destination $setupPath -Force
+        if (-not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
+            throw "The expected setup package was not produced: $setupPath"
+        }
+
+        if (-not $SkipSigning) {
+            $enginePath = Join-Path $bundleOutputDirectory 'burn-engine.exe'
+            & $wixCli burn detach $setupPath -engine $enginePath
+            if ($LASTEXITCODE -ne 0) {
+                throw "Detaching the $($sku.Label) Burn engine failed."
+            }
+
+            & $signTool sign /fd SHA256 /sha1 $privateCertificate.Thumbprint /s My /tr $timestampUri.AbsoluteUri /td SHA256 $enginePath
+            if ($LASTEXITCODE -ne 0) {
+                throw "Signing the $($sku.Label) Burn engine failed."
+            }
+
+            & $wixCli burn reattach $setupPath -engine $enginePath -o $setupPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "Reattaching the $($sku.Label) Burn engine failed."
+            }
+
+            & $signTool sign /fd SHA256 /sha1 $privateCertificate.Thumbprint /s My /tr $timestampUri.AbsoluteUri /td SHA256 $setupPath
+            if ($LASTEXITCODE -ne 0) {
+                throw "Signing the $($sku.Label) setup executable failed."
+            }
+
+            $signature = Get-AuthenticodeSignature -LiteralPath $setupPath
+            if ($null -eq $signature.SignerCertificate -or
+                $signature.SignerCertificate.Thumbprint -ne $publicCertificate.Thumbprint -or
+                $signature.Status -notin 'Valid', 'UnknownError' -or
+                $null -eq $signature.TimeStamperCertificate) {
+                throw "Setup signature verification failed for $($sku.Label): $($signature.Status)"
+            }
+        }
+
+        $setupHash = (Get-FileHash -LiteralPath $setupPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        Set-Content -LiteralPath "$setupPath.sha256" -Value "$setupHash  $($sku.OutputName)" -Encoding ascii
+        Write-Host "Setup package ($($sku.Label)): $setupPath"
+        Write-Host "SHA256: $setupHash"
+    }
 }
 finally {
     if (Test-Path -LiteralPath $stagingDirectory) {

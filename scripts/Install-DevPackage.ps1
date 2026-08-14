@@ -13,12 +13,6 @@ $cerPath = Join-Path $repoRoot '.local\signing\RightAgent.Dev.cer'
 if (-not (Test-Path -LiteralPath $cerPath -PathType Leaf)) {
     throw 'Development certificate not found. Run scripts\New-DevCertificate.ps1 first.'
 }
-if (-not $PackagePath) {
-    $PackagePath = Get-RightAgentPackagePath -RepoRoot $repoRoot -Configuration $Configuration
-}
-if (-not $PackagePath -or -not (Test-Path -LiteralPath $PackagePath -PathType Leaf)) {
-    throw 'No signed package was found.'
-}
 if (-not $CommandPackagePaths) {
     $CommandPackagePaths = @(Get-RightAgentCommandPackagePaths `
         -RepoRoot $repoRoot `
@@ -29,7 +23,7 @@ $CommandPackagePaths = @($CommandPackagePaths)
 if ($CommandPackagePaths.Count -ne 16) {
     throw "Expected exactly 16 signed command packages, but found $($CommandPackagePaths.Count)."
 }
-$allPackagePaths = @($PackagePath) + $CommandPackagePaths
+$allPackagePaths = @($CommandPackagePaths)
 foreach ($candidatePackagePath in $allPackagePaths) {
     if (-not (Test-Path -LiteralPath $candidatePackagePath -PathType Leaf)) {
         throw "Signed development package was not found: $candidatePackagePath"
@@ -113,10 +107,6 @@ try {
     }
 }
 
-$dependencyDirectory = Join-Path (Split-Path -Parent $PackagePath) 'Dependencies\x64'
-$dependencies = if (Test-Path -LiteralPath $dependencyDirectory -PathType Container) {
-    @(Get-ChildItem -LiteralPath $dependencyDirectory -File | Where-Object { $_.Extension -in '.msix', '.appx' } | Select-Object -ExpandProperty FullName)
-} else { @() }
 $classIds = @(0..15 | ForEach-Object {
     'F7E08D{0:X2}-676E-4D4B-950A-5B4451E19E3C' -f (0x6D + $_)
 })
@@ -130,25 +120,48 @@ $surrogates = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop |
 foreach ($surrogate in $surrogates) {
     Stop-Process -Id $surrogate.ProcessId -Force -ErrorAction Stop
 }
-if ($dependencies.Count -gt 0) {
-    Add-AppxPackage -Path $PackagePath -DependencyPath $dependencies -ForceApplicationShutdown -ForceUpdateFromAnyVersion
-} else {
-    Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown -ForceUpdateFromAnyVersion
-}
 
-$mainPackage = Get-AppxPackage -Name 'RightAgent.Dev' -ErrorAction SilentlyContinue |
+$legacyDev = Get-AppxPackage -Name 'RightAgent.Dev' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -ceq 'RightAgent.Dev' -and $_.Publisher -ceq 'CN=RightAgent Dev' } |
     Select-Object -First 1
-if (-not $mainPackage) {
-    throw 'Cannot cache command packages because RightAgent.Dev is not installed.'
+$dataDirectory = Join-Path $env:LOCALAPPDATA 'RightAgent'
+New-Item -ItemType Directory -Path $dataDirectory -Force | Out-Null
+$settingsPath = Join-Path $dataDirectory 'settings.json'
+if ($legacyDev) {
+    $legacySettings = Join-Path $env:LOCALAPPDATA "Packages\$($legacyDev.PackageFamilyName)\LocalState\settings.json"
+    if ((Test-Path -LiteralPath $legacySettings -PathType Leaf) -and -not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {
+        Copy-Item -LiteralPath $legacySettings -Destination $settingsPath -Force
+    }
+    $legacyDev | Remove-AppxPackage -ErrorAction Stop
 }
-$cacheDirectory = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\CommandPackages"
+
+$appExecutable = Join-Path $repoRoot "RightAgent.App\bin\x64\$Configuration\net10.0-windows10.0.26100.0\win-x64\RightAgent.App.exe"
+if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
+    $published = Join-Path $repoRoot "artifacts\app\$Configuration\win-x64\RightAgent.App.exe"
+    if (Test-Path -LiteralPath $published -PathType Leaf) {
+        $appExecutable = $published
+    }
+}
+if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
+    throw "RightAgent.App.exe was not found for $Configuration."
+}
+
+$installRecord = [ordered]@{
+    packageName = 'RightAgent.Dev'
+    publisher = 'CN=RightAgent Dev'
+    appPath = $appExecutable
+    version = (Get-RightAgentPackageVersion -RepoRoot $repoRoot -PackageIdentity Development)
+}
+[IO.File]::WriteAllText(
+    (Join-Path $dataDirectory 'install.json'),
+    ($installRecord | ConvertTo-Json -Compress),
+    [Text.UTF8Encoding]::new($false))
+
+$cacheDirectory = Join-Path $dataDirectory 'CommandPackages'
 New-Item -ItemType Directory -Path $cacheDirectory -Force | Out-Null
 for ($slot = 0; $slot -lt $CommandPackagePaths.Count; ++$slot) {
     Copy-Item -LiteralPath $CommandPackagePaths[$slot] -Destination (Join-Path $cacheDirectory ('{0:D2}.msix' -f $slot)) -Force -ErrorAction Stop
 }
-
-$settingsPath = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\settings.json"
 $requiredSlots = 1
 if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
     try {

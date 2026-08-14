@@ -1,0 +1,154 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <?include $(sys.SOURCEFILEDIR)Common.wxi ?>
+  <Package
+    Name="RightAgent"
+    Manufacturer="RightAgent"
+    Version="$(var.Version)"
+    UpgradeCode="$(var.PackageUpgradeCode)"
+    Scope="$(var.PackageScope)"
+    ProductCode="*">
+    <SummaryInformation Description="$(var.PackageSummary)" />
+    <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
+      DowngradeErrorMessage="A later version of RightAgent is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Icon Id="RightAgentIcon" SourceFile="$(var.RepoDir)RightAgent.Package\Assets\Agents\rightagent.ico" />
+    <Property Id="ARPPRODUCTICON" Value="RightAgentIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/y0ung-jg-1/RightAgent" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <?if $(var.PerUser) = "true" ?>
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="RightAgent">
+          <Directory Id="CommandPayloadFolder" Name="CommandPackages" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <?else?>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="RightAgent">
+        <Directory Id="CommandPayloadFolder" Name="CommandPackages" />
+      </Directory>
+    </StandardDirectory>
+    <?endif?>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="RightAgent" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.AppSource)\**">
+        <Exclude Files="$(var.AppSource)\RightAgent.App.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <ComponentGroup Id="CommandPayloadFiles" Directory="CommandPayloadFolder">
+      <Files Include="$(var.CommandSource)\*.msix" />
+    </ComponentGroup>
+
+    <Component Id="AppExecutable" Directory="INSTALLFOLDER" Guid="$(var.AppExeGuid)">
+      <RegistryValue
+        Root="$(var.RegistryRoot)"
+        Key="Software\RightAgent"
+        Name="AppExecutable"
+        Type="string"
+        Value="[INSTALLFOLDER]RightAgent.App.exe"
+        KeyPath="yes" />
+      <File Id="RightAgentAppExe" Source="$(var.AppSource)\RightAgent.App.exe">
+        <Shortcut
+          Id="StartMenuShortcut"
+          Name="RightAgent"
+          Directory="ApplicationProgramsFolder"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="RightAgentIcon"
+          Advertise="no" />
+      </File>
+      <RemoveFolder Id="RemoveStartMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+    </Component>
+
+    <Component Id="InstallScript" Directory="INSTALLFOLDER" Guid="*">
+      <File
+        Id="InstallScriptFile"
+        Source="$(var.RepoDir)scripts\Install-Release.ps1"
+        Name="Install-RightAgent.ps1"
+        KeyPath="yes" />
+    </Component>
+    <Component Id="InstallCommandsCmd" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="InstallCommandsCmdFile" Source="$(var.RepoDir)installer\install_commands.cmd" KeyPath="yes" />
+    </Component>
+    <Component Id="UninstallCommandsCmd" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="UninstallCommandsCmdFile" Source="$(var.RepoDir)installer\uninstall_commands.cmd" KeyPath="yes" />
+    </Component>
+    <Component Id="ReleaseCertificate" Directory="INSTALLFOLDER" Guid="*">
+      <File Id="ReleaseCertificateFile" Source="$(var.PayloadDir)\RightAgent.cer" KeyPath="yes" />
+    </Component>
+    <Component Id="InstallFolderRegistry" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryValue
+        Root="$(var.RegistryRoot)"
+        Key="Software\RightAgent"
+        Name="InstallFolder"
+        Type="string"
+        Value="[INSTALLFOLDER]"
+        KeyPath="yes" />
+    </Component>
+
+    <Component Id="ProtocolRegistration" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryValue Root="$(var.RegistryRoot)" Key="Software\Classes\rightagent" Value="URL:RightAgent" Type="string" KeyPath="yes" />
+      <RegistryValue Root="$(var.RegistryRoot)" Key="Software\Classes\rightagent" Name="URL Protocol" Value="" Type="string" />
+      <RegistryValue Root="$(var.RegistryRoot)" Key="Software\Classes\rightagent\DefaultIcon" Value="[INSTALLFOLDER]RightAgent.App.exe,0" Type="string" />
+      <RegistryValue Root="$(var.RegistryRoot)" Key="Software\Classes\rightagent\shell\open\command" Value="&quot;[INSTALLFOLDER]RightAgent.App.exe&quot; &quot;%1&quot;" Type="string" />
+    </Component>
+
+    <Feature Id="ProductFeature" Title="RightAgent" AllowAbsent="no" AllowAdvertise="no">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentGroupRef Id="CommandPayloadFiles" />
+      <ComponentRef Id="AppExecutable" />
+      <ComponentRef Id="InstallScript" />
+      <ComponentRef Id="InstallCommandsCmd" />
+      <ComponentRef Id="UninstallCommandsCmd" />
+      <ComponentRef Id="ReleaseCertificate" />
+      <ComponentRef Id="InstallFolderRegistry" />
+      <ComponentRef Id="ProtocolRegistration" />
+    </Feature>
+
+    <ui:WixUI Id="WixUI_InstallDir" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.RepoDir)installer\License.rtf" />
+
+    <util:CloseApplication
+      Target="RightAgent.App.exe"
+      CloseMessage="yes"
+      ElevatedCloseMessage="yes"
+      RebootPrompt="no"
+      TerminateProcess="1" />
+
+    <CustomAction
+      Id="InstallCommandPackages"
+      FileRef="InstallCommandsCmdFile"
+      ExeCommand=""
+      Execute="deferred"
+      Impersonate="yes"
+      Return="check" />
+    <CustomAction
+      Id="RemoveCommandPackages"
+      FileRef="UninstallCommandsCmdFile"
+      ExeCommand=""
+      Execute="deferred"
+      Impersonate="yes"
+      Return="ignore" />
+
+    <CustomAction
+      Id="LaunchApp"
+      FileRef="RightAgentAppExe"
+      ExeCommand=""
+      Impersonate="yes"
+      Return="asyncNoWait" />
+
+    <InstallExecuteSequence>
+      <Custom Action="InstallCommandPackages" After="InstallFiles" Condition="NOT Installed OR REINSTALL OR WIX_UPGRADE_DETECTED" />
+      <Custom Action="RemoveCommandPackages" Before="RemoveFiles" Condition="Installed AND REMOVE=&quot;ALL&quot;" />
+      <Custom Action="LaunchApp" After="InstallFinalize" Condition="NOT Installed AND UILevel &gt; 3" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

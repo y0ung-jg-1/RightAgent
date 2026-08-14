@@ -1,0 +1,49 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <?include $(sys.SOURCEFILEDIR)Common.wxi ?>
+  <Bundle
+    Name="RightAgent"
+    Version="$(var.Version)"
+    Manufacturer="RightAgent"
+    UpgradeCode="$(var.BundleUpgradeCode)"
+    IconSourceFile="$(var.RepoDir)RightAgent.Package\Assets\Agents\rightagent.ico"
+    Compressed="yes">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+        LicenseFile="$(var.RepoDir)installer\License.rtf"
+        LogoFile="$(var.RepoDir)RightAgent.Package\Assets\Square44x44Logo.png"
+        Theme="rtfLicense"
+        ThemeFile="$(var.RepoDir)installer\loc\RtfTheme.xml"
+        SuppressRepair="yes"
+        SuppressOptionsUI="no" />
+      <Payload Name="2052\thm.wxl" SourceFile="$(var.RepoDir)installer\loc\thm.zh-CN.wxl" Compressed="yes" />
+      <Payload Name="2052\license.rtf" SourceFile="$(var.RepoDir)installer\loc\License.zh-CN.rtf" Compressed="yes" />
+    </BootstrapperApplication>
+
+    <Variable
+      Name="InstallFolder"
+      Type="formatted"
+      Value="$(var.DefaultInstallFolder)"
+      bal:Overridable="yes" />
+    <Variable
+      Name="LaunchTarget"
+      Type="formatted"
+      Value="[InstallFolder]\RightAgent.App.exe" />
+
+    <Log Prefix="$(var.LogPrefix)-$(var.Version)" />
+
+    <Chain>
+      <MsiPackage
+        Id="RightAgentMsi"
+        DisplayName="RightAgent"
+        SourceFile="$(var.MsiPath)"
+        Compressed="yes"
+        Visible="no"
+        bal:DisplayInternalUICondition="false">
+        <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
+        <MsiProperty Name="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>

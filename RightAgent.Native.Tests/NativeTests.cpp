@@ -3,6 +3,7 @@
 #include "ShellExports.h"
 
 #include <windows.h>
+#include <shlobj.h>
 #include <shellapi.h>
 #include <shobjidl.h>
 #include <winrt/base.h>
@@ -157,6 +158,46 @@ namespace
         Expect(
             unpackagedPath.filename() == L"settings.json" && unpackagedPath.parent_path().filename() == L"RightAgent",
             "Unpackaged settings should use the LocalAppData RightAgent fallback");
+        wchar_t userProfile[MAX_PATH]{};
+        Expect(GetEnvironmentVariableW(L"USERPROFILE", userProfile, MAX_PATH) > 0,
+            "USERPROFILE is required to locate unpackaged settings");
+        const std::filesystem::path expectedSettingsPath =
+            std::filesystem::path(userProfile) / L"AppData" / L"Local" / L"RightAgent" / L"settings.json";
+        Expect(
+            unpackagedPath == expectedSettingsPath,
+            "Settings must use the real user LocalAppData, not a packaged LocalCache redirect");
+    }
+
+    void TestUtf8BomSettings()
+    {
+        const auto root = std::filesystem::temp_directory_path() / L"RightAgent.BomSettings.Tests" / std::to_wstring(GetCurrentProcessId());
+        std::error_code error;
+        std::filesystem::create_directories(root, error);
+        {
+            std::ofstream output(root / L"settings.json", std::ios::binary | std::ios::trunc);
+            output << "\xEF\xBB\xBF" << R"({
+  "schemaVersion": 1,
+  "menuEnabled": true,
+  "language": "en-US",
+  "menuMode": "direct",
+  "directAgentId": "codex",
+  "agents": [
+    {"id":"codex","name":"Codex","enabled":true,"sort":0,"iconPath":"builtin:codex","action":{"type":"terminalCommand","value":"codex"}}
+  ]
+})";
+        }
+        {
+            std::ofstream output(root / L"install.json", std::ios::binary | std::ios::trunc);
+            output << "\xEF\xBB\xBF" << R"({"packageName":"RightAgent","publisher":"CN=RightAgent","appPath":"C:\\Windows\\System32\\notepad.exe","version":"1.1.4.0"})";
+        }
+        SetEnvironmentVariableW(L"RIGHTAGENT_SETTINGS_PATH", (root / L"settings.json").c_str());
+        const auto settings = rightagent::LoadSettings();
+        SetEnvironmentVariableW(L"RIGHTAGENT_SETTINGS_PATH", nullptr);
+        std::filesystem::remove_all(root, error);
+        Expect(settings.menuEnabled, "UTF-8 BOM settings must not disable the menu");
+        Expect(rightagent::FindDirectAgent(settings) != nullptr &&
+                rightagent::FindDirectAgent(settings)->id == L"codex",
+            "UTF-8 BOM settings must still parse the selected agent");
     }
 
     void TestSimpleTokenDetection()
@@ -467,6 +508,7 @@ int wmain()
         TestQuoting();
         TestSettingsParsing();
         TestUnpackagedSettingsPath();
+        TestUtf8BomSettings();
         TestSimpleTokenDetection();
         TestWindowsTerminalDefaultProfile();
         TestShellComSurface();

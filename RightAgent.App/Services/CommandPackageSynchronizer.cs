@@ -36,7 +36,7 @@ internal static class CommandPackageSynchronizer
         string localStateDirectory,
         CancellationToken cancellationToken)
     {
-        if (!TryGetMainPackageIdentity(out var mainPackageName, out var publisher))
+        if (!TryGetCommandPackageIdentity(out var mainPackageName, out var publisher))
         {
             return CommandPackageSyncResult.Skipped;
         }
@@ -129,8 +129,18 @@ internal static class CommandPackageSynchronizer
         return CommandPackageSyncResult.Refreshed;
     }
 
-    private static bool TryGetMainPackageIdentity(out string mainPackageName, out string publisher)
+    private static bool TryGetCommandPackageIdentity(out string mainPackageName, out string publisher)
     {
+        var record = InstallRecord.TryLoad();
+        if (record is not null &&
+            !string.IsNullOrWhiteSpace(record.PackageName) &&
+            !string.IsNullOrWhiteSpace(record.Publisher))
+        {
+            mainPackageName = record.PackageName;
+            publisher = record.Publisher;
+            return true;
+        }
+
         try
         {
             var id = Package.Current.Id;

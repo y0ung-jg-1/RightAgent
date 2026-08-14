@@ -9,6 +9,7 @@ namespace rightagent
 {
     inline constexpr int kSettingsSchemaVersion = 1;
     inline constexpr wchar_t kSettingsFileName[] = L"settings.json";
+    inline constexpr wchar_t kInstallRecordFileName[] = L"install.json";
 
     enum class MenuMode
     {

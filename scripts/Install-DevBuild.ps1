@@ -2,8 +2,7 @@
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
-    [switch]$SkipTests,
-    [switch]$ResetInstalledPackage
+    [switch]$SkipTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,31 +33,11 @@ if (-not $certificate -or -not (Test-Path -LiteralPath $cerPath -PathType Leaf))
 #    trust the development certificate in Local Computer\Trusted People.
 & (Join-Path $PSScriptRoot 'Sign-PackageSet.ps1') -Configuration $Configuration
 
-# Windows blocks replacing a package with different contents at the same version.
-# Preserve LocalState for real upgrades/downgrades, and require an explicit opt-in
-# before uninstalling a same-version development package.
-$installedPackages = @(Get-AppxPackage -Name 'RightAgent.Dev' -ErrorAction SilentlyContinue)
-if ($installedPackages.Count -gt 1) {
-    throw "Expected at most one installed RightAgent.Dev package, but found $($installedPackages.Count)."
-}
-if ($installedPackages.Count -eq 1) {
-    $installed = $installedPackages[0]
-    [xml]$manifest = Get-Content -LiteralPath (Join-Path $repoRoot 'RightAgent.Package\Package.appxmanifest') -Raw
-    $targetVersion = [version]$manifest.Package.Identity.Version
-    $installedVersion = [version]$installed.Version
-    if ($installedVersion -eq $targetVersion) {
-        if (-not $ResetInstalledPackage) {
-            throw "RightAgent.Dev $targetVersion is already installed. Increment the manifest version to preserve LocalState, or rerun with -ResetInstalledPackage to explicitly uninstall it and erase that package's settings."
-        }
-
-        Write-Warning "Resetting the RightAgent development package set; this erases the main package's LocalState settings."
-        foreach ($slot in 0..15) {
-            $commandPackageName = "RightAgent.Dev.Command$($slot.ToString('D2'))"
-            $installedCommandPackages = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue)
-            foreach ($installedCommandPackage in $installedCommandPackages) {
-                $installedCommandPackage | Remove-AppxPackage -ErrorAction Stop
-            }
-        }
+$legacyDev = @(Get-AppxPackage -Name 'RightAgent.Dev' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ceq 'RightAgent.Dev' -and $_.Publisher -ceq 'CN=RightAgent Dev' })
+if ($legacyDev.Count -gt 0) {
+    Write-Host 'Removing leftover packaged RightAgent.Dev settings app...'
+    foreach ($installed in $legacyDev) {
         $installed | Remove-AppxPackage -ErrorAction Stop
     }
 }

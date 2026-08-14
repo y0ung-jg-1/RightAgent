@@ -56,17 +56,77 @@ namespace
         return value;
     }
 
+    bool LooksLikePackageRedirectedLocalAppData(const std::filesystem::path& path)
+    {
+        const auto text = ToLower(path.lexically_normal().wstring());
+        return text.find(L"\\packages\\") != std::wstring::npos &&
+            text.find(L"\\localcache\\local") != std::wstring::npos;
+    }
+
     std::filesystem::path GetLocalAppDataDirectory()
     {
+        // Packaged COM surrogates redirect FOLDERID_LocalAppData (and often
+        // KF_FLAG_NO_PACKAGE_REDIRECTION still fails). Settings live in the
+        // real user profile, next to the unpackaged app.
+        const auto userProfile = GetEnvironmentValue(L"USERPROFILE");
+        if (!userProfile.empty())
+        {
+            const auto fromProfile = std::filesystem::path(userProfile) / L"AppData" / L"Local";
+            std::error_code error;
+            if (std::filesystem::is_directory(fromProfile, error) &&
+                !LooksLikePackageRedirectedLocalAppData(fromProfile))
+            {
+                return fromProfile;
+            }
+        }
+
         PWSTR rawPath = nullptr;
-        if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &rawPath)))
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Profile, KF_FLAG_DEFAULT, nullptr, &rawPath)) &&
+            rawPath != nullptr)
+        {
+            const auto fromKnownFolder = std::filesystem::path(rawPath) / L"AppData" / L"Local";
+            CoTaskMemFree(rawPath);
+            rawPath = nullptr;
+            if (!LooksLikePackageRedirectedLocalAppData(fromKnownFolder))
+            {
+                return fromKnownFolder;
+            }
+        }
+        else if (rawPath != nullptr)
+        {
+            CoTaskMemFree(rawPath);
+            rawPath = nullptr;
+        }
+
+        if (SUCCEEDED(SHGetKnownFolderPath(
+                FOLDERID_LocalAppData,
+                KF_FLAG_NO_PACKAGE_REDIRECTION,
+                nullptr,
+                &rawPath)) &&
+            rawPath != nullptr)
+        {
+            const std::filesystem::path unredirected(rawPath);
+            CoTaskMemFree(rawPath);
+            rawPath = nullptr;
+            if (!LooksLikePackageRedirectedLocalAppData(unredirected))
+            {
+                return unredirected;
+            }
+        }
+        else if (rawPath != nullptr)
+        {
+            CoTaskMemFree(rawPath);
+            rawPath = nullptr;
+        }
+
+        if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, nullptr, &rawPath)) ||
+            rawPath == nullptr)
         {
             return {};
         }
-
-        const std::filesystem::path path(rawPath);
+        const std::filesystem::path fallback(rawPath);
         CoTaskMemFree(rawPath);
-        return path;
+        return fallback;
     }
 
     std::wstring GetPackageFamilyNameValue()
@@ -91,21 +151,10 @@ namespace
         return value;
     }
 
-    std::filesystem::path GetPackagedLocalStateDirectory()
+    std::filesystem::path GetDefaultLocalStateDirectory()
     {
-        const auto currentPackageFamilyName = GetPackageFamilyNameValue();
-        if (currentPackageFamilyName.empty())
-        {
-            return {};
-        }
-
-        const auto settingsPackageFamilyName = rightagent::GetSettingsPackageFamilyName(currentPackageFamilyName);
         const auto localAppData = GetLocalAppDataDirectory();
-        if (settingsPackageFamilyName.empty() || localAppData.empty())
-        {
-            return {};
-        }
-        return localAppData / L"Packages" / settingsPackageFamilyName / L"LocalState";
+        return localAppData.empty() ? std::filesystem::path{} : localAppData / L"RightAgent";
     }
 
     bool IsSettingsPackageRegistered()
@@ -113,7 +162,7 @@ namespace
         const auto currentPackageFamilyName = GetPackageFamilyNameValue();
         if (currentPackageFamilyName.empty())
         {
-            return true;
+            return false;
         }
 
         const auto settingsPackageFamilyName = rightagent::GetSettingsPackageFamilyName(currentPackageFamilyName);
@@ -145,10 +194,17 @@ namespace
             return {};
         }
 
-        const std::string bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+        std::string bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
         if (bytes.empty())
         {
             return {};
+        }
+        if (bytes.size() >= 3 &&
+            static_cast<unsigned char>(bytes[0]) == 0xEF &&
+            static_cast<unsigned char>(bytes[1]) == 0xBB &&
+            static_cast<unsigned char>(bytes[2]) == 0xBF)
+        {
+            bytes.erase(0, 3);
         }
         return std::wstring(winrt::to_hstring(bytes));
     }
@@ -326,6 +382,43 @@ namespace
         return value.ValueType() == JsonValueType::Number ? static_cast<int>(value.GetNumber()) : fallback;
     }
 
+    bool IsInstallRecordAppPresent(const std::filesystem::path& localStateDirectory)
+    {
+        const auto text = ReadUtf8File(localStateDirectory / rightagent::kInstallRecordFileName);
+        if (text.empty())
+        {
+            return false;
+        }
+
+        try
+        {
+            const auto root = JsonObject::Parse(text);
+            const auto appPath = Trim(GetString(root, L"appPath"));
+            std::error_code error;
+            return !appPath.empty() && std::filesystem::is_regular_file(appPath, error);
+        }
+        catch (const winrt::hresult_error&)
+        {
+            return false;
+        }
+    }
+
+    bool IsProductInstalled(const std::filesystem::path& localStateDirectory)
+    {
+        // Unpackaged settings/test hosts have no package identity.
+        if (GetPackageFamilyNameValue().empty())
+        {
+            return true;
+        }
+
+        if (IsInstallRecordAppPresent(localStateDirectory))
+        {
+            return true;
+        }
+
+        return IsSettingsPackageRegistered();
+    }
+
     bool IsValidHttpUrl(const std::wstring& value)
     {
         const auto lower = ToLower(Trim(value));
@@ -499,14 +592,7 @@ namespace rightagent
             return path.has_filename() && ToLower(path.filename().wstring()) == L"settings.json" ? path.parent_path() : path;
         }
 
-        const auto packagedLocalState = GetPackagedLocalStateDirectory();
-        if (!packagedLocalState.empty())
-        {
-            return packagedLocalState;
-        }
-
-        const auto localAppData = GetLocalAppDataDirectory();
-        return localAppData / L"RightAgent";
+        return GetDefaultLocalStateDirectory();
     }
 
     std::filesystem::path GetSettingsPath()
@@ -523,16 +609,23 @@ namespace rightagent
     Settings LoadSettings()
     {
         // Companion command packages are intentionally independent so Explorer
-        // attributes each multi-direct verb at the menu root. If the visible
-        // settings package has been removed, keep any surviving command package
-        // inert instead of falling back to enabled defaults.
-        if (!IsSettingsPackageRegistered())
+        // attributes each multi-direct verb at the menu root. If the unpackaged
+        // settings app (or a leftover packaged settings identity) is gone, keep
+        // any surviving command package inert instead of falling back to defaults.
+        const auto localStateDirectory = GetLocalStateDirectory();
+        const auto settingsPath = localStateDirectory / kSettingsFileName;
+        std::error_code error;
+        if (std::filesystem::is_regular_file(settingsPath, error))
+        {
+            return LoadSettingsFromPath(settingsPath);
+        }
+        if (!IsProductInstalled(localStateDirectory))
         {
             Settings settings;
             settings.menuEnabled = false;
             return settings;
         }
-        return LoadSettingsFromPath(GetSettingsPath());
+        return LoadSettingsFromPath(settingsPath);
     }
 
     Settings LoadSettingsFromPath(const std::filesystem::path& path)

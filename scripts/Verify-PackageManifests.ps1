@@ -121,4 +121,4 @@ foreach ($itemType in $itemTypes) {
     }
 }
 
-Write-Host 'Verified package manifests: one settings package plus independently attributed command package template.'
+Write-Host 'Verified package manifests: settings identity plus independently attributed command package template.'

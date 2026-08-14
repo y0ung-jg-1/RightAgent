@@ -31,44 +31,12 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Install pinned Inno Setup compiler
+      - name: Restore WiX Toolset 5.0.2
         shell: pwsh
         run: |
-          $version = '6.7.3'
-          $installerUri = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe'
-          $expectedHash = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
-          $runnerTemp = [IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\')
-          $installerPath = [IO.Path]::GetFullPath((Join-Path $runnerTemp "innosetup-$version.exe"))
-          if (-not [IO.Directory]::GetParent($installerPath).FullName.Equals($runnerTemp, [StringComparison]::OrdinalIgnoreCase) -or
-              [IO.Path]::GetFileName($installerPath) -cne "innosetup-$version.exe") {
-              throw "Refusing to use an unexpected Inno Setup download path: $installerPath"
-          }
-          try {
-              Invoke-WebRequest -Uri $installerUri -OutFile $installerPath
-              $actualHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
-              if ($actualHash -cne $expectedHash) {
-                  throw "Inno Setup SHA-256 mismatch. Expected $expectedHash, found $actualHash."
-              }
-              $process = Start-Process -FilePath $installerPath -ArgumentList @(
-                  '/VERYSILENT',
-                  '/SUPPRESSMSGBOXES',
-                  '/NORESTART',
-                  '/SP-',
-                  '/CURRENTUSER'
-              ) -WindowStyle Hidden -Wait -PassThru
-              if ($process.ExitCode -ne 0) {
-                  throw "Inno Setup installation failed with exit code $($process.ExitCode)."
-              }
-          }
-          finally {
-              if (Test-Path -LiteralPath $installerPath -PathType Leaf) {
-                  Remove-Item -LiteralPath $installerPath -Force -ErrorAction Stop
-              }
-          }
-          $iscc = Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'
-          if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
-              throw "Inno Setup compiler was not found after installation: $iscc"
-          }
+          dotnet restore ./installer/RightAgent.Package.wixproj
+          dotnet restore ./installer/RightAgent.Bundle.wixproj
+          dotnet tool update --global wix --version 5.0.2
 
       - name: Validate tag and manifest version
         shell: pwsh
@@ -142,9 +110,7 @@ jobs:
       - name: Create verified installer payload
         shell: pwsh
         run: |
-          . ./scripts/PackageHelpers.ps1
-          $package = Get-RightAgentPackagePath -RepoRoot $env:GITHUB_WORKSPACE -Configuration Release -PackageIdentity Release
-          ./scripts/New-ReleaseBundle.ps1 -PackagePath $package -CertificatePath '${{ steps.certificate.outputs.cer_path }}'
+          ./scripts/New-ReleaseBundle.ps1 -CertificatePath '${{ steps.certificate.outputs.cer_path }}'
           $releaseZip = Get-ChildItem -LiteralPath './artifacts/release' -Filter '*.zip' -File -ErrorAction Stop
           if (@($releaseZip).Count -ne 1) {
               throw 'Expected exactly one release ZIP.'
@@ -160,11 +126,11 @@ jobs:
         run: |
           $setupFiles = @(Get-ChildItem -LiteralPath './artifacts/installer' -Filter 'RightAgent-*-x64-Setup.exe' -File -ErrorAction Stop)
           if ($setupFiles.Count -ne 1) {
-              throw "Expected exactly one setup executable, but found $($setupFiles.Count)."
+              throw "Expected exactly one setup package, but found $($setupFiles.Count)."
           }
           $checksumPath = "$($setupFiles[0].FullName).sha256"
           if (-not (Test-Path -LiteralPath $checksumPath -PathType Leaf)) {
-              throw 'The setup executable SHA-256 file is missing.'
+              throw 'The setup package SHA-256 file is missing.'
           }
           $signature = Get-AuthenticodeSignature -LiteralPath $setupFiles[0].FullName
           if ($null -eq $signature.SignerCertificate -or
@@ -186,18 +152,24 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $setupFiles = @(Get-ChildItem -LiteralPath './artifacts/installer' -Filter 'RightAgent-*-x64-Setup.exe' -File -ErrorAction Stop)
           if ($setupFiles.Count -ne 1) {
-            throw "Expected exactly one setup executable, but found $($setupFiles.Count)."
+            throw "Expected exactly one setup package, but found $($setupFiles.Count)."
           }
 
           $setupLog = Join-Path $env:RUNNER_TEMP 'RightAgent-Setup-smoke.log'
           $setupProcess = Start-Process -FilePath $setupFiles[0].FullName -ArgumentList @(
-            '/VERYSILENT',
-            '/SUPPRESSMSGBOXES',
-            '/NORESTART',
-            "/LOG=$setupLog"
+            '-silent',
+            '-norestart',
+            '-log',
+            $setupLog
           ) -WindowStyle Hidden -PassThru
           if (-not $setupProcess.WaitForExit(300000)) {
             throw 'Setup did not finish within five minutes.'
+          }
+          if ($setupProcess.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $setupLog -PathType Leaf) {
+              Write-Host (Get-Content -LiteralPath $setupLog -Raw)
+            }
+            throw "Setup exited with code $($setupProcess.ExitCode)."
           }
           if (-not (Test-Path -LiteralPath $setupLog -PathType Leaf)) {
             throw 'Setup did not create its diagnostic log.'
@@ -205,29 +177,27 @@ jobs:
 
           $setupLogText = Get-Content -LiteralPath $setupLog -Raw
           Write-Host $setupLogText
-          if ($setupProcess.ExitCode -ne 0) {
-            throw "Setup exited with code $($setupProcess.ExitCode)."
-          }
-          if ($setupLogText -match 'raised an exception|QuerySpawnServer|Unexpected response') {
+          if ($setupLogText -match 'raised an exception|QuerySpawnServer|Unexpected response|0x800704c7|Please locate') {
             throw 'Setup logged an installation exception.'
           }
-          if ($setupLogText -notmatch 'Administrative install mode: No') {
-            throw 'Setup did not retain per-user installation mode.'
+          if ($setupLogText -notmatch 'Apply complete, result: 0x0') {
+            throw 'Setup did not report a successful Burn apply result.'
           }
-          if ($setupLogText -notmatch 'RightAgent installer output: RIGHTAGENT_PROGRESS:100') {
-            throw 'Setup did not report completed package deployment progress.'
-          }
-          if ($setupLogText -notmatch 'RightAgent installer output: RightAgent installed\.') {
-            throw 'Setup did not report a completed RightAgent installation.'
-          }
-
           [xml]$manifest = Get-Content -LiteralPath './RightAgent.Package/Package.Release.appxmanifest' -Raw
           $expectedVersion = [version]([string]$manifest.Package.Identity.Version)
-          $mainPackage = Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
+          $appExecutable = Join-Path $env:ProgramFiles 'RightAgent\RightAgent.App.exe'
+          if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
+            throw "Setup did not install the unpackaged settings app to '$appExecutable'."
+          }
+          $installRecordPath = Join-Path $env:LOCALAPPDATA 'RightAgent\install.json'
+          if (-not (Test-Path -LiteralPath $installRecordPath -PathType Leaf)) {
+            throw 'Setup did not write install.json.'
+          }
+          $legacyMain = Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -ceq 'RightAgent' -and $_.Publisher -ceq 'CN=RightAgent' } |
             Select-Object -First 1
-          if (-not $mainPackage -or [version]$mainPackage.Version -ne $expectedVersion) {
-            throw "Setup did not register package 'RightAgent' at version $expectedVersion."
+          if ($legacyMain) {
+            throw 'Setup left a packaged settings app registered.'
           }
 
           $command00 = Get-AppxPackage -Name 'RightAgent.Command00' -ErrorAction SilentlyContinue |
@@ -246,7 +216,7 @@ jobs:
             }
           }
 
-          $cacheDirectory = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\CommandPackages"
+          $cacheDirectory = Join-Path $env:LOCALAPPDATA 'RightAgent\CommandPackages'
           $cachedPackages = @(Get-ChildItem -LiteralPath $cacheDirectory -Filter '*.msix' -File -ErrorAction SilentlyContinue)
           if ($cachedPackages.Count -ne 16) {
             throw "Setup did not cache all 16 command packages. Found $($cachedPackages.Count) in '$cacheDirectory'."
@@ -284,7 +254,7 @@ jobs:
           $tag = $env:GITHUB_REF_NAME
           $setup = @(Get-ChildItem -LiteralPath './artifacts/installer' -Filter 'RightAgent-*-x64-Setup.exe' -File -ErrorAction Stop)
           if ($setup.Count -ne 1) {
-              throw "Expected exactly one setup executable, but found $($setup.Count)."
+              throw "Expected exactly one setup package, but found $($setup.Count)."
           }
           $assets = @($setup[0].FullName, "$($setup[0].FullName).sha256")
           & gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null

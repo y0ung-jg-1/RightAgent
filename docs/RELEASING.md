@@ -4,8 +4,7 @@ RightAgent uses GitHub Actions to build and test every change. A version tag
 starts a separate release job that imports the project-owned signing key from
 the GitHub `release` environment, signs and timestamps the complete 17-package
 MSIX set, builds and
-signs a single-file per-user Setup EXE whose first-install certificate helper
-requests administrator approval, verifies its checksum, and
+signs a single-file per-machine Setup EXE, verifies its checksum, and
 creates a draft GitHub Release containing only the EXE and `.sha256` file.
 
 ## One-time setup
@@ -34,11 +33,10 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
    `RIGHTAGENT_SIGNING_PFX_PASSWORD`. Never use them in the ordinary CI
    workflow.
 
-4. The release workflow installs the exact Inno Setup 6.7.3 compiler from its
-   pinned upstream URL after checking its SHA-256. For equivalent local release
-   builds, install the same version with Windows Package Manager:
-
-       winget install --exact --id JRSoftware.InnoSetup --version 6.7.3 --scope user
+4. The release workflow restores WiX Toolset 5.0.2 through the installer
+   `.wixproj` files. Local release builds need the same .NET 10 SDK used by
+   the rest of the repo; `New-SetupExecutable.ps1` restores and compiles the
+   per-machine Setup.exe and per-user UserSetup.exe Burn bundles.
 
 ## Release checklist
 
@@ -58,9 +56,7 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
    Then create the same verified payload and signed Setup executable used by
    GitHub Actions:
 
-       . .\scripts\PackageHelpers.ps1
-       $package = Get-RightAgentPackagePath -RepoRoot $PWD -Configuration Release -PackageIdentity Release
-       .\scripts\New-ReleaseBundle.ps1 -PackagePath $package -CertificatePath .\.local\signing\RightAgent.cer
+       .\scripts\New-ReleaseBundle.ps1 -CertificatePath .\.local\signing\RightAgent.cer
        .\scripts\New-SetupExecutable.ps1
 
 3. Commit and push the reviewed source to `main`, then wait for CI to pass.
@@ -73,10 +69,11 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
    exactly one `RightAgent-version-x64-Setup.exe` and its `.sha256`. Verify the
    Setup signature, timestamp, certificate thumbprint, and SHA-256. The release
    job also runs the final Setup silently on its clean hosted runner, rejects any
-   installer exception or elevated install mode, requires the package-deployment
-   progress protocol to reach 100%, verifies the main package, command slot zero
-   at the expected version, unused command slots left unregistered, and all 16
-   command MSIX files cached, confirms only the main app appears
+   installer exception, requires the package-deployment
+   progress protocol to reach 100%, verifies the unpackaged settings app,
+   command slot zero at the expected version, unused command slots left
+   unregistered, and all 16 command MSIX files cached, confirms only the
+   settings app appears
    in Start, and verifies the certificate-store boundary before uploading assets.
 7. Run Setup on a clean Windows 11 x64 standard-user account. Confirm Setup
    stays under that user, requests UAC only when the first installation needs
@@ -85,7 +82,7 @@ creates a draft GitHub Release containing only the EXE and `.sha256` file.
    Setup rather than the administrator account used for UAC approval. Start a
    second Setup while installation is active and confirm it is rejected. Run
    Setup again after the certificate is trusted and confirm no second UAC
-   prompt appears and the main package `LocalState` is preserved. During the first
+   prompt appears and `%LOCALAPPDATA%\RightAgent\settings.json` is preserved. During the first
    deployment, confirm the progress bar switches from an indeterminate animation
    to the combined Windows-reported percentage and reaches 100%. Confirm that
    grouped mode has one RightAgent flyout, while multi-direct mode exposes each

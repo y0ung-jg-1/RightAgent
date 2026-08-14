@@ -68,4 +68,43 @@ $packagePath = Get-RightAgentPackagePath -RepoRoot $repoRoot -Configuration $Con
 & (Join-Path $PSScriptRoot 'Verify-PackageCompliance.ps1') -PackagePath $packagePath
 & (Join-Path $PSScriptRoot 'New-CommandPackages.ps1') -Configuration $Configuration -PackageIdentity $PackageIdentity
 & (Join-Path $PSScriptRoot 'Verify-CommandPackages.ps1') -Configuration $Configuration -PackageIdentity $PackageIdentity
+
+$appPublishRoot = [IO.Path]::GetFullPath((Join-Path $artifactsRoot 'app'))
+$appPublishDirectory = [IO.Path]::GetFullPath((Join-Path $appPublishRoot "$Configuration\win-x64"))
+if (-not [IO.Directory]::GetParent($appPublishDirectory).FullName.StartsWith($appPublishRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing to clean an unexpected app publish directory: $appPublishDirectory"
+}
+foreach ($candidate in @($appPublishRoot, $appPublishDirectory)) {
+    if (Test-Path -LiteralPath $candidate) {
+        $candidateItem = Get-Item -LiteralPath $candidate -Force
+        if (($candidateItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Refusing to clean through an app publish reparse point: $candidate"
+        }
+    }
+}
+if (Test-Path -LiteralPath $appPublishDirectory) {
+    Write-Host "Cleaning app publish output: $appPublishDirectory"
+    Remove-Item -LiteralPath $appPublishDirectory -Recurse -Force -ErrorAction Stop
+}
+New-Item -ItemType Directory -Path $appPublishDirectory -Force | Out-Null
+
+Push-Location $repoRoot
+try {
+    & dotnet publish '.\RightAgent.App\RightAgent.App.csproj' `
+        -c $Configuration `
+        -r win-x64 `
+        --self-contained true `
+        -p:Platform=x64 `
+        -p:WindowsAppSDKSelfContained=true `
+        -p:PublishTrimmed=false `
+        -o $appPublishDirectory `
+        --nologo
+    if ($LASTEXITCODE -ne 0) { throw 'Unpackaged settings app publish failed.' }
+}
+finally {
+    Pop-Location
+}
+
+$publishedApp = Get-RightAgentAppPublishPath -RepoRoot $repoRoot -Configuration $Configuration
 Write-Host "Built ($PackageIdentity identity): $packagePath"
+Write-Host "Published unpackaged settings app: $publishedApp"

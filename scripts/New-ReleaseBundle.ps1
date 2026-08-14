@@ -1,10 +1,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [string]$PackagePath,
-
-    [Parameter(Mandatory)]
     [string]$CertificatePath,
+
+    [string]$AppDirectory,
 
     [string[]]$CommandPackagePaths,
 
@@ -15,16 +14,19 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'PackageHelpers.ps1')
 
-$PackagePath = [IO.Path]::GetFullPath($PackagePath)
 $CertificatePath = [IO.Path]::GetFullPath($CertificatePath)
-if (-not (Test-Path -LiteralPath $PackagePath -PathType Leaf)) {
-    throw "Package was not found: $PackagePath"
-}
 if (-not (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
     throw "Certificate was not found: $CertificatePath"
 }
 
-& (Join-Path $PSScriptRoot 'Verify-PackageCompliance.ps1') -PackagePath $PackagePath
+if (-not $AppDirectory) {
+    $AppDirectory = Get-RightAgentAppPublishPath -RepoRoot $repoRoot -Configuration Release
+}
+$AppDirectory = [IO.Path]::GetFullPath($AppDirectory)
+$appExecutable = Join-Path $AppDirectory 'RightAgent.App.exe'
+if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
+    throw "Unpackaged settings app was not found: $appExecutable"
+}
 
 if (-not $CommandPackagePaths) {
     $CommandPackagePaths = @(Get-RightAgentCommandPackagePaths `
@@ -44,8 +46,7 @@ foreach ($commandPackagePath in $CommandPackagePaths) {
 & (Join-Path $PSScriptRoot 'Verify-CommandPackages.ps1') -Configuration Release -PackageIdentity Release
 
 $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
-$allPackagePaths = @($PackagePath) + $CommandPackagePaths
-foreach ($signedPackagePath in $allPackagePaths) {
+foreach ($signedPackagePath in $CommandPackagePaths) {
     $signature = Get-AuthenticodeSignature -LiteralPath $signedPackagePath
     $signerMatches =
         $null -ne $signature.SignerCertificate -and
@@ -58,34 +59,8 @@ foreach ($signedPackagePath in $allPackagePaths) {
     }
 }
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$archive = [IO.Compression.ZipFile]::OpenRead($PackagePath)
-try {
-    $manifestEntry = $archive.GetEntry('AppxManifest.xml')
-    if (-not $manifestEntry) {
-        throw 'The package does not contain AppxManifest.xml.'
-    }
-    $reader = [IO.StreamReader]::new($manifestEntry.Open())
-    try {
-        [xml]$manifest = $reader.ReadToEnd()
-    }
-    finally {
-        $reader.Dispose()
-    }
-}
-finally {
-    $archive.Dispose()
-}
-
-$identity = $manifest.Package.Identity
-if ([string]$identity.Name -cne 'RightAgent' -or [string]$identity.Publisher -cne 'CN=RightAgent') {
-    throw 'The signed package does not use the public RightAgent release identity.'
-}
-$version = [version]([string]$identity.Version)
-$displayVersion = "$($version.Major).$($version.Minor).$($version.Build)"
-if ($version.Revision -gt 0) {
-    $displayVersion += ".$($version.Revision)"
-}
+$packageVersion = Get-RightAgentPackageVersion -RepoRoot $repoRoot -PackageIdentity Release
+$displayVersion = Get-RightAgentDisplayVersion -PackageVersion $packageVersion
 
 $artifactsRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot 'artifacts'))
 $expectedOutputDirectory = [IO.Path]::GetFullPath((Join-Path $artifactsRoot 'release'))
@@ -111,8 +86,12 @@ New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
 
 $stagingDirectory = Join-Path $OutputDirectory "RightAgent-$displayVersion-x64"
 New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
-$releasePackageName = "RightAgent-$displayVersion-x64.msix"
-Copy-Item -LiteralPath $PackagePath -Destination (Join-Path $stagingDirectory $releasePackageName)
+$appStagingDirectory = Join-Path $stagingDirectory 'App'
+New-Item -ItemType Directory -Path $appStagingDirectory | Out-Null
+Copy-Item -Path (Join-Path $AppDirectory '*') -Destination $appStagingDirectory -Recurse -Force
+if (-not (Test-Path -LiteralPath (Join-Path $appStagingDirectory 'RightAgent.App.exe') -PathType Leaf)) {
+    throw "Failed to stage the unpackaged settings app from '$AppDirectory'."
+}
 for ($slot = 0; $slot -lt $CommandPackagePaths.Count; ++$slot) {
     $slotText = $slot.ToString('D2')
     $commandReleaseName = "RightAgent.Command$slotText-$displayVersion-x64.msix"
@@ -124,13 +103,6 @@ Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENSE') -Destination $stagingDire
 Copy-Item -LiteralPath (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md') -Destination $stagingDirectory
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\SIDELOAD_INSTALL.md') -Destination (Join-Path $stagingDirectory 'README.md')
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\SIDELOAD_INSTALL.en.md') -Destination (Join-Path $stagingDirectory 'README.en.md')
-
-$sourceDependencyDirectory = Join-Path (Split-Path -Parent $PackagePath) 'Dependencies\x64'
-if (Test-Path -LiteralPath $sourceDependencyDirectory -PathType Container) {
-    $targetDependencyDirectory = Join-Path $stagingDirectory 'Dependencies\x64'
-    New-Item -ItemType Directory -Path $targetDependencyDirectory -Force | Out-Null
-    Copy-Item -Path (Join-Path $sourceDependencyDirectory '*') -Destination $targetDependencyDirectory -Recurse
-}
 
 $checksumLines = foreach ($file in Get-ChildItem -LiteralPath $stagingDirectory -Recurse -File | Sort-Object FullName) {
     $stagingPrefix = $stagingDirectory.TrimEnd('\') + '\'

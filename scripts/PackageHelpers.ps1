@@ -101,6 +101,59 @@ function Get-RightAgentPackagePath {
     return $packages[0].FullName
 }
 
+function Get-RightAgentPackageVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepoRoot,
+
+        [ValidateSet('Development', 'Release')]
+        [string]$PackageIdentity = 'Development'
+    )
+
+    $manifestPath = Get-RightAgentManifestPath -RepoRoot $RepoRoot -PackageIdentity $PackageIdentity
+    [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw
+    $version = [string]$manifest.Package.Identity.Version
+    if ([string]::IsNullOrWhiteSpace($version)) {
+        throw "The package manifest does not contain an Identity version: $manifestPath"
+    }
+    return $version
+}
+
+function Get-RightAgentDisplayVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$PackageVersion
+    )
+
+    $version = [version]$PackageVersion
+    $displayVersion = "$($version.Major).$($version.Minor).$($version.Build)"
+    if ($version.Revision -gt 0) {
+        $displayVersion += ".$($version.Revision)"
+    }
+    return $displayVersion
+}
+
+function Get-RightAgentAppPublishPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepoRoot,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Debug', 'Release')]
+        [string]$Configuration
+    )
+
+    $publishDirectory = [IO.Path]::GetFullPath((Join-Path $RepoRoot "artifacts\app\$Configuration\win-x64"))
+    $executablePath = Join-Path $publishDirectory 'RightAgent.App.exe'
+    if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+        throw "Unpackaged settings app was not found: $executablePath"
+    }
+    return $publishDirectory
+}
+
 function Get-RightAgentCommandPackagePaths {
     [CmdletBinding()]
     param(

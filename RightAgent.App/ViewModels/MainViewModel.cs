@@ -335,42 +335,45 @@ public sealed class MainViewModel : BindableBase
             return;
         }
 
-        await saveLock.WaitAsync(cancellationToken);
+        RightAgentSettings normalized;
+        await saveLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var normalized = await PersistAsync(cancellationToken);
+            normalized = await PersistAsync(cancellationToken).ConfigureAwait(false);
             if (!synchronizeOccupancy)
             {
                 return;
-            }
-
-            try
-            {
-                await CommandPackageSynchronizer.SynchronizeAsync(
-                    normalized,
-                    store.LocalStateDirectory,
-                    cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception)
-            {
-                // JSON is already on disk. Occupancy is repaired on the next successful load.
             }
         }
         finally
         {
             saveLock.Release();
         }
+
+        try
+        {
+            await CommandPackageSynchronizer.SynchronizeAsync(
+                normalized,
+                store.LocalStateDirectory,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // JSON is already on disk. Occupancy is repaired on the next successful load.
+        }
     }
 
     public async Task FlushAutoSaveAsync()
     {
         autoSaveCts?.Cancel();
-        // Closing the window must not wait on package add/remove or Explorer restart.
-        await SaveAsync(synchronizeOccupancy: false);
+        // Persist first so a mode/occupancy change is not lost if the user
+        // closes before the debounce timer. Then sync slots without holding
+        // the save lock on the UI thread.
+        await SaveAsync(synchronizeOccupancy: true).ConfigureAwait(false);
     }
 
     private void ScheduleAutoSave()
