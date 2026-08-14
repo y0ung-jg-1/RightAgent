@@ -23,10 +23,38 @@ $msbuild = if ($vsPath) { Join-Path $vsPath 'MSBuild\Current\Bin\amd64\MSBuild.e
 $vsDetails = if ($vsPath) { $vsPath } else { 'not found or installation incomplete' }
 Write-Check 'Visual Studio 2026' ([bool]($vsPath -and (Test-Path -LiteralPath $msbuild))) $vsDetails
 
-$sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Include\10.0.26100.0'
-Write-Check 'Windows 11 SDK 26100' (Test-Path -LiteralPath $sdkRoot) $sdkRoot
+$minWindowsSdk = [version]'10.0.26100.0'
+$kitsRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
+$includeRoot = Join-Path $kitsRoot 'Include'
+$sdkCandidates = @()
+if (Test-Path -LiteralPath $includeRoot) {
+    $sdkCandidates = @(
+        Get-ChildItem -LiteralPath $includeRoot -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^10\.\d+\.\d+\.\d+$' -and [version]$_.Name -ge $minWindowsSdk } |
+            Sort-Object { [version]$_.Name } -Descending
+    )
+}
+$selectedSdk = $null
+foreach ($candidate in $sdkCandidates) {
+    $bin = Join-Path $kitsRoot "bin\$($candidate.Name)\x64"
+    $required = @(
+        (Join-Path $candidate.FullName 'um\windows.h'),
+        (Join-Path $bin 'MrmSupport.dll'),
+        (Join-Path $bin 'MakeAppx.exe'),
+        (Join-Path $bin 'MakePri.exe'),
+        (Join-Path $bin 'SignTool.exe')
+    )
+    if ($required | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }) {
+        continue
+    }
+    $selectedSdk = $candidate
+    break
+}
+$sdkRoot = if ($selectedSdk) { $selectedSdk.FullName } else { Join-Path $includeRoot '10.0.26100.0' }
+$sdkDetails = if ($selectedSdk) { $selectedSdk.FullName } else { "need Windows SDK $minWindowsSdk or newer with um headers" }
+Write-Check 'Windows 11 SDK' ([bool]$selectedSdk) $sdkDetails
 
-$sdkBin = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin\10.0.26100.0\x64'
+$sdkBin = if ($selectedSdk) { Join-Path $kitsRoot "bin\$($selectedSdk.Name)\x64" } else { Join-Path $kitsRoot 'bin\10.0.26100.0\x64' }
 $packagingTools = @(
     (Join-Path $sdkBin 'MrmSupport.dll'),
     (Join-Path $sdkBin 'MakeAppx.exe'),

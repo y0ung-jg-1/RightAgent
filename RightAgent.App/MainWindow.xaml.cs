@@ -54,15 +54,15 @@ public sealed partial class MainWindow : Window
             {
                 DispatcherQueue.TryEnqueue(PlaceDefaultWindow);
             }
+            if (RootNav.SelectedItem is null)
+            {
+                RootNav.SelectedItem = MenuNavItem;
+            }
             await ViewModel.LoadAsync();
             Bindings.Update();
             UpdateStatusInfoBar();
             Title = ViewModel.WindowTitle;
             RootNav.IsPaneOpen = true;
-            if (RootNav.SelectedItem is null)
-            {
-                RootNav.SelectedItem = MenuNavItem;
-            }
             DispatcherQueue.TryEnqueue(() => RootNav.IsPaneOpen = true);
             await PromptForWindowsTerminalAsync();
         }

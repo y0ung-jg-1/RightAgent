@@ -68,7 +68,11 @@ public sealed class AgentItemViewModel : BindableBase
         get => iconPath;
         set
         {
-            SetProperty(ref iconPath, value);
+            if (!SetProperty(ref iconPath, value))
+            {
+                return;
+            }
+
             iconRevision = DateTime.UtcNow.Ticks;
             OnPropertyChanged(nameof(IconDisplayPath));
             OnPropertyChanged(nameof(HasCustomIcon));
@@ -110,6 +114,14 @@ public sealed class AgentItemViewModel : BindableBase
         set
         {
             if (value is null)
+            {
+                return;
+            }
+
+            var current = IconPath.StartsWith(SettingsContract.BuiltInIconPrefix, StringComparison.OrdinalIgnoreCase)
+                ? SettingsValidator.NormalizeIconPath(IconPath)
+                : null;
+            if (string.Equals(current, value, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }

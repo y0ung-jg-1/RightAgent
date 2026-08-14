@@ -291,22 +291,10 @@ public sealed class MainViewModel : BindableBase
         }
 
         RefreshSort();
-        var occupancy = settings;
-        try
-        {
-            await SynchronizeCommandPackagesAsync(occupancy, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            // Settings still load if Explorer command occupancy cannot be updated.
-        }
         RefreshLocalization();
         IsLoaded = true;
         NotifyState();
+        _ = SynchronizeOccupancyInBackgroundAsync(settings);
     }
 
     public async Task SaveAsync(
@@ -356,7 +344,8 @@ public sealed class MainViewModel : BindableBase
         // Persist first so a mode/occupancy change is not lost if the user
         // closes before the debounce timer. Then sync slots without holding
         // the save lock on the UI thread.
-        await SaveAsync(synchronizeOccupancy: true).ConfigureAwait(false);
+        await SaveAsync(synchronizeOccupancy: false).ConfigureAwait(false);
+        _ = SynchronizeOccupancyInBackgroundAsync(BuildCurrentSettings());
     }
 
     private void ScheduleAutoSave()
@@ -391,8 +380,16 @@ public sealed class MainViewModel : BindableBase
 
     private async Task<RightAgentSettings> PersistAsync(CancellationToken cancellationToken)
     {
+        var normalized = SettingsValidator.Normalize(BuildCurrentSettings());
+        await store.SaveAsync(normalized, cancellationToken);
+        ApplyDirectAgentId(normalized.DirectAgentId, allowClear: true);
+        return normalized;
+    }
+
+    private RightAgentSettings BuildCurrentSettings()
+    {
         RefreshSort();
-        var settings = new RightAgentSettings
+        return new RightAgentSettings
         {
             Language = Language,
             MenuMode = MenuMode,
@@ -401,17 +398,18 @@ public sealed class MainViewModel : BindableBase
             MenuEnabled = MenuEnabled,
             Agents = Agents.Select(agent => agent.ToDefinition()).ToList()
         };
-        var normalized = SettingsValidator.Normalize(settings);
-        await store.SaveAsync(normalized, cancellationToken);
-        ApplyDirectAgentId(normalized.DirectAgentId, allowClear: true);
-        return normalized;
     }
 
-    private Task SynchronizeCommandPackagesAsync(
-        RightAgentSettings settings,
-        CancellationToken cancellationToken)
+    private async Task SynchronizeOccupancyInBackgroundAsync(RightAgentSettings settings)
     {
-        return CommandPackageSynchronizer.SynchronizeAsync(settings, store.LocalStateDirectory, cancellationToken);
+        try
+        {
+            await CommandPackageSynchronizer.SynchronizeAsync(settings, store.LocalStateDirectory);
+        }
+        catch (Exception)
+        {
+            // Occupancy is repaired on the next successful sync. Never fail the UI for it.
+        }
     }
 
     public void AddAgent()

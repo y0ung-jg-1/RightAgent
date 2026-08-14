@@ -1,4 +1,11 @@
 <Project>
+  <PropertyGroup>
+    <RightAgentWindowsKitsRoot>$(MSBuildProgramFiles32)\Windows Kits\10</RightAgentWindowsKitsRoot>
+    <!-- Prefer a newer installed kit; keep 26100 for CI images that still ship that SDK. -->
+    <RightAgentWindowsSdkVersion Condition="Exists('$(RightAgentWindowsKitsRoot)\Include\10.0.28000.0\um\windows.h')">10.0.28000.0</RightAgentWindowsSdkVersion>
+    <RightAgentWindowsSdkVersion Condition="'$(RightAgentWindowsSdkVersion)' == '' And Exists('$(RightAgentWindowsKitsRoot)\Include\10.0.26100.0\um\windows.h')">10.0.26100.0</RightAgentWindowsSdkVersion>
+    <RightAgentWindowsSdkVersion Condition="'$(RightAgentWindowsSdkVersion)' == ''">10.0.26100.0</RightAgentWindowsSdkVersion>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>

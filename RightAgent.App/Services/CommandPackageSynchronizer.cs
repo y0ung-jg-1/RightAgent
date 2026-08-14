@@ -15,6 +15,7 @@ internal enum CommandPackageSyncResult
 internal static class CommandPackageSynchronizer
 {
     internal const string InstallationMutexName = @"Global\RightAgent.Setup";
+    private static readonly TimeSpan PackageOperationTimeout = TimeSpan.FromSeconds(30);
     private const uint ShellAssociationChanged = 0x08000000;
     private const uint ShellNotifyIdList = 0x0000;
 
@@ -143,28 +144,24 @@ internal static class CommandPackageSynchronizer
 
     private static Dictionary<int, string> ListInstalledCommandSlots(string mainPackageName, string publisher)
     {
+        // Query the 16 known command identities. FindPackagesForUser("") walks
+        // every package on the machine and has hung or torn down this process.
         var installed = new Dictionary<int, string>();
-        var prefix = mainPackageName + ".Command";
-        foreach (var package in new PackageManager().FindPackagesForUser(string.Empty))
+        var packageManager = new PackageManager();
+        for (var slot = 0; slot < SettingsContract.MaxMultiDirectAgents; ++slot)
         {
-            if (!string.Equals(package.Id.Publisher, publisher, StringComparison.Ordinal))
+            var name = mainPackageName + ".Command" + slot.ToString("D2");
+            try
             {
-                continue;
+                foreach (var package in packageManager.FindPackagesForUser(string.Empty, name, publisher))
+                {
+                    installed[slot] = package.Id.FullName;
+                    break;
+                }
             }
-
-            if (!package.Id.Name.StartsWith(prefix, StringComparison.Ordinal)
-                || package.Id.Name.Length != prefix.Length + 2)
+            catch (Exception exception) when (exception is COMException or InvalidOperationException or ArgumentException)
             {
-                continue;
             }
-
-            var slotText = package.Id.Name[prefix.Length..];
-            if (!int.TryParse(slotText, out var slot) || slot < 0 || slot >= SettingsContract.MaxMultiDirectAgents)
-            {
-                continue;
-            }
-
-            installed[slot] = package.Id.FullName;
         }
 
         return installed;
@@ -174,13 +171,11 @@ internal static class CommandPackageSynchronizer
     {
         var options = new AddPackageOptions
         {
-            ForceAppShutdown = true,
             ForceUpdateFromAnyVersion = true
         };
-        var result = packageManager.AddPackageByUriAsync(new Uri(packagePath), options)
-            .AsTask(cancellationToken)
-            .GetAwaiter()
-            .GetResult();
+        var result = WaitForDeployment(
+            packageManager.AddPackageByUriAsync(new Uri(Path.GetFullPath(packagePath)), options),
+            cancellationToken);
         if (!result.IsRegistered || result.ExtendedErrorCode is not null)
         {
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.ErrorText)
@@ -191,16 +186,27 @@ internal static class CommandPackageSynchronizer
 
     private static void RemovePackage(PackageManager packageManager, string packageFullName, CancellationToken cancellationToken)
     {
-        var result = packageManager.RemovePackageAsync(packageFullName)
-            .AsTask(cancellationToken)
-            .GetAwaiter()
-            .GetResult();
+        var result = WaitForDeployment(packageManager.RemovePackageAsync(packageFullName), cancellationToken);
         if (result.ExtendedErrorCode is not null)
         {
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(result.ErrorText)
                 ? $"Could not remove '{packageFullName}'."
                 : result.ErrorText);
         }
+    }
+
+    private static DeploymentResult WaitForDeployment(
+        Windows.Foundation.IAsyncOperationWithProgress<DeploymentResult, DeploymentProgress> operation,
+        CancellationToken cancellationToken)
+    {
+        var task = operation.AsTask(cancellationToken);
+        if (!task.Wait(PackageOperationTimeout))
+        {
+            operation.Cancel();
+            throw new TimeoutException("A command-package deployment operation timed out.");
+        }
+
+        return task.GetAwaiter().GetResult();
     }
 
     private static void NotifyShellAssociationsChanged()
