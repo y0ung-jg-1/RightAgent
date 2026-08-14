@@ -143,10 +143,6 @@
                     Text="{x:Bind ViewModel.MenuSectionLabel, Mode=OneWay}" />
 
                 <controls:SettingsCard CornerRadius="8" Header="{x:Bind ViewModel.MasterSwitchLabel, Mode=OneWay}">
-                    <controls:SettingsCard.Resources>
-                        <x:Double x:Key="SettingsCardWrapThreshold">200</x:Double>
-                        <x:Double x:Key="SettingsCardWrapNoIconThreshold">120</x:Double>
-                    </controls:SettingsCard.Resources>
                     <controls:SettingsCard.HeaderIcon>
                         <FontIcon Glyph="&#xE7E8;" />
                     </controls:SettingsCard.HeaderIcon>
@@ -165,10 +161,6 @@
                     IsEnabled="{x:Bind ViewModel.MenuEnabled, Mode=OneWay}">
                     <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
                         <controls:SettingsCard CornerRadius="8" Header="{x:Bind ViewModel.MenuModeLabel, Mode=OneWay}">
-                            <controls:SettingsCard.Resources>
-                                <x:Double x:Key="SettingsCardWrapThreshold">280</x:Double>
-                                <x:Double x:Key="SettingsCardWrapNoIconThreshold">180</x:Double>
-                            </controls:SettingsCard.Resources>
                             <controls:SettingsCard.HeaderIcon>
                                 <FontIcon Glyph="&#xE700;" />
                             </controls:SettingsCard.HeaderIcon>

@@ -149,6 +149,7 @@ function Get-RightAgentMainPackage {
         Select-Object -First 1
 }
 
+# Duplicated in PackageHelpers.ps1 because this script is harvested into Setup.exe.
 function Get-RightAgentUserLocalAppData {
     $profile = $env:USERPROFILE
     if (-not [string]::IsNullOrWhiteSpace($profile)) {
@@ -183,6 +184,9 @@ function Get-RightAgentSettingsPath {
     return $unpackagedSettings
 }
 
+# Keep this rule identical to CommandSlotPlanner.RequiredSlotCount and
+# PackageHelpers.Get-RightAgentRequiredCommandSlotCount. This script is
+# harvested into Setup.exe and must stay self-contained.
 function Get-RightAgentRequiredCommandSlotCount {
     $settingsPath = Get-RightAgentSettingsPath
     if (-not (Test-Path -LiteralPath $settingsPath -PathType Leaf)) {

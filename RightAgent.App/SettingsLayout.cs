@@ -6,6 +6,8 @@ namespace RightAgent.App;
 
 internal static class SettingsLayout
 {
+    // SettingsCard wrap resources in generic.xaml win over App.xaml.
+    // Patch the live ControlSizeTrigger after the template is applied.
     private const double WrapThreshold = 220;
     private const double WrapNoIconThreshold = 120;
 

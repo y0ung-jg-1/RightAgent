@@ -162,30 +162,7 @@ New-Item -ItemType Directory -Path $cacheDirectory -Force | Out-Null
 for ($slot = 0; $slot -lt $CommandPackagePaths.Count; ++$slot) {
     Copy-Item -LiteralPath $CommandPackagePaths[$slot] -Destination (Join-Path $cacheDirectory ('{0:D2}.msix' -f $slot)) -Force -ErrorAction Stop
 }
-$requiredSlots = 1
-if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
-    try {
-        $settings = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($settings.PSObject.Properties.Name -contains 'menuEnabled' -and -not [bool]$settings.menuEnabled) {
-            $requiredSlots = 0
-        }
-        else {
-            $enabled = @($settings.agents | Where-Object { $_.enabled })
-            $requiredSlots = if ($enabled.Count -eq 0) {
-                0
-            }
-            elseif ([string]$settings.menuMode -eq 'multiDirect') {
-                [Math]::Min(16, [int]$enabled.Count)
-            }
-            else {
-                1
-            }
-        }
-    }
-    catch {
-        $requiredSlots = 1
-    }
-}
+$requiredSlots = Get-RightAgentRequiredCommandSlotCount -SettingsPath $settingsPath
 
 for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
     Add-AppxPackage -Path $CommandPackagePaths[$slot] -ForceApplicationShutdown -ForceUpdateFromAnyVersion
