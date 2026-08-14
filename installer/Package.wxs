@@ -8,6 +8,7 @@
     Version="$(var.Version)"
     UpgradeCode="$(var.PackageUpgradeCode)"
     Scope="$(var.PackageScope)"
+    Codepage="65001"
     ProductCode="*">
     <SummaryInformation Description="$(var.PackageSummary)" />
     <MajorUpgrade
@@ -66,6 +67,8 @@
           Advertise="no" />
       </File>
       <RemoveFolder Id="RemoveStartMenuFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+      <RemoveFolder Id="RemoveCommandPayloadFolder" Directory="CommandPayloadFolder" On="uninstall" />
+      <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
     </Component>
 
     <Component Id="InstallScript" Directory="INSTALLFOLDER" Guid="*">
@@ -115,6 +118,14 @@
 
     <ui:WixUI Id="WixUI_InstallDir" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.RepoDir)installer\License.rtf" />
+    <UI>
+      <ProgressText Action="InstallCommandPackages" Message="正在注册资源管理器命令" />
+      <ProgressText Action="RemoveCommandPackages" Message="正在移除资源管理器命令" />
+      <ProgressText Action="RemoveCommandPackagesUpgrade" Message="正在更新资源管理器命令" />
+      <ProgressText Action="RemoveTrustedCertificate" Message="正在移除证书" />
+      <ProgressText Action="WixCloseApplications" Message="正在关闭 RightAgent" />
+      <ProgressText Action="WixCloseApplicationsDeferred" Message="正在关闭 RightAgent" />
+    </UI>
 
     <util:CloseApplication
       Target="RightAgent.App.exe"
@@ -133,9 +144,23 @@
     <CustomAction
       Id="RemoveCommandPackages"
       FileRef="UninstallCommandsCmdFile"
-      ExeCommand=""
+      ExeCommand="-RemoveCommandPackages"
       Execute="deferred"
       Impersonate="yes"
+      Return="check" />
+    <CustomAction
+      Id="RemoveCommandPackagesUpgrade"
+      FileRef="UninstallCommandsCmdFile"
+      ExeCommand="-RemoveCommandPackages -KeepUserData"
+      Execute="deferred"
+      Impersonate="yes"
+      Return="check" />
+    <CustomAction
+      Id="RemoveTrustedCertificate"
+      FileRef="UninstallCommandsCmdFile"
+      ExeCommand="-RemoveCertificateOnly"
+      Execute="deferred"
+      Impersonate="no"
       Return="ignore" />
 
     <CustomAction
@@ -147,7 +172,9 @@
 
     <InstallExecuteSequence>
       <Custom Action="InstallCommandPackages" After="InstallFiles" Condition="NOT Installed OR REINSTALL OR WIX_UPGRADE_DETECTED" />
-      <Custom Action="RemoveCommandPackages" Before="RemoveFiles" Condition="Installed AND REMOVE=&quot;ALL&quot;" />
+      <Custom Action="RemoveCommandPackages" Before="RemoveFiles" Condition="Installed AND REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="RemoveCommandPackagesUpgrade" Before="RemoveCommandPackages" Condition="Installed AND REMOVE=&quot;ALL&quot; AND UPGRADINGPRODUCTCODE" />
+      <Custom Action="RemoveTrustedCertificate" After="RemoveCommandPackages" Condition="Installed AND REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="LaunchApp" After="InstallFinalize" Condition="NOT Installed AND UILevel &gt; 3" />
     </InstallExecuteSequence>
   </Package>

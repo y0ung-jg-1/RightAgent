@@ -52,7 +52,16 @@
             </Button>
         </Page>
         <Page Name="Progress">
-            <Label X="11" Y="80" Width="-11" Height="30" FontId="2" DisablePrefix="yes">#(loc.ProgressHeader)</Label>
+            <Label X="11" Y="80" Width="-11" Height="30" FontId="2" DisablePrefix="yes">
+                <Text>#(loc.ProgressHeader)</Text>
+                <Text Condition="WixBundleAction = 2">#(loc.ProgressLayoutHeader)</Text>
+                <Text Condition="WixBundleAction = 3">#(loc.ProgressUninstallHeader)</Text>
+                <Text Condition="WixBundleAction = 4">#(loc.ProgressUninstallHeader)</Text>
+                <Text Condition="WixBundleAction = 5">#(loc.ProgressCacheHeader)</Text>
+                <Text Condition="WixBundleAction = 6">#(loc.ProgressInstallHeader)</Text>
+                <Text Condition="WixBundleAction = 7">#(loc.ProgressModifyHeader)</Text>
+                <Text Condition="WixBundleAction = 8">#(loc.ProgressRepairHeader)</Text>
+            </Label>
             <Label X="11" Y="121" Width="90" Height="17" FontId="3" DisablePrefix="yes">#(loc.ProgressLabel)</Label>
             <Label Name="OverallProgressPackageText" X="105" Y="121" Width="-11" Height="17" FontId="3" DisablePrefix="yes">#(loc.OverallProgressPackageText)</Label>
             <Progressbar Name="OverallCalculatedProgressbar" X="11" Y="143" Width="-11" Height="15" />

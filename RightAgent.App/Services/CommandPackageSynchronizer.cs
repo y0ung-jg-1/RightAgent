@@ -67,60 +67,62 @@ internal static class CommandPackageSynchronizer
         var stampPath = Path.Combine(localStateDirectory, "command-slots.refreshed");
         var stampMatches = File.Exists(stampPath)
             && string.Equals(File.ReadAllText(stampPath).Trim(), requiredSlots.ToString(), StringComparison.Ordinal);
-        if (toAdd.Count == 0 && toRemove.Count == 0 && stampMatches)
+        if (toAdd.Count == 0 && toRemove.Count == 0)
         {
-            return missingAdds ? CommandPackageSyncResult.Skipped : CommandPackageSyncResult.Unchanged;
+            if (missingAdds)
+            {
+                return CommandPackageSyncResult.Skipped;
+            }
+
+            if (!stampMatches)
+            {
+                File.WriteAllText(stampPath, requiredSlots.ToString());
+            }
+
+            return CommandPackageSyncResult.Unchanged;
         }
 
-        if (toAdd.Count > 0 || toRemove.Count > 0)
+        using var mutex = new Mutex(false, InstallationMutexName);
+        var acquired = false;
+        try
         {
-            using var mutex = new Mutex(false, InstallationMutexName);
-            var acquired = false;
             try
             {
-                try
-                {
-                    acquired = mutex.WaitOne(TimeSpan.FromSeconds(15));
-                }
-                catch (AbandonedMutexException)
-                {
-                    acquired = true;
-                }
-
-                if (!acquired)
-                {
-                    return CommandPackageSyncResult.Skipped;
-                }
-
-                StopCommandSurrogates(cancellationToken);
-                foreach (var slot in toAdd)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var packagePath = Path.Combine(cacheDirectory, CommandSlotPlanner.CommandPackageFileName(slot));
-                    AddPackage(packagePath, cancellationToken);
-                }
-
-                foreach (var fullName in toRemove)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    RemovePackage(fullName, cancellationToken);
-                }
+                acquired = mutex.WaitOne(TimeSpan.FromSeconds(15));
             }
-            finally
+            catch (AbandonedMutexException)
             {
-                if (acquired)
-                {
-                    mutex.ReleaseMutex();
-                }
+                acquired = true;
+            }
+
+            if (!acquired)
+            {
+                return CommandPackageSyncResult.Skipped;
+            }
+
+            StopCommandSurrogates(cancellationToken);
+            foreach (var slot in toAdd)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var packagePath = Path.Combine(cacheDirectory, CommandSlotPlanner.CommandPackageFileName(slot));
+                AddPackage(packagePath, cancellationToken);
+            }
+
+            foreach (var fullName in toRemove)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                RemovePackage(fullName, cancellationToken);
             }
         }
-        else if (missingAdds)
+        finally
         {
-            return CommandPackageSyncResult.Skipped;
+            if (acquired)
+            {
+                mutex.ReleaseMutex();
+            }
         }
 
-        SHChangeNotify(ShellAssociationChanged, ShellNotifyIdList, IntPtr.Zero, IntPtr.Zero);
-        RestartExplorer();
+        NotifyShellAssociationsChanged();
         var installedAfter = ListInstalledCommandSlots(mainPackageName, publisher);
         var requiredInstalled = Enumerable.Range(0, requiredSlots).Count(slot => installedAfter.ContainsKey(slot));
         if (requiredInstalled >= requiredSlots)
@@ -273,42 +275,9 @@ internal static class CommandPackageSynchronizer
             : detail.Trim());
     }
 
-    private static void RestartExplorer()
+    private static void NotifyShellAssociationsChanged()
     {
-        var explorer = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
-        var processes = Process.GetProcessesByName("explorer");
-        foreach (var process in processes)
-        {
-            try
-            {
-                process.Kill();
-            }
-            catch (InvalidOperationException)
-            {
-            }
-            catch (System.ComponentModel.Win32Exception)
-            {
-            }
-        }
-
-        foreach (var process in processes)
-        {
-            try
-            {
-                process.WaitForExit(3000);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
-            process.Dispose();
-        }
-
-        Thread.Sleep(400);
-        if (Process.GetProcessesByName("explorer").Length == 0)
-        {
-            Process.Start(new ProcessStartInfo(explorer) { UseShellExecute = true });
-        }
+        SHChangeNotify(ShellAssociationChanged, ShellNotifyIdList, IntPtr.Zero, IntPtr.Zero);
     }
 
     private static string EscapePowerShellLiteral(string value) => value.Replace("'", "''", StringComparison.Ordinal);

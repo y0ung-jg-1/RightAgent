@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="en-US" Language="1033" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+  <String Id="Caption" Value="[WixBundleName] Setup" Overridable="yes" />
+  <String Id="Title" Value="[WixBundleName]" Overridable="yes" />
+  <String Id="CheckingForUpdatesLabel" Value="Checking for updates" Overridable="yes" />
+  <String Id="UpdateButton" Value="&amp;Update to version [WixStdBAUpdateAvailable]" Overridable="yes" />
+  <String Id="InstallVersion" Value="Version [WixBundleVersion]" Overridable="yes" />
+  <String Id="ConfirmCancelMessage" Value="Are you sure you want to cancel?" Overridable="yes" />
+  <String Id="ExecuteUpgradeRelatedBundleMessage" Value="Previous version" Overridable="yes" />
+  <String Id="ExecuteAddonRelatedBundleMessage" Value="Related add-on" Overridable="yes" />
+  <String Id="ExecutePatchRelatedBundleMessage" Value="Related patch" Overridable="yes" />
+  <String Id="PauseAutomaticUpdatesMessage" Value="Pausing Windows automatic updates" Overridable="yes" />
+  <String Id="SystemRestorePointMessage" Value="Creating system restore point" Overridable="yes" />
+  <String Id="PREREQBAINFINITELOOPErrorMessage" Value="The prerequisite bootstrapper entered an infinite loop." Overridable="yes" />
+  <String Id="HelpHeader" Value="Setup Help" Overridable="yes" />
+  <String Id="HelpText" Value="/install | /repair | /uninstall | /layout [directory] - installs, repairs, uninstalls or&#xA;   creates a complete local copy of the bundle in directory. Install is the default.&#xA;&#xA;/passive | /quiet -  displays minimal UI with no prompts or displays no UI and&#xA;   no prompts. By default UI and all prompts are displayed.&#xA;&#xA;/norestart   - suppress any attempts to restart. By default UI will prompt before restart.&#xA;/log log.txt - logs to a specific file. By default a log file is created in %TEMP%." Overridable="yes" />
+  <String Id="HelpCloseButton" Value="&amp;Close" Overridable="yes" />
+  <String Id="InstallAcceptCheckbox" Value="I &amp;agree to the license terms and conditions" Overridable="yes" />
+  <String Id="InstallOptionsButton" Value="&amp;Options" Overridable="yes" />
+  <String Id="InstallInstallButton" Value="&amp;Install" Overridable="yes" />
+  <String Id="InstallCancelButton" Value="&amp;Cancel" Overridable="yes" />
+  <String Id="OptionsHeader" Value="Setup Options" Overridable="yes" />
+  <String Id="OptionsLocationLabel" Value="Install location:" Overridable="yes" />
+  <String Id="OptionsBrowseButton" Value="&amp;Browse" Overridable="yes" />
+  <String Id="OptionsOkButton" Value="&amp;OK" Overridable="yes" />
+  <String Id="OptionsCancelButton" Value="&amp;Cancel" Overridable="yes" />
+  <String Id="ProgressHeader" Value="Setup Progress" Overridable="yes" />
+  <String Id="ProgressInstallHeader" Value="Installing" Overridable="yes" />
+  <String Id="ProgressUninstallHeader" Value="Uninstalling" Overridable="yes" />
+  <String Id="ProgressRepairHeader" Value="Repairing" Overridable="yes" />
+  <String Id="ProgressModifyHeader" Value="Modifying" Overridable="yes" />
+  <String Id="ProgressCacheHeader" Value="Caching" Overridable="yes" />
+  <String Id="ProgressLayoutHeader" Value="Creating layout" Overridable="yes" />
+  <String Id="ProgressLabel" Value="Processing:" Overridable="yes" />
+  <String Id="OverallProgressPackageText" Value="Initializing..." Overridable="yes" />
+  <String Id="ProgressCancelButton" Value="&amp;Cancel" Overridable="yes" />
+  <String Id="ModifyHeader" Value="Modify Setup" Overridable="yes" />
+  <String Id="ModifyRepairButton" Value="&amp;Repair" Overridable="yes" />
+  <String Id="ModifyUninstallButton" Value="&amp;Uninstall" Overridable="yes" />
+  <String Id="ModifyCancelButton" Value="&amp;Cancel" Overridable="yes" />
+  <String Id="SuccessHeader" Value="Setup Successful" Overridable="yes" />
+  <String Id="SuccessCacheHeader" Value="Cache Successfully Completed" Overridable="yes" />
+  <String Id="SuccessInstallHeader" Value="Installation Successfully Completed" Overridable="yes" />
+  <String Id="SuccessLayoutHeader" Value="Layout Successfully Completed" Overridable="yes" />
+  <String Id="SuccessModifyHeader" Value="Modify Successfully Completed" Overridable="yes" />
+  <String Id="SuccessRepairHeader" Value="Repair Successfully Completed" Overridable="yes" />
+  <String Id="SuccessUninstallHeader" Value="Uninstall Successfully Completed" Overridable="yes" />
+  <String Id="SuccessUnsafeUninstallHeader" Value="Uninstall Successfully Completed" Overridable="yes" />
+  <String Id="SuccessLaunchButton" Value="&amp;Launch" Overridable="yes" />
+  <String Id="SuccessRestartText" Value="You must restart your computer before you can use the software." Overridable="yes" />
+  <String Id="SuccessUninstallRestartText" Value="You must restart your computer to complete the removal of the software." Overridable="yes" />
+  <String Id="SuccessRestartButton" Value="&amp;Restart" Overridable="yes" />
+  <String Id="SuccessCloseButton" Value="&amp;Close" Overridable="yes" />
+  <String Id="FailureHeader" Value="Setup Failed" Overridable="yes" />
+  <String Id="FailureCacheHeader" Value="Cache Failed" Overridable="yes" />
+  <String Id="FailureInstallHeader" Value="Setup Failed" Overridable="yes" />
+  <String Id="FailureLayoutHeader" Value="Layout Failed" Overridable="yes" />
+  <String Id="FailureModifyHeader" Value="Modify Failed" Overridable="yes" />
+  <String Id="FailureRepairHeader" Value="Repair Failed" Overridable="yes" />
+  <String Id="FailureUninstallHeader" Value="Uninstall Failed" Overridable="yes" />
+  <String Id="FailureUnsafeUninstallHeader" Value="Uninstall Failed" Overridable="yes" />
+  <String Id="FailureHyperlinkLogText" Value="One or more issues caused the setup to fail. Please fix the issues and then retry setup. For more information see the &lt;a href=&quot;#&quot;&gt;log file&lt;/a&gt;." Overridable="yes" />
+  <String Id="FailureRestartText" Value="You must restart your computer to complete the rollback of the software." Overridable="yes" />
+  <String Id="FailureRestartButton" Value="&amp;Restart" Overridable="yes" />
+  <String Id="FailureCloseButton" Value="&amp;Close" Overridable="yes" />
+  <String Id="FilesInUseTitle" Value="Files In Use" Overridable="yes" />
+  <String Id="FilesInUseLabel" Value="The following applications are using files that need to be updated:" Overridable="yes" />
+  <String Id="FilesInUseNetfxCloseRadioButton" Value="Close the &amp;applications." Overridable="yes" />
+  <String Id="FilesInUseCloseRadioButton" Value="Close the &amp;applications and attempt to restart them." Overridable="yes" />
+  <String Id="FilesInUseDontCloseRadioButton" Value="&amp;Do not close applications. A reboot will be required." Overridable="yes" />
+  <String Id="FilesInUseRetryButton" Value="&amp;Retry" Overridable="yes" />
+  <String Id="FilesInUseIgnoreButton" Value="&amp;Ignore" Overridable="yes" />
+  <String Id="FilesInUseExitButton" Value="E&amp;xit" Overridable="yes" />
+</WixLocalization>

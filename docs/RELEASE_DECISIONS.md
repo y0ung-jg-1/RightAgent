@@ -59,7 +59,7 @@ release. It is an engineering release record, not legal advice.
 
 - Public installer SKU: ship a WiX 5 Burn `Setup.exe` that embeds a per-machine MSI, matching the PowerToys Setup / UserSetup split. `UserSetup.exe` remains the per-user SKU. Inno Setup is retired.
 - Burn signing: sign the detached Burn engine, reattach it, then sign the final EXE. Signing only the outer file leaves the attached MSI container unreadable after elevation.
-- Installer UI language: follow the Windows display language with English as the default theme and a Simplified Chinese `2052` payload. Traditional Chinese locales fall back to 2052.
+- Installer UI language: follow the Windows display language with English as the default theme and a Simplified Chinese payload for LCIDs `2052` (zh-CN), `4` (zh-Hans), and `1028` (zh-TW). Traditional Chinese uses the same Simplified strings.
 - Settings and menu contract: keep the unpackaged settings app and `%LOCALAPPDATA%\RightAgent\settings.json`. Command packages must resolve that real user directory (not the packaged `LocalCache`) and must accept a UTF-8 BOM on `install.json`, because Windows PowerShell 5 `Set-Content -Encoding utf8` writes one.
 
 ## Publication gate

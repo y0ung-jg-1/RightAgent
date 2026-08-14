@@ -7,6 +7,8 @@ param(
     [string]$ResultPath,
     [switch]$TrustCertificateOnly,
     [switch]$RemoveCommandPackages,
+    [switch]$RemoveCertificateOnly,
+    [switch]$KeepUserData,
     [switch]$SkipAppCopy
 )
 
@@ -215,31 +217,179 @@ function Get-RightAgentRequiredCommandSlotCount {
     return 1
 }
 
-function Restart-RightAgentExplorer {
-    Get-Process -Name explorer -ErrorAction SilentlyContinue |
-        Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 600
-    if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) {
-        Start-Process -FilePath (Join-Path $env:WINDIR 'explorer.exe')
+function Initialize-RightAgentCertificateDrive {
+    if (-not (Get-PSDrive -Name 'Cert' -ErrorAction SilentlyContinue)) {
+        $securityModulePath = Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'
+        if (Test-Path -LiteralPath $securityModulePath -PathType Leaf) {
+            Import-Module -Name $securityModulePath -ErrorAction Stop
+        } else {
+            Import-Module -Name 'Microsoft.PowerShell.Security' -ErrorAction Stop
+        }
     }
+    if (-not (Get-PSDrive -Name 'Cert' -ErrorAction SilentlyContinue)) {
+        throw 'The Cert: drive is unavailable after loading Microsoft.PowerShell.Security.'
+    }
+}
+
+function Stop-RightAgentProcesses {
+    Get-Process -Name 'RightAgent.App', 'RightAgent.Launcher' -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
+function Remove-RightAgentRegisteredPackages {
+    $publisher = 'CN=RightAgent'
+    for ($slot = 0; $slot -lt 16; ++$slot) {
+        $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
+        $installed = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq $publisher })
+        foreach ($package in $installed) {
+            $package | Remove-AppxPackage -ErrorAction Stop
+        }
+    }
+
+    $legacyMain = Get-RightAgentMainPackage -MainPackageName 'RightAgent' -Publisher $publisher
+    if ($legacyMain) {
+        $legacyMain | Remove-AppxPackage -ErrorAction Stop
+    }
+}
+
+function Get-RightAgentTrustedCertificateThumbprint {
+    $cerPath = Join-Path $PSScriptRoot 'RightAgent.cer'
+    if ($CertificatePath -and (Test-Path -LiteralPath $CertificatePath -PathType Leaf)) {
+        $cerPath = $CertificatePath
+    }
+    if (Test-Path -LiteralPath $cerPath -PathType Leaf) {
+        return ([Security.Cryptography.X509Certificates.X509Certificate2]::new((Get-Item -LiteralPath $cerPath).FullName)).Thumbprint
+    }
+    return $null
+}
+
+function Remove-RightAgentTrustedCertificate {
+    Initialize-RightAgentCertificateDrive
+    $storePath = 'Cert:\LocalMachine\TrustedPeople'
+    if (-not (Test-Path -LiteralPath $storePath)) {
+        return
+    }
+
+    $thumbprint = Get-RightAgentTrustedCertificateThumbprint
+    $certs = @(Get-ChildItem -LiteralPath $storePath | Where-Object {
+        if ($thumbprint) {
+            $_.Thumbprint -eq $thumbprint
+        } else {
+            $_.Subject -ceq 'CN=RightAgent'
+        }
+    })
+    if ($certs.Count -eq 0) {
+        return
+    }
+
+    $removeBlock = {
+        param([string[]]$CertificateThumbprints)
+        foreach ($itemThumbprint in $CertificateThumbprints) {
+            $certificatePath = Join-Path 'Cert:\LocalMachine\TrustedPeople' $itemThumbprint
+            if (Test-Path -LiteralPath $certificatePath) {
+                Remove-Item -LiteralPath $certificatePath -Force -ErrorAction Stop
+            }
+        }
+    }
+
+    try {
+        & $removeBlock -CertificateThumbprints @($certs.Thumbprint)
+        return
+    } catch {
+        # Local Machine\Trusted People requires administrator rights when this
+        # custom action is impersonating a standard user.
+    }
+
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+        throw 'The RightAgent certificate could not be removed from Local Computer\Trusted People.'
+    }
+
+    $thumbprintsLiteral = (@($certs.Thumbprint) | ForEach-Object { "'$($_.Replace("'", "''"))'" }) -join ','
+    $elevatedCommand = @"
+`$ErrorActionPreference = 'Stop'
+try {
+    `$securityModulePath = Join-Path `$PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'
+    if (Test-Path -LiteralPath `$securityModulePath -PathType Leaf) {
+        Import-Module -Name `$securityModulePath -ErrorAction Stop
+    } else {
+        Import-Module -Name 'Microsoft.PowerShell.Security' -ErrorAction Stop
+    }
+    foreach (`$itemThumbprint in @($thumbprintsLiteral)) {
+        `$certificatePath = Join-Path 'Cert:\LocalMachine\TrustedPeople' `$itemThumbprint
+        if (Test-Path -LiteralPath `$certificatePath) {
+            Remove-Item -LiteralPath `$certificatePath -Force -ErrorAction Stop
+        }
+    }
+    exit 0
+} catch {
+    Write-Error `$_
+    exit 1
+}
+"@
+    $encodedCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($elevatedCommand))
+    $powerShellExecutable = Join-Path $PSHOME 'powershell.exe'
+    try {
+        $elevatedProcess = Start-Process -FilePath $powerShellExecutable -Verb RunAs -ArgumentList @(
+            '-NoLogo',
+            '-NoProfile',
+            '-NonInteractive',
+            '-EncodedCommand',
+            $encodedCommand
+        ) -WindowStyle Hidden -Wait -PassThru
+    } catch {
+        Write-Warning 'Administrator approval was cancelled. The RightAgent certificate remains in Local Computer\Trusted People.'
+        return
+    }
+    if ($elevatedProcess.ExitCode -ne 0) {
+        Write-Warning 'The RightAgent certificate could not be removed from Local Computer\Trusted People.'
+    }
+}
+
+function Remove-RightAgentUserData {
+    $dataDirectory = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent'
+    if (-not (Test-Path -LiteralPath $dataDirectory)) {
+        return
+    }
+
+    $dataItem = Get-Item -LiteralPath $dataDirectory -Force
+    if (($dataItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Refusing to remove a RightAgent data reparse point: $dataDirectory"
+    }
+    Remove-Item -LiteralPath $dataDirectory -Recurse -Force -ErrorAction Stop
+}
+
+function Notify-RightAgentShell {
+    if (-not ('RightAgentShellNotify' -as [type])) {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class RightAgentShellNotify {
+    [DllImport("shell32.dll")]
+    public static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);
+}
+"@
+    }
+    [RightAgentShellNotify]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
 }
 
 function Stop-RightAgentComSurrogates {
     $installedRightAgentPackages = @(
-        @(Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ceq 'RightAgent' -and $_.Publisher -ceq 'CN=RightAgent' })
-        @(Get-AppxPackage -Name 'RightAgent.Command*' -ErrorAction SilentlyContinue |
+        Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ceq 'RightAgent' -and $_.Publisher -ceq 'CN=RightAgent' }
+        Get-AppxPackage -Name 'RightAgent.Command*' -ErrorAction SilentlyContinue |
             Where-Object {
                 $_.Name -match '^RightAgent\.Command(0[0-9]|1[0-5])$' -and
                 $_.Publisher -ceq 'CN=RightAgent'
-            })
+            }
     )
-    if ($installedRightAgentPackages.Count -eq 0) {
-        return
-    }
-
     if (-not (Get-Command -Name 'Get-CimInstance' -CommandType Cmdlet -ErrorAction SilentlyContinue)) {
-        throw 'RightAgent command packages are active, but the installer cannot inspect their COM surrogate processes. Close all File Explorer windows or sign out, then run Setup again.'
+        if ($installedRightAgentPackages.Count -gt 0) {
+            throw 'RightAgent command packages are active, but the installer cannot inspect their COM surrogate processes. Close all File Explorer windows or sign out, then run Setup again.'
+        }
+        return
     }
 
     $classIds = @(0..15 | ForEach-Object {
@@ -281,25 +431,36 @@ try {
         exit 1618
     }
 
+    if ($RemoveCertificateOnly) {
+        Remove-RightAgentTrustedCertificate
+        Write-Host 'The RightAgent release certificate was removed from Local Computer\Trusted People if it was present.'
+        return
+    }
+
     if ($RemoveCommandPackages) {
-        $publisher = 'CN=RightAgent'
-        for ($slot = 0; $slot -lt 16; ++$slot) {
-            $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
-            $installed = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq $publisher })
-            foreach ($package in $installed) {
-                $package | Remove-AppxPackage -ErrorAction Stop
+        Stop-RightAgentProcesses
+        Stop-RightAgentComSurrogates
+        Remove-RightAgentRegisteredPackages
+        if ($KeepUserData) {
+            $installRecordPath = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\install.json'
+            if (Test-Path -LiteralPath $installRecordPath -PathType Leaf) {
+                Remove-Item -LiteralPath $installRecordPath -Force -ErrorAction Stop
             }
+            $cacheDirectory = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\CommandPackages'
+            if (Test-Path -LiteralPath $cacheDirectory) {
+                $cacheItem = Get-Item -LiteralPath $cacheDirectory -Force
+                if (($cacheItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "Refusing to remove a command-package cache reparse point: $cacheDirectory"
+                }
+                Remove-Item -LiteralPath $cacheDirectory -Recurse -Force -ErrorAction Stop
+            }
+            Write-Host 'RightAgent command packages were removed. User settings were kept for the upgrade.'
+            return
         }
-        $installRecordPath = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\install.json'
-        if (Test-Path -LiteralPath $installRecordPath -PathType Leaf) {
-            Remove-Item -LiteralPath $installRecordPath -Force -ErrorAction Stop
-        }
-        $cacheDirectory = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\CommandPackages'
-        if (Test-Path -LiteralPath $cacheDirectory) {
-            Remove-Item -LiteralPath $cacheDirectory -Recurse -Force -ErrorAction Stop
-        }
-        Write-Host 'RightAgent command packages were removed.'
+
+        Remove-RightAgentUserData
+        Notify-RightAgentShell
+        Write-Host 'RightAgent command packages, user data, and Explorer menu state were removed.'
         return
     }
 
@@ -636,9 +797,11 @@ try {
         }
     }
 
-    Restart-RightAgentExplorer
+    $stampPath = Join-Path $dataDirectory 'command-slots.refreshed'
+    [IO.File]::WriteAllText($stampPath, "$requiredSlots")
+    Notify-RightAgentShell
     Write-RightAgentInstallationProgress -PercentComplete 100
-    Write-Host 'RightAgent installed. Explorer was refreshed so the context menu matches the current menu mode.'
+    Write-Host 'RightAgent installed. The shell was notified so the context menu matches the current menu mode.'
 }
 catch {
     $installationFailure = $_

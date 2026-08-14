@@ -613,19 +613,13 @@ namespace rightagent
         // settings app (or a leftover packaged settings identity) is gone, keep
         // any surviving command package inert instead of falling back to defaults.
         const auto localStateDirectory = GetLocalStateDirectory();
-        const auto settingsPath = localStateDirectory / kSettingsFileName;
-        std::error_code error;
-        if (std::filesystem::is_regular_file(settingsPath, error))
-        {
-            return LoadSettingsFromPath(settingsPath);
-        }
         if (!IsProductInstalled(localStateDirectory))
         {
             Settings settings;
             settings.menuEnabled = false;
             return settings;
         }
-        return LoadSettingsFromPath(settingsPath);
+        return LoadSettingsFromPath(localStateDirectory / kSettingsFileName);
     }
 
     Settings LoadSettingsFromPath(const std::filesystem::path& path)

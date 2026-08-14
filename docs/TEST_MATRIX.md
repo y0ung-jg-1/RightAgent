@@ -27,6 +27,6 @@
 15. Temporarily configure a missing simple command and confirm the launcher error offers **Open settings** without crashing Explorer.
 16. Test light, dark, and high-contrast themes; keyboard-only navigation; Narrator labels; and text scaling.
 17. Close the settings app and complete a menu launch. Confirm Task Manager has no remaining RightAgent process after the launcher returns.
-18. Install `0.1.0.0`, install a higher version over it, then uninstall RightAgent from Apps & features. Confirm any independently installed command packages become inert immediately and no modern context-menu command remains visible.
+18. Install `0.1.0.0`, install a higher version over it, then uninstall RightAgent from Apps & features. Confirm the upgrade kept `%LOCALAPPDATA%\RightAgent\settings.json`. After uninstall, confirm no `RightAgent.Command*` Appx packages remain, `%ProgramFiles%\RightAgent` (or the per-user Programs folder) is gone, `%LOCALAPPDATA%\RightAgent` is gone, the RightAgent certificate is absent from Local Machine\Trusted People, and no modern context-menu command remains visible without signing out.
 
-If Explorer retains a cached command after install/upgrade, close all Explorer windows or sign out once. Do not add a background watcher merely to refresh the menu.
+Setup and the settings app must not terminate `explorer.exe`. If a folder window still shows a stale command after occupancy changes, close that window or sign out once. Do not add a background watcher merely to refresh the menu.

@@ -176,10 +176,16 @@ for ($slot = $requiredSlots; $slot -lt 16; ++$slot) {
     }
 }
 
-Get-Process -Name explorer -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Milliseconds 600
-if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) {
-    Start-Process -FilePath (Join-Path $env:WINDIR 'explorer.exe')
+if (-not ('RightAgentShellNotify' -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class RightAgentShellNotify {
+    [DllImport("shell32.dll")]
+    public static extern void SHChangeNotify(uint eventId, uint flags, IntPtr item1, IntPtr item2);
 }
+"@
+}
+[RightAgentShellNotify]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
 
-Write-Host 'RightAgent installed. Explorer was refreshed so the context menu matches the current menu mode.'
+Write-Host 'RightAgent installed. The shell was notified so the context menu matches the current menu mode.'

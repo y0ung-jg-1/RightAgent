@@ -10,6 +10,7 @@ Starting with v1.0.2, RightAgent is distributed through GitHub Releases as a sin
 2. Double-click Setup and start the installation. The per-machine SKU requests administrator approval. Setup validates every embedded MSIX and the public certificate. The wizard is Chinese or English according to the Windows display language.
 3. First install imports the public RightAgent certificate into Local Computer\Trusted People, never Trusted Root Certification Authorities, then registers only the command packages required by the current menu. Cancelling User Account Control prevents RightAgent installation. Uninstall it from Apps & features.
 4. After installation, right-click a folder or folder background. Setup refreshes File Explorer to match the current menu. If the menu is still stale, close all File Explorer windows or sign out once.
+5. Uninstall from Apps & features removes the settings app, registered command packages, settings and cache under `%LOCALAPPDATA%\RightAgent`, and the project certificate from Local Computer\Trusted People, then refreshes Explorer. Running the same Setup again, or a major upgrade, keeps `settings.json`.
 
 ## Security information
 
