@@ -218,8 +218,14 @@ jobs:
             throw "Setup did not create the Start menu shortcut at '$shortcutPath'."
           }
           $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcutPath)
-          if ($shortcut.TargetPath -cne $appExecutable) {
-            throw "Start menu shortcut target was '$($shortcut.TargetPath)', expected '$appExecutable'."
+          $installerIcon = Join-Path $env:WINDIR 'Installer'
+          $advertisedTarget = $shortcut.TargetPath.StartsWith($installerIcon + '\', [StringComparison]::OrdinalIgnoreCase) -and
+            ([IO.Path]::GetFileName($shortcut.TargetPath) -ceq 'RightAgent.exe')
+          if ($shortcut.TargetPath -cne $appExecutable -and -not $advertisedTarget) {
+            throw "Start menu shortcut target was '$($shortcut.TargetPath)', expected '$appExecutable' or an advertised Windows Installer icon."
+          }
+          if ($shortcut.WorkingDirectory -and $shortcut.WorkingDirectory.TrimEnd('\') -cne ([IO.Path]::GetDirectoryName($appExecutable))) {
+            throw "Start menu shortcut working directory was '$($shortcut.WorkingDirectory)', expected '$( [IO.Path]::GetDirectoryName($appExecutable) )'."
           }
 
           $rightAgentStartApps = @(Get-StartApps | Where-Object {
