@@ -8,6 +8,11 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
             <x:Double x:Key="SettingsCardSpacing">4</x:Double>
+            <!-- Default 476 wraps the action while the header row still has a large gap. -->
+            <x:Double x:Key="SettingsCardWrapThreshold">300</x:Double>
+            <x:Double x:Key="SettingsCardWrapNoIconThreshold">200</x:Double>
+            <!-- SettingsExpander headers otherwise left-align and size-to-content. -->
+            <HorizontalAlignment x:Key="ExpanderHeaderHorizontalContentAlignment">Stretch</HorizontalAlignment>
             <Style
                 x:Key="SettingsSectionHeaderTextBlockStyle"
                 BasedOn="{StaticResource BodyStrongTextBlockStyle}"

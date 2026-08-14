@@ -1,3 +1,4 @@
+using CommunityToolkit.WinUI.Controls;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using RightAgent.App.ViewModels;
@@ -10,12 +11,19 @@ namespace RightAgent.App.Pages;
 
 public sealed partial class MenuPage : Page
 {
-    private const double PreviewBreakpointWidth = 1000;
+    private const double PreviewColumnWidth = 280;
+    private const double PreviewSpacing = 16;
+    private const double MinSettingsColumnWidth = 360;
     private bool? narrowLayoutActive;
 
     public MenuPage()
     {
         InitializeComponent();
+        Loaded += (_, _) =>
+        {
+            ApplyResponsiveLayout(PageRoot.ActualWidth);
+            SettingsLayout.PreventPrematureWrap(PageRoot);
+        };
     }
 
     public MainViewModel ViewModel => App.Main?.ViewModel
@@ -23,7 +31,18 @@ public sealed partial class MenuPage : Page
 
     private void PageRoot_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        var useNarrowLayout = e.NewSize.Width < PreviewBreakpointWidth;
+        ApplyResponsiveLayout(e.NewSize.Width);
+    }
+
+    private void ApplyResponsiveLayout(double pageWidth)
+    {
+        if (pageWidth <= 0)
+        {
+            return;
+        }
+
+        var innerWidth = pageWidth - PageRoot.Padding.Left - PageRoot.Padding.Right;
+        var useNarrowLayout = innerWidth < MinSettingsColumnWidth + PreviewSpacing + PreviewColumnWidth;
         if (narrowLayoutActive == useNarrowLayout)
         {
             return;
@@ -31,8 +50,16 @@ public sealed partial class MenuPage : Page
 
         narrowLayoutActive = useNarrowLayout;
         PreviewCard.Visibility = useNarrowLayout ? Visibility.Collapsed : Visibility.Visible;
-        PreviewColumn.Width = new GridLength(useNarrowLayout ? 0 : 320);
-        PageRoot.ColumnSpacing = useNarrowLayout ? 0 : 24;
+        PreviewColumn.Width = new GridLength(useNarrowLayout ? 0 : PreviewColumnWidth);
+        PageRoot.ColumnSpacing = useNarrowLayout ? 0 : PreviewSpacing;
+    }
+
+    private void SettingsExpander_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is SettingsExpander expander)
+        {
+            SettingsLayout.PreventPrematureWrap(expander);
+        }
     }
 
     private void AddAgent_Click(object sender, RoutedEventArgs e)

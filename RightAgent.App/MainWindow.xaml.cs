@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -14,8 +15,10 @@ public sealed partial class MainWindow : Window
 {
     private const int MinimumWindowWidth = 640;
     private const int MinimumWindowHeight = 540;
-    private const int DefaultWindowWidth = 1240;
-    private const int DefaultWindowHeight = 880;
+    private const int DefaultWindowWidth = 1150;
+    private const int DefaultWindowHeight = 720;
+    private bool defaultSizeApplied;
+    private double defaultPlacementScale;
     private static readonly Uri WindowsTerminalStoreUri = new("ms-windows-store://pdp/?ProductId=9N0DX20HK701");
     private static readonly Uri WindowsTerminalStoreWebUri = new("https://apps.microsoft.com/detail/9n0dx20hk701");
     private bool terminalRequirementChecked;
@@ -26,11 +29,11 @@ public sealed partial class MainWindow : Window
         App.SetMain(this);
         ViewModel = new MainViewModel(App.LocalStateDirectory);
         InitializeComponent();
-        ApplyWindowMetrics();
+        ApplyMinimumSize();
         TryApplyMicaBackdrop();
         ExtendIntoTitleBar();
         Title = ViewModel.WindowTitle;
-        Activated += (_, _) => Title = ViewModel.WindowTitle;
+        Activated += MainWindow_Activated;
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         ViewModel.PersistFailed += (_, message) =>
             ShowStatus(InfoBarSeverity.Error, $"{ViewModel.SaveFailedLabel}: {message}");
@@ -48,6 +51,10 @@ public sealed partial class MainWindow : Window
         try
         {
             ApplyMinimumSize();
+            if (!defaultSizeApplied)
+            {
+                DispatcherQueue.TryEnqueue(PlaceDefaultWindow);
+            }
             await ViewModel.LoadAsync();
             Bindings.Update();
             UpdateStatusInfoBar();
@@ -66,23 +73,138 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ApplyWindowMetrics()
+    private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
-        ApplyMinimumSize();
-        AppWindow.Resize(new SizeInt32(DefaultWindowWidth, DefaultWindowHeight));
-    }
-
-    private void ApplyMinimumSize()
-    {
-        if (AppWindow.Presenter is not OverlappedPresenter presenter)
+        Title = ViewModel.WindowTitle;
+        if (args.WindowActivationState == WindowActivationState.Deactivated || defaultSizeApplied)
         {
             return;
         }
 
-        // PreferredMinimum* is not DPI-aware; pass physical pixels so 640x540 DIP still holds.
-        var scale = RootGrid.XamlRoot?.RasterizationScale ?? 1d;
+        DispatcherQueue.TryEnqueue(PlaceDefaultWindow);
+    }
+
+    private void ApplyMinimumSize()
+    {
+        var scale = GetRasterizationScale();
+        if (scale <= 0 || AppWindow.Presenter is not OverlappedPresenter presenter)
+        {
+            return;
+        }
+
         presenter.PreferredMinimumWidth = (int)Math.Ceiling(MinimumWindowWidth * scale);
         presenter.PreferredMinimumHeight = (int)Math.Ceiling(MinimumWindowHeight * scale);
+    }
+
+    private void PlaceDefaultWindow()
+    {
+        var scale = GetRasterizationScale();
+        if (scale <= 0)
+        {
+            return;
+        }
+
+        ApplyMinimumSize();
+
+        if (defaultSizeApplied && RootGrid.XamlRoot is not null
+            && Math.Abs(scale - defaultPlacementScale) <= 0.01)
+        {
+            return;
+        }
+
+        if (!TryGetWorkArea(out var workLeft, out var workTop, out var workWidth, out var workHeight))
+        {
+            var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+            workLeft = workArea.X;
+            workTop = workArea.Y;
+            workWidth = workArea.Width;
+            workHeight = workArea.Height;
+        }
+
+        var width = (int)Math.Round(DefaultWindowWidth * scale);
+        var height = (int)Math.Round(DefaultWindowHeight * scale);
+        width = Math.Clamp(width, (int)Math.Ceiling(MinimumWindowWidth * scale), workWidth);
+        height = Math.Clamp(height, (int)Math.Ceiling(MinimumWindowHeight * scale), workHeight);
+        var x = workLeft + Math.Max(0, (workWidth - width) / 2);
+        var y = workTop + Math.Max(0, (workHeight - height) / 2);
+        AppWindow.Move(new PointInt32(x, y));
+        AppWindow.Resize(new SizeInt32(width, height));
+        defaultSizeApplied = true;
+        defaultPlacementScale = scale;
+    }
+
+    private bool TryGetWorkArea(out int left, out int top, out int width, out int height)
+    {
+        left = top = width = height = 0;
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        if (hwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref info))
+        {
+            return false;
+        }
+
+        left = info.Work.Left;
+        top = info.Work.Top;
+        width = info.Work.Right - info.Work.Left;
+        height = info.Work.Bottom - info.Work.Top;
+        return width > 0 && height > 0;
+    }
+
+    private double GetRasterizationScale()
+    {
+        if (RootGrid.XamlRoot?.RasterizationScale is > 0 and var xamlScale)
+        {
+            return xamlScale;
+        }
+
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        if (hwnd == IntPtr.Zero)
+        {
+            return 0;
+        }
+
+        var dpi = GetDpiForWindow(hwnd);
+        return dpi > 0 ? dpi / 96d : 0;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    private const uint MonitorDefaultToNearest = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public NativeRect Monitor;
+        public NativeRect Work;
+        public uint Flags;
     }
 
     private async Task PromptForWindowsTerminalAsync()

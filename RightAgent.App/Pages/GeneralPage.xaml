@@ -6,16 +6,22 @@
     NavigationCacheMode="Required">
 
     <ScrollViewer
-        Padding="36,16,52,24"
+        Padding="24,12,24,20"
         HorizontalScrollBarVisibility="Disabled"
         VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="{StaticResource SettingsCardSpacing}">
+        <StackPanel
+            HorizontalAlignment="Stretch"
+            Spacing="{StaticResource SettingsCardSpacing}">
             <TextBlock
                 Margin="0,0,0,12"
                 Style="{ThemeResource TitleTextBlockStyle}"
                 Text="{x:Bind ViewModel.GeneralSectionLabel, Mode=OneWay}" />
 
             <controls:SettingsCard CornerRadius="8" Header="{x:Bind ViewModel.LanguageLabel, Mode=OneWay}">
+                <controls:SettingsCard.Resources>
+                    <x:Double x:Key="SettingsCardWrapThreshold">240</x:Double>
+                    <x:Double x:Key="SettingsCardWrapNoIconThreshold">160</x:Double>
+                </controls:SettingsCard.Resources>
                 <controls:SettingsCard.HeaderIcon>
                     <FontIcon Glyph="&#xE774;" />
                 </controls:SettingsCard.HeaderIcon>
@@ -30,6 +36,10 @@
             </controls:SettingsCard>
 
             <controls:SettingsCard CornerRadius="8" Header="{x:Bind ViewModel.TerminalProfileLabel, Mode=OneWay}">
+                <controls:SettingsCard.Resources>
+                    <x:Double x:Key="SettingsCardWrapThreshold">280</x:Double>
+                    <x:Double x:Key="SettingsCardWrapNoIconThreshold">180</x:Double>
+                </controls:SettingsCard.Resources>
                 <controls:SettingsCard.HeaderIcon>
                     <FontIcon Glyph="&#xE8FD;" />
                 </controls:SettingsCard.HeaderIcon>
