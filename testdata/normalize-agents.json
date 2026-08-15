@@ -1,43 +1,308 @@
 {
-  "schemaVersion": 1,
-  "menuMode": "DIRECT",
-  "directAgentId": "missing",
-  "agents": [
+  "scenarios": [
     {
-      "id": "same",
-      "name": "Same Name",
-      "enabled": true,
-      "sort": 20,
-      "action": { "type": "terminalCommand", "value": "one" }
+      "name": "legacy repairs: case, duplicates, empty ids, unsafe url and icon",
+      "input": {
+        "schemaVersion": 1,
+        "menuMode": "DIRECT",
+        "directAgentId": "missing",
+        "agents": [
+          { "id": "same", "name": "Same Name", "enabled": true, "sort": 20, "action": { "type": "terminalCommand", "value": "one" } },
+          { "id": "same", "name": "Same Name", "enabled": true, "sort": 10, "action": { "type": "terminalCommand", "value": "two" } },
+          { "id": "", "name": "Broken Empty Id", "enabled": true, "sort": 30, "action": { "type": "terminalCommand", "value": "three" } },
+          { "id": "noname", "name": "  ", "enabled": true, "sort": 40, "action": { "type": "terminalCommand", "value": "four" } },
+          { "id": "bad url", "name": "Bad", "enabled": true, "sort": 50, "iconPath": "local:C:/Windows/x.ico", "action": { "type": "url", "value": "file:///C:/x" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "direct",
+        "directAgentId": "same",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "same", "name": "Same Name", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "two" } },
+          { "id": "same-2", "name": "Same Name", "enabled": true, "sort": 1, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "one" } },
+          { "id": "broken-empty-id", "name": "Broken Empty Id", "enabled": true, "sort": 2, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "three" } },
+          { "id": "noname", "name": "noname", "enabled": true, "sort": 3, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "four" } },
+          { "id": "bad-url", "name": "Bad", "enabled": false, "sort": 4, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "file:///C:/x" } }
+        ]
+      }
     },
     {
-      "id": "same",
-      "name": "Same Name",
-      "enabled": true,
-      "sort": 10,
-      "action": { "type": "terminalCommand", "value": "two" }
+      "name": "triple duplicate ids receive chained suffixes after sorting",
+      "input": {
+        "schemaVersion": 1,
+        "agents": [
+          { "id": "dup", "name": "Third", "enabled": true, "sort": 2, "action": { "type": "terminalCommand", "value": "c" } },
+          { "id": "dup", "name": "Second", "enabled": true, "sort": 1, "action": { "type": "terminalCommand", "value": "b" } },
+          { "id": "dup", "name": "First", "enabled": true, "sort": 0, "action": { "type": "terminalCommand", "value": "a" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "grouped",
+        "directAgentId": "dup",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "dup", "name": "First", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "a" } },
+          { "id": "dup-2", "name": "Second", "enabled": true, "sort": 1, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "b" } },
+          { "id": "dup-3", "name": "Third", "enabled": true, "sort": 2, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c" } }
+        ]
+      }
     },
     {
-      "id": "",
-      "name": "Broken Empty Id",
-      "enabled": true,
-      "sort": 30,
-      "action": { "type": "terminalCommand", "value": "three" }
+      "name": "unusable id and name fall back to agent stems",
+      "input": {
+        "schemaVersion": 1,
+        "agents": [
+          { "id": "###", "name": "", "enabled": true, "sort": 0, "action": { "type": "terminalCommand", "value": "x" } },
+          { "id": "", "name": "***", "enabled": true, "sort": 1, "action": { "type": "terminalCommand", "value": "y" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "grouped",
+        "directAgentId": "agent",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "agent", "name": "agent", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "x" } },
+          { "id": "agent-2", "name": "***", "enabled": true, "sort": 1, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "y" } }
+        ]
+      }
     },
     {
-      "id": "noname",
-      "name": "  ",
-      "enabled": true,
-      "sort": 40,
-      "action": { "type": "terminalCommand", "value": "four" }
+      "name": "unknown language and menu mode fall back to defaults",
+      "input": {
+        "schemaVersion": 1,
+        "language": "fr-FR",
+        "menuMode": "banana",
+        "agents": []
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "grouped",
+        "directAgentId": null,
+        "terminalProfile": null,
+        "agents": []
+      }
     },
     {
-      "id": "bad url",
-      "name": "Bad",
-      "enabled": true,
-      "sort": 50,
-      "iconPath": "local:C:/Windows/x.ico",
-      "action": { "type": "url", "value": "file:///C:/x" }
+      "name": "valid language and uppercase multiDirect are kept",
+      "input": {
+        "schemaVersion": 1,
+        "language": "zh-CN",
+        "menuMode": "MULTIDIRECT",
+        "agents": [
+          { "id": "codex", "name": "Codex", "enabled": true, "sort": 0, "action": { "type": "terminalCommand", "value": "codex" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "zh-CN",
+        "menuMode": "multiDirect",
+        "directAgentId": "codex",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "codex", "name": "Codex", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "codex" } }
+        ]
+      }
+    },
+    {
+      "name": "mixed-case direct mode and terminal profile trimming",
+      "input": {
+        "schemaVersion": 1,
+        "menuMode": "DiReCt",
+        "terminalProfile": "  {574e775e-4f2a-5b96-ac1e-a2962d40df93}  ",
+        "agents": [
+          { "id": "web", "name": "Web", "enabled": true, "sort": 0, "action": { "type": "url", "value": "https://example.com" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "direct",
+        "directAgentId": "web",
+        "terminalProfile": "{574e775e-4f2a-5b96-ac1e-a2962d40df93}",
+        "agents": [
+          { "id": "web", "name": "Web", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "https://example.com" } }
+        ]
+      }
+    },
+    {
+      "name": "all agents disabled clears the direct target",
+      "input": {
+        "schemaVersion": 1,
+        "menuMode": "direct",
+        "directAgentId": "x",
+        "agents": [
+          { "id": "x", "name": "Disabled", "enabled": false, "sort": 0, "action": { "type": "terminalCommand", "value": "ok" } },
+          { "id": "y", "name": "Also", "enabled": false, "sort": 1, "action": { "type": "terminalCommand", "value": "ok" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "direct",
+        "directAgentId": null,
+        "terminalProfile": null,
+        "agents": [
+          { "id": "x", "name": "Disabled", "enabled": false, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "ok" } },
+          { "id": "y", "name": "Also", "enabled": false, "sort": 1, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "ok" } }
+        ]
+      }
+    },
+    {
+      "name": "icon prefixes, keys, parents, drive segments and garbage",
+      "input": {
+        "schemaVersion": 1,
+        "agents": [
+          { "id": "icon-case", "name": "Case", "enabled": true, "sort": 0, "iconPath": "builtin:CLAUDE", "action": { "type": "terminalCommand", "value": "c0" } },
+          { "id": "icon-trim", "name": "Trim", "enabled": true, "sort": 1, "iconPath": "builtin: KIMI ", "action": { "type": "terminalCommand", "value": "c1" } },
+          { "id": "icon-unknown", "name": "Unknown", "enabled": true, "sort": 2, "iconPath": "builtin:NOPE", "action": { "type": "terminalCommand", "value": "c2" } },
+          { "id": "icon-local", "name": "Local", "enabled": true, "sort": 3, "iconPath": "LOCAL:Icons\\My Icon.ico", "action": { "type": "terminalCommand", "value": "c3" } },
+          { "id": "icon-parent", "name": "Parent", "enabled": true, "sort": 4, "iconPath": "local:../outside.ico", "action": { "type": "terminalCommand", "value": "c4" } },
+          { "id": "icon-drive", "name": "Drive", "enabled": true, "sort": 5, "iconPath": "local:C:x.ico", "action": { "type": "terminalCommand", "value": "c5" } },
+          { "id": "icon-leading", "name": "Leading", "enabled": true, "sort": 6, "iconPath": "local:/Icons/leading.ico", "action": { "type": "terminalCommand", "value": "c6" } },
+          { "id": "icon-absolute", "name": "Absolute", "enabled": true, "sort": 7, "iconPath": "C:/abs.ico", "action": { "type": "terminalCommand", "value": "c7" } },
+          { "id": "icon-empty", "name": "Empty", "enabled": true, "sort": 8, "iconPath": "", "action": { "type": "terminalCommand", "value": "c8" } },
+          { "id": "icon-blank", "name": "Blank", "enabled": true, "sort": 9, "iconPath": "   ", "action": { "type": "terminalCommand", "value": "c9" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "grouped",
+        "directAgentId": "icon-case",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "icon-case", "name": "Case", "enabled": true, "sort": 0, "iconPath": "builtin:claude", "action": { "type": "terminalCommand", "value": "c0" } },
+          { "id": "icon-trim", "name": "Trim", "enabled": true, "sort": 1, "iconPath": "builtin:kimi", "action": { "type": "terminalCommand", "value": "c1" } },
+          { "id": "icon-unknown", "name": "Unknown", "enabled": true, "sort": 2, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c2" } },
+          { "id": "icon-local", "name": "Local", "enabled": true, "sort": 3, "iconPath": "local:Icons/My Icon.ico", "action": { "type": "terminalCommand", "value": "c3" } },
+          { "id": "icon-parent", "name": "Parent", "enabled": true, "sort": 4, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c4" } },
+          { "id": "icon-drive", "name": "Drive", "enabled": true, "sort": 5, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c5" } },
+          { "id": "icon-leading", "name": "Leading", "enabled": true, "sort": 6, "iconPath": "local:Icons/leading.ico", "action": { "type": "terminalCommand", "value": "c6" } },
+          { "id": "icon-absolute", "name": "Absolute", "enabled": true, "sort": 7, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c7" } },
+          { "id": "icon-empty", "name": "Empty", "enabled": true, "sort": 8, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c8" } },
+          { "id": "icon-blank", "name": "Blank", "enabled": true, "sort": 9, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c9" } }
+        ]
+      }
+    },
+    {
+      "name": "url validation requires an http or https authority",
+      "input": {
+        "schemaVersion": 1,
+        "agents": [
+          { "id": "url-ok", "name": "Ok", "enabled": true, "sort": 0, "action": { "type": "url", "value": "https://example.com/中文" } },
+          { "id": "url-upper", "name": "Upper", "enabled": true, "sort": 1, "action": { "type": "url", "value": "HTTPS://example.com" } },
+          { "id": "url-upper2", "name": "Upper2", "enabled": true, "sort": 2, "action": { "type": "url", "value": "HTTP://localhost:3000/x?a=1" } },
+          { "id": "url-ftp", "name": "Ftp", "enabled": true, "sort": 3, "action": { "type": "url", "value": "ftp://example.com/file" } },
+          { "id": "url-js", "name": "Js", "enabled": true, "sort": 4, "action": { "type": "url", "value": "javascript:alert(1)" } },
+          { "id": "url-slash", "name": "Slash", "enabled": true, "sort": 5, "action": { "type": "url", "value": "http:/missing-slash" } },
+          { "id": "url-space", "name": "Space", "enabled": true, "sort": 6, "action": { "type": "url", "value": "https://two words.example" } },
+          { "id": "url-empty", "name": "Empty", "enabled": true, "sort": 7, "action": { "type": "url", "value": "   " } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "grouped",
+        "directAgentId": "url-ok",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "url-ok", "name": "Ok", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "https://example.com/中文" } },
+          { "id": "url-upper", "name": "Upper", "enabled": true, "sort": 1, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "HTTPS://example.com" } },
+          { "id": "url-upper2", "name": "Upper2", "enabled": true, "sort": 2, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "HTTP://localhost:3000/x?a=1" } },
+          { "id": "url-ftp", "name": "Ftp", "enabled": false, "sort": 3, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "ftp://example.com/file" } },
+          { "id": "url-js", "name": "Js", "enabled": false, "sort": 4, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "javascript:alert(1)" } },
+          { "id": "url-slash", "name": "Slash", "enabled": false, "sort": 5, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "http:/missing-slash" } },
+          { "id": "url-space", "name": "Space", "enabled": false, "sort": 6, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "https://two words.example" } },
+          { "id": "url-empty", "name": "Empty", "enabled": false, "sort": 7, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "" } }
+        ]
+      }
+    },
+    {
+      "name": "action type matching is case sensitive",
+      "input": {
+        "schemaVersion": 1,
+        "menuMode": "grouped",
+        "agents": [
+          { "id": "upper-url", "name": "UpperUrl", "enabled": true, "sort": 0, "action": { "type": "URL", "value": "https://example.com" } },
+          { "id": "normal-url", "name": "NormalUrl", "enabled": true, "sort": 1, "action": { "type": "url", "value": "https://example.com" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "grouped",
+        "directAgentId": "upper-url",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "upper-url", "name": "UpperUrl", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "https://example.com" } },
+          { "id": "normal-url", "name": "NormalUrl", "enabled": true, "sort": 1, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "https://example.com" } }
+        ]
+      }
+    },
+    {
+      "name": "missing sorts default to zero and ties keep document order",
+      "input": {
+        "schemaVersion": 1,
+        "agents": [
+          { "id": "nos", "name": "No Sort", "enabled": true, "action": { "type": "terminalCommand", "value": "n" } },
+          { "id": "zero", "name": "Zero", "enabled": true, "sort": 0, "action": { "type": "terminalCommand", "value": "z" } },
+          { "id": "neg", "name": "Neg", "enabled": true, "sort": -1, "action": { "type": "terminalCommand", "value": "g" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": true,
+        "language": "system",
+        "menuMode": "grouped",
+        "directAgentId": "neg",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "neg", "name": "Neg", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "g" } },
+          { "id": "nos", "name": "No Sort", "enabled": true, "sort": 1, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "n" } },
+          { "id": "zero", "name": "Zero", "enabled": true, "sort": 2, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "z" } }
+        ]
+      }
+    },
+    {
+      "name": "menu disabled and valid direct target pass through unchanged",
+      "input": {
+        "schemaVersion": 1,
+        "menuEnabled": false,
+        "menuMode": "direct",
+        "directAgentId": "KEEP",
+        "agents": [
+          { "id": "keep", "name": "Keep", "enabled": true, "sort": 0, "action": { "type": "terminalCommand", "value": "keep" } }
+        ]
+      },
+      "expected": {
+        "schemaVersion": 1,
+        "menuEnabled": false,
+        "language": "system",
+        "menuMode": "direct",
+        "directAgentId": "KEEP",
+        "terminalProfile": null,
+        "agents": [
+          { "id": "keep", "name": "Keep", "enabled": true, "sort": 0, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "keep" } }
+        ]
+      }
     }
   ]
 }

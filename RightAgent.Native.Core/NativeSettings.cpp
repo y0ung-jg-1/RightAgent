@@ -396,25 +396,13 @@ namespace
     bool IsValidHttpUrl(const std::wstring& value)
     {
         const auto lower = ToLower(Trim(value));
-        return lower.starts_with(L"https://") || lower.starts_with(L"http://");
-    }
-
-    TerminalShell ParseTerminalShell(std::wstring value)
-    {
-        value = ToLower(Trim(std::move(value)));
-        if (value == L"pwsh")
+        if (!lower.starts_with(L"https://") && !lower.starts_with(L"http://"))
         {
-            return TerminalShell::PowerShell7;
+            return false;
         }
-        if (value == L"windowspowershell")
-        {
-            return TerminalShell::WindowsPowerShell;
-        }
-        if (value == L"cmd")
-        {
-            return TerminalShell::CommandPrompt;
-        }
-        return TerminalShell::Automatic;
+        // The managed validator rejects URLs that System.Uri cannot parse;
+        // embedded whitespace covers the same failure class here.
+        return lower.find_first_of(L" \t\r\n\f\v") == std::wstring::npos;
     }
 
     MenuMode ParseMenuMode(std::wstring value)
@@ -459,6 +447,13 @@ namespace
                 for (const auto& segment : relativePath)
                 {
                     if (segment == L"..")
+                    {
+                        return L"builtin:rightagent";
+                    }
+                    // Drive-relative segments ("C:x") are rooted for the managed
+                    // writer and must not survive here as local icon paths.
+                    const std::wstring text = segment.wstring();
+                    if (text.size() >= 2 && std::iswalpha(static_cast<wint_t>(text[0])) && text[1] == L':')
                     {
                         return L"builtin:rightagent";
                     }
@@ -526,6 +521,7 @@ namespace
         {
             settings.language = L"system";
         }
+        settings.terminalProfile = Trim(std::move(settings.terminalProfile));
 
         std::stable_sort(settings.agents.begin(), settings.agents.end(), [](const AgentDefinition& left, const AgentDefinition& right)
         {
@@ -567,25 +563,6 @@ namespace
             }
         }
         return settings;
-    }
-
-    AgentDefinition BuiltIn(
-        const wchar_t* id,
-        const wchar_t* name,
-        const wchar_t* icon,
-        const wchar_t* command,
-        const int sort,
-        const bool enabled)
-    {
-        AgentDefinition agent;
-        agent.id = id;
-        agent.name = name;
-        agent.enabled = enabled;
-        agent.sort = sort;
-        agent.iconPath = icon;
-        agent.actionType = ActionType::TerminalCommand;
-        agent.actionValue = command;
-        return agent;
     }
 }
 
@@ -674,7 +651,6 @@ namespace rightagent
             settings.language = GetString(root, L"language", L"system");
             settings.menuMode = ParseMenuMode(GetString(root, L"menuMode", L"grouped"));
             settings.directAgentId = GetString(root, L"directAgentId");
-            settings.terminalShell = ParseTerminalShell(GetString(root, L"terminalShell", L"auto"));
             settings.terminalProfile = GetString(root, L"terminalProfile");
 
             if (root.HasKey(L"agents") && root.GetNamedValue(L"agents").ValueType() == JsonValueType::Array)
@@ -691,7 +667,7 @@ namespace rightagent
                     agent.id = GetString(object, L"id");
                     agent.name = GetString(object, L"name");
                     agent.enabled = GetBoolean(object, L"enabled", false);
-                    agent.sort = GetInteger(object, L"sort", static_cast<int>(settings.agents.size()));
+                    agent.sort = GetInteger(object, L"sort", 0);
                     agent.iconPath = GetString(object, L"iconPath", L"builtin:rightagent");
                     if (object.HasKey(L"action") && object.GetNamedValue(L"action").ValueType() == JsonValueType::Object)
                     {
@@ -710,29 +686,6 @@ namespace rightagent
         {
             return {};
         }
-    }
-
-    Settings CreateDefaultSettings()
-    {
-        Settings settings;
-        settings.agents =
-        {
-            BuiltIn(L"claude-code", L"Claude Code", L"builtin:claude", L"claude", 0, CommandExists(L"claude")),
-            BuiltIn(L"codex", L"Codex", L"builtin:codex", L"codex", 1, CommandExists(L"codex")),
-            BuiltIn(L"kimi", L"Kimi", L"builtin:kimi", L"kimi", 2, CommandExists(L"kimi")),
-            BuiltIn(L"grok", L"Grok", L"builtin:grok", L"grok", 3, CommandExists(L"grok")),
-            BuiltIn(L"opencode", L"opencode", L"builtin:opencode", L"opencode", 4, CommandExists(L"opencode")),
-            BuiltIn(L"cursor-agent", L"Cursor Agent", L"builtin:cursor", L"cursor-agent", 5, CommandExists(L"cursor-agent"))
-        };
-        for (const auto& agent : settings.agents)
-        {
-            if (agent.enabled)
-            {
-                settings.directAgentId = agent.id;
-                break;
-            }
-        }
-        return settings;
     }
 
     bool CommandExists(std::wstring_view command)

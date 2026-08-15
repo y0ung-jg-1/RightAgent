@@ -7,23 +7,34 @@
 #include <shellapi.h>
 #include <shobjidl.h>
 #include <winrt/base.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Data.Json.h>
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <chrono>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace
 {
+    namespace json = winrt::Windows::Data::Json;
+
     void Expect(const bool condition, const char* message)
     {
         if (!condition)
         {
             throw std::runtime_error(message);
         }
+    }
+
+    void Expect(const bool condition, const std::string& message)
+    {
+        Expect(condition, message.c_str());
     }
 
     void VerifyRoundTrip(const std::vector<std::wstring>& arguments)
@@ -72,21 +83,12 @@ namespace
 
         const auto settings = rightagent::LoadSettingsFromPath(path);
         Expect(settings.menuMode == rightagent::MenuMode::Direct, "Direct mode was not parsed");
-        Expect(settings.terminalShell == rightagent::TerminalShell::CommandPrompt, "Terminal shell was not parsed");
+        // The input still carries a legacy "terminalShell" key; parsing must ignore it.
         Expect(rightagent::FindDirectAgent(settings) != nullptr, "Direct agent was not resolved");
         Expect(rightagent::FindDirectAgent(settings)->id == L"web", "Wrong direct agent");
         Expect(settings.agents.size() == 2, "Agent count changed");
         Expect(!settings.agents[0].enabled, "Unsafe URL should be disabled after sorting");
         Expect(settings.agents[0].iconPath == L"builtin:rightagent", "Unsafe icon path should be replaced");
-        const auto defaultSettings = rightagent::CreateDefaultSettings();
-        Expect(defaultSettings.terminalShell == rightagent::TerminalShell::Automatic, "Default terminal shell should be automatic");
-        const auto cursor = std::find_if(defaultSettings.agents.begin(), defaultSettings.agents.end(), [](const rightagent::AgentDefinition& agent)
-        {
-            return agent.id == L"cursor-agent";
-        });
-        Expect(cursor != defaultSettings.agents.end(), "Cursor Agent default is missing");
-        Expect(cursor->iconPath == L"builtin:cursor", "Cursor Agent default icon changed");
-        Expect(cursor->actionValue == L"cursor-agent", "Cursor Agent command changed");
         Expect(
             rightagent::ResolveIconPath(L"builtin:cursor", L"C:\\RightAgent", L"C:\\LocalState")
                 == std::filesystem::path(L"C:\\RightAgent\\Assets\\Agents\\cursor.ico"),
@@ -517,26 +519,100 @@ namespace
         std::filesystem::remove_all(root, error);
     }
 
+    std::wstring MenuModeString(const rightagent::MenuMode mode)
+    {
+        switch (mode)
+        {
+        case rightagent::MenuMode::Direct:
+            return L"direct";
+        case rightagent::MenuMode::MultiDirect:
+            return L"multiDirect";
+        default:
+            return L"grouped";
+        }
+    }
+
+    std::wstring ActionTypeString(const rightagent::ActionType type)
+    {
+        return type == rightagent::ActionType::Url ? L"url" : L"terminalCommand";
+    }
+
+    std::wstring ExpectedString(const json::JsonObject& object, const wchar_t* key)
+    {
+        const json::IJsonValue value = object.GetNamedValue(key);
+        return value.ValueType() == json::JsonValueType::Null ? std::wstring{} : std::wstring(value.GetString().c_str());
+    }
+
+    void VerifyGoldenScenario(const rightagent::Settings& settings, const json::JsonObject& expected, const uint32_t index)
+    {
+        const std::string scope = "Golden scenario #" + std::to_string(index);
+        Expect(settings.schemaVersion == static_cast<int>(expected.GetNamedNumber(L"schemaVersion")),
+            scope + ": schemaVersion mismatch");
+        Expect(settings.menuEnabled == expected.GetNamedBoolean(L"menuEnabled"),
+            scope + ": menuEnabled mismatch");
+        Expect(settings.language == ExpectedString(expected, L"language"),
+            scope + ": language mismatch");
+        Expect(MenuModeString(settings.menuMode) == ExpectedString(expected, L"menuMode"),
+            scope + ": menuMode mismatch");
+        Expect(settings.directAgentId == ExpectedString(expected, L"directAgentId"),
+            scope + ": directAgentId mismatch");
+        Expect(settings.terminalProfile == ExpectedString(expected, L"terminalProfile"),
+            scope + ": terminalProfile mismatch");
+
+        const json::JsonArray agents = expected.GetNamedArray(L"agents");
+        Expect(settings.agents.size() == agents.Size(), scope + ": agent count mismatch");
+        for (uint32_t position = 0; position < agents.Size(); ++position)
+        {
+            const std::string where = scope + " agent " + std::to_string(position);
+            const rightagent::AgentDefinition& agent = settings.agents[position];
+            const json::JsonObject expectedAgent = agents.GetAt(position).GetObject();
+            Expect(agent.id == ExpectedString(expectedAgent, L"id"), where + ": id mismatch");
+            Expect(agent.name == ExpectedString(expectedAgent, L"name"), where + ": name mismatch");
+            Expect(agent.enabled == expectedAgent.GetNamedBoolean(L"enabled"), where + ": enabled mismatch");
+            Expect(agent.sort == static_cast<int>(expectedAgent.GetNamedNumber(L"sort")), where + ": sort mismatch");
+            Expect(agent.iconPath == ExpectedString(expectedAgent, L"iconPath"), where + ": iconPath mismatch");
+            const json::JsonObject action = expectedAgent.GetNamedObject(L"action");
+            Expect(ActionTypeString(agent.actionType) == ExpectedString(action, L"type"),
+                where + ": action type mismatch");
+            Expect(agent.actionValue == ExpectedString(action, L"value"), where + ": action value mismatch");
+        }
+    }
+
     void TestGoldenNormalize()
     {
         const auto path = rightagent::GetModuleDirectory(GetModuleHandleW(nullptr)) / L"normalize-agents.json";
         Expect(std::filesystem::is_regular_file(path), "Shared normalize golden file is missing next to the native test executable");
-        const auto settings = rightagent::LoadSettingsFromPath(path);
-        Expect(settings.menuMode == rightagent::MenuMode::Direct, "Golden menu mode should be direct");
-        Expect(settings.agents.size() == 5, "Golden agent count changed");
-        Expect(settings.agents[0].id == L"same" && settings.agents[0].actionValue == L"two",
-            "First golden agent should keep the earlier sort and the original id");
-        Expect(settings.agents[1].id == L"same-2" && settings.agents[1].actionValue == L"one",
-            "Duplicate golden id should receive the same suffix as the managed writer");
-        Expect(settings.agents[2].id == L"broken-empty-id" && settings.agents[2].name == L"Broken Empty Id",
-            "Empty golden id should be generated from the name");
-        Expect(settings.agents[3].id == L"noname" && settings.agents[3].name == L"noname",
-            "Empty golden name should fall back to the id");
-        Expect(settings.agents[4].id == L"bad-url"
-                && !settings.agents[4].enabled
-                && settings.agents[4].iconPath == L"builtin:rightagent",
-            "Unsafe golden URL and icon should be disabled and rewritten");
-        Expect(settings.directAgentId == L"same", "Golden direct agent should be the first enabled id");
+        std::ifstream input(path, std::ios::binary);
+        Expect(input.is_open(), "Shared normalize golden file cannot be opened");
+        std::string text{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+        if (text.size() >= 3
+            && static_cast<unsigned char>(text[0]) == 0xEF
+            && static_cast<unsigned char>(text[1]) == 0xBB
+            && static_cast<unsigned char>(text[2]) == 0xBF)
+        {
+            text.erase(0, 3);
+        }
+        const json::JsonObject root = json::JsonObject::Parse(winrt::to_hstring(text));
+        const json::JsonArray scenarios = root.GetNamedArray(L"scenarios");
+        Expect(scenarios.Size() > 0, "Shared normalize golden file has no scenarios");
+
+        const auto scenarioRoot = std::filesystem::temp_directory_path()
+            / L"RightAgent.Native.Tests" / std::to_wstring(GetCurrentProcessId()) / L"golden";
+        std::filesystem::create_directories(scenarioRoot);
+        for (uint32_t index = 0; index < scenarios.Size(); ++index)
+        {
+            const json::JsonObject scenario = scenarios.GetAt(index).GetObject();
+            const auto inputPath = scenarioRoot / (L"scenario-" + std::to_wstring(index) + L".json");
+            {
+                std::ofstream output(inputPath, std::ios::binary | std::ios::trunc);
+                output << winrt::to_string(scenario.GetNamedObject(L"input").Stringify());
+            }
+            const auto settings = rightagent::LoadSettingsFromPath(inputPath);
+            VerifyGoldenScenario(settings, scenario.GetNamedObject(L"expected"), index);
+        }
+
+        std::error_code error;
+        std::filesystem::remove_all(scenarioRoot, error);
     }
 }
 

@@ -65,6 +65,15 @@ public static partial class SettingsValidator
             return true;
         }
 
+        // Uri.TryCreate alone also accepts single-slash forms like "http:/host";
+        // both readers enforce the same "//" authority prefix.
+        var trimmed = value.Trim();
+        if (!trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            && !trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         return Uri.TryCreate(value, UriKind.Absolute, out var uri)
                && (uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
                    || uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase));

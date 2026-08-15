@@ -355,8 +355,11 @@ public sealed class MainViewModel : BindableBase
             return;
         }
 
+        // Cancel only, never Dispose: the replaced source is still held by the
+        // in-flight DebouncedSaveAsync, where a disposed source makes
+        // SemaphoreSlim.WaitAsync(token) throw ObjectDisposedException and
+        // surface as a false PersistFailed.
         autoSaveCts?.Cancel();
-        autoSaveCts?.Dispose();
         autoSaveCts = new CancellationTokenSource();
         var token = autoSaveCts.Token;
         _ = DebouncedSaveAsync(token);

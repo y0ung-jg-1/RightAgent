@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using RightAgent.Core;
 using Xunit;
 
@@ -75,6 +76,8 @@ public sealed class SettingsTests
     [InlineData("http://localhost:3000", true)]
     [InlineData("file:///C:/secret.txt", false)]
     [InlineData("javascript:alert(1)", false)]
+    [InlineData("http:/missing-slash", false)]
+    [InlineData("https://two words.example", false)]
     public void UrlValidationAllowsOnlyHttpAndHttps(string value, bool expected)
     {
         Assert.Equal(expected, SettingsValidator.IsActionValid(SettingsContract.Url, value));
@@ -424,30 +427,30 @@ public sealed class SettingsTests
     }
 
     [Fact]
-    public async Task NormalizeMatchesSharedGoldenFile()
+    public async Task NormalizeMatchesSharedGoldenScenarios()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "normalize-agents.json");
         await using var stream = File.OpenRead(path);
-        var settings = await JsonSerializer.DeserializeAsync<RightAgentSettings>(stream, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        });
-        var result = SettingsValidator.Normalize(settings);
+        var root = await JsonNode.ParseAsync(stream)
+            ?? throw new InvalidOperationException("The shared golden file is not valid JSON.");
+        var scenarios = root["scenarios"] as JsonArray
+            ?? throw new InvalidOperationException("The shared golden file has no scenarios array.");
+        Assert.NotEmpty(scenarios);
+        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-        Assert.Equal(SettingsContract.DirectMenu, result.MenuMode);
-        Assert.Equal(5, result.Agents.Count);
-        Assert.Equal("same", result.Agents[0].Id);
-        Assert.Equal("two", result.Agents[0].Action.Value);
-        Assert.Equal("same-2", result.Agents[1].Id);
-        Assert.Equal("one", result.Agents[1].Action.Value);
-        Assert.Equal("broken-empty-id", result.Agents[2].Id);
-        Assert.Equal("Broken Empty Id", result.Agents[2].Name);
-        Assert.Equal("noname", result.Agents[3].Id);
-        Assert.Equal("noname", result.Agents[3].Name);
-        Assert.Equal("bad-url", result.Agents[4].Id);
-        Assert.False(result.Agents[4].Enabled);
-        Assert.Equal("builtin:rightagent", result.Agents[4].IconPath);
-        Assert.Equal("same", result.DirectAgentId);
+        for (var index = 0; index < scenarios.Count; index++)
+        {
+            var scenario = (JsonObject)scenarios[index]!;
+            var input = scenario["input"]!.Deserialize<RightAgentSettings>(options);
+            var actual = SettingsValidator.Normalize(input);
+            var actualNode = JsonSerializer.SerializeToNode(actual, options);
+
+            Assert.True(
+                JsonNode.DeepEquals(actualNode, scenario["expected"]),
+                $"Golden scenario #{index} ({scenario["name"]}) mismatch:{Environment.NewLine}"
+                    + $"actual:   {actualNode!.ToJsonString()}{Environment.NewLine}"
+                    + $"expected: {scenario["expected"]!.ToJsonString()}");
+        }
     }
 
     [Fact]

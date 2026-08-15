@@ -24,14 +24,6 @@ namespace rightagent
         Url
     };
 
-    enum class TerminalShell
-    {
-        Automatic,
-        PowerShell7,
-        WindowsPowerShell,
-        CommandPrompt
-    };
-
     struct AgentDefinition
     {
         std::wstring id;
@@ -50,7 +42,6 @@ namespace rightagent
         std::wstring language{L"system"};
         MenuMode menuMode{MenuMode::Grouped};
         std::wstring directAgentId;
-        TerminalShell terminalShell{TerminalShell::Automatic};
         std::wstring terminalProfile;
         std::vector<AgentDefinition> agents;
     };
@@ -61,7 +52,6 @@ namespace rightagent
     [[nodiscard]] std::filesystem::path GetSettingsPath();
     [[nodiscard]] Settings LoadSettings();
     [[nodiscard]] Settings LoadSettingsFromPath(const std::filesystem::path& path);
-    [[nodiscard]] Settings CreateDefaultSettings();
     [[nodiscard]] bool CommandExists(std::wstring_view command);
     [[nodiscard]] bool IsChinese(const Settings& settings);
     [[nodiscard]] const AgentDefinition* FindEnabledAgent(const Settings& settings, std::wstring_view id);
