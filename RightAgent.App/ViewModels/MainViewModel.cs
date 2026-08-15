@@ -29,6 +29,9 @@ public sealed class MainViewModel : BindableBase
     private bool hasValidationErrors;
     private CancellationTokenSource? autoSaveCts;
     private readonly SemaphoreSlim saveLock = new(1, 1);
+    // Captured on the UI thread that constructed the view model; persist-side
+    // callbacks marshal their binding cascade back through it.
+    private readonly SynchronizationContext? uiContext = SynchronizationContext.Current;
 
     public MainViewModel(string localStateDirectory)
     {
@@ -146,24 +149,48 @@ public sealed class MainViewModel : BindableBase
             {
                 return;
             }
-            ApplyDirectAgentId(value, allowClear: false);
+            ApplyDirectAgentId(value, allowClear: false, scheduleSave: true);
         }
     }
 
-    private void ApplyDirectAgentId(string? value, bool allowClear)
+    private void ApplyDirectAgentId(string? value, bool allowClear, bool scheduleSave)
     {
         if (value is null && !allowClear)
         {
             return;
         }
 
-        if (SetProperty(ref directAgentId, value, nameof(DirectAgentId)))
+        if (!SetProperty(ref directAgentId, value, nameof(DirectAgentId)))
         {
-            NotifyMenuModePresentation();
-            RefreshPreview();
-            RefreshValidation();
-            ScheduleAutoSave();
+            return;
         }
+
+        if (scheduleSave)
+        {
+            NotifyDirectAgentChanged();
+            ScheduleAutoSave();
+            return;
+        }
+
+        // Persist-side repair runs on a worker after ConfigureAwait(false):
+        // marshal the binding cascade back to the UI thread and never
+        // re-enter the save machinery, which would cancel the in-flight
+        // save's own token and schedule a redundant write of the same state.
+        if (uiContext is { } context)
+        {
+            context.Post(_ => NotifyDirectAgentChanged(), null);
+        }
+        else
+        {
+            NotifyDirectAgentChanged();
+        }
+    }
+
+    private void NotifyDirectAgentChanged()
+    {
+        NotifyMenuModePresentation();
+        RefreshPreview();
+        RefreshValidation();
     }
 
     public string TerminalProfile
@@ -297,13 +324,14 @@ public sealed class MainViewModel : BindableBase
         _ = SynchronizeOccupancyInBackgroundAsync(settings);
     }
 
-    public async Task SaveAsync(
+    /// <summary>Returns the settings snapshot that reached the disk, or null when the save was skipped.</summary>
+    public async Task<RightAgentSettings?> SaveAsync(
         CancellationToken cancellationToken = default,
         bool synchronizeOccupancy = true)
     {
         if (!IsLoaded || HasValidationErrors)
         {
-            return;
+            return null;
         }
 
         RightAgentSettings normalized;
@@ -313,7 +341,7 @@ public sealed class MainViewModel : BindableBase
             normalized = await PersistAsync(cancellationToken).ConfigureAwait(false);
             if (!synchronizeOccupancy)
             {
-                return;
+                return normalized;
             }
         }
         finally
@@ -336,16 +364,21 @@ public sealed class MainViewModel : BindableBase
         {
             // JSON is already on disk. Occupancy is repaired on the next successful load.
         }
+        return normalized;
     }
 
     public async Task FlushAutoSaveAsync()
     {
         autoSaveCts?.Cancel();
         // Persist first so a mode/occupancy change is not lost if the user
-        // closes before the debounce timer. Then sync slots without holding
-        // the save lock on the UI thread.
-        await SaveAsync(synchronizeOccupancy: false).ConfigureAwait(false);
-        _ = SynchronizeOccupancyInBackgroundAsync(BuildCurrentSettings());
+        // closes before the debounce timer. Occupancy follows only a real
+        // persist: with invalid fields the disk keeps the last valid settings
+        // and the installed slots must keep matching those, not the broken UI.
+        var persisted = await SaveAsync(synchronizeOccupancy: false).ConfigureAwait(false);
+        if (persisted is not null)
+        {
+            _ = SynchronizeOccupancyInBackgroundAsync(persisted);
+        }
     }
 
     private void ScheduleAutoSave()
@@ -385,7 +418,7 @@ public sealed class MainViewModel : BindableBase
     {
         var normalized = SettingsValidator.Normalize(BuildCurrentSettings());
         await store.SaveAsync(normalized, cancellationToken);
-        ApplyDirectAgentId(normalized.DirectAgentId, allowClear: true);
+        ApplyDirectAgentId(normalized.DirectAgentId, allowClear: true, scheduleSave: false);
         return normalized;
     }
 
@@ -445,7 +478,8 @@ public sealed class MainViewModel : BindableBase
         {
             ApplyDirectAgentId(
                 Agents.FirstOrDefault(candidate => candidate.Enabled)?.Id,
-                allowClear: true);
+                allowClear: true,
+                scheduleSave: true);
         }
         RefreshSort();
         NotifyState();
