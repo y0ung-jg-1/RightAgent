@@ -33,9 +33,14 @@ public sealed class MainViewModel : BindableBase
     // callbacks marshal their binding cascade back through it.
     private readonly SynchronizationContext? uiContext = SynchronizationContext.Current;
 
-    public MainViewModel(string localStateDirectory)
+    private readonly Func<RightAgentSettings, string, CancellationToken, Task<CommandPackageSyncResult>> synchronizePackages;
+
+    public MainViewModel(
+        string localStateDirectory,
+        Func<RightAgentSettings, string, CancellationToken, Task<CommandPackageSyncResult>>? synchronizePackages = null)
     {
         store = new SettingsStore(localStateDirectory);
+        this.synchronizePackages = synchronizePackages ?? CommandPackageSynchronizer.SynchronizeAsync;
         RefreshLocalization();
     }
 
@@ -351,7 +356,7 @@ public sealed class MainViewModel : BindableBase
 
         try
         {
-            await CommandPackageSynchronizer.SynchronizeAsync(
+            await synchronizePackages(
                 normalized,
                 store.LocalStateDirectory,
                 cancellationToken).ConfigureAwait(false);
@@ -440,7 +445,7 @@ public sealed class MainViewModel : BindableBase
     {
         try
         {
-            await CommandPackageSynchronizer.SynchronizeAsync(settings, store.LocalStateDirectory);
+            await synchronizePackages(settings, store.LocalStateDirectory, CancellationToken.None);
         }
         catch (Exception)
         {

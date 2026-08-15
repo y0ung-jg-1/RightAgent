@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <!-- The App's build targets flow in transitively; this host must not
+         generate its own PRI (Localization reads the copied App PRI). -->
+    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
+    <AppxGeneratePrisForPortableLibrariesEnabled>false</AppxGeneratePrisForPortableLibrariesEnabled>
+    <EnableMsixTooling>false</EnableMsixTooling>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- Resolve the App's transitive MSIX tooling from the package, not the
+         Windows SDK install, matching RightAgent.App. -->
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4948" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RightAgent.App\RightAgent.App.csproj" />
+    <ProjectReference Include="..\RightAgent.Core\RightAgent.Core.csproj" />
+  </ItemGroup>
+  <!-- Localization's ResourceManager falls back to the app PRI next to the
+       test host; copy it once the App project has built. -->
+  <Target Name="CopyAppResources" AfterTargets="Build">
+    <ItemGroup>
+      <AppPri Include="..\RightAgent.App\bin\$(Platform)\$(Configuration)\net10.0-windows10.0.26100.0\win-x64\RightAgent.App.pri" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AppPri)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('%(AppPri.Identity)')" />
+  </Target>
+</Project>
