@@ -225,11 +225,11 @@
                                 MinWidth="240"
                                 MinHeight="44"
                                 AutomationProperties.Name="{x:Bind ViewModel.DirectAgentLabel, Mode=OneWay}"
-                                DisplayMemberPath="Name"
-                                ItemsSource="{x:Bind ViewModel.EnabledAgents, Mode=OneWay}"
+                                DisplayMemberPath="Label"
+                                ItemsSource="{x:Bind ViewModel.EnabledAgentOptions, Mode=OneWay}"
                                 PlaceholderText="{x:Bind ViewModel.PreviewEmptyLabel, Mode=OneWay}"
                                 SelectedValue="{x:Bind ViewModel.DirectAgentId, Mode=TwoWay}"
-                                SelectedValuePath="Id" />
+                                SelectedValuePath="Key" />
                         </controls:SettingsCard>
 
                         <ContentControl

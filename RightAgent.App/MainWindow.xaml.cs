@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -14,8 +15,8 @@ public sealed partial class MainWindow : Window
 {
     private const int MinimumWindowWidth = 640;
     private const int MinimumWindowHeight = 540;
-    private const int DefaultWindowWidth = 1150;
-    private const int DefaultWindowHeight = 720;
+    private const int DefaultWindowWidth = 1109;
+    private const int DefaultWindowHeight = 698;
     private bool defaultSizeApplied;
     private double defaultPlacementScale;
     private static readonly Uri WindowsTerminalStoreUri = new("ms-windows-store://pdp/?ProductId=9N0DX20HK701");
@@ -75,7 +76,7 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Activated(object sender, WindowActivatedEventArgs args)
     {
         Title = ViewModel.WindowTitle;
-        if (args.WindowActivationState == WindowActivationState.Deactivated || defaultSizeApplied)
+        if (args.WindowActivationState == WindowActivationState.Deactivated)
         {
             return;
         }
@@ -129,8 +130,25 @@ public sealed partial class MainWindow : Window
         defaultPlacementScale = scale;
     }
 
-    private double GetRasterizationScale() =>
-        RootGrid.XamlRoot?.RasterizationScale is > 0 and var xamlScale ? xamlScale : 1;
+    private double GetRasterizationScale()
+    {
+        if (RootGrid.XamlRoot?.RasterizationScale is > 0 and var xamlScale)
+        {
+            return xamlScale;
+        }
+
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        if (hwnd == IntPtr.Zero)
+        {
+            return 0;
+        }
+
+        var dpi = GetDpiForWindow(hwnd);
+        return dpi > 0 ? dpi / 96d : 0;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
 
     private async Task PromptForWindowsTerminalAsync()
     {
@@ -281,6 +299,12 @@ public sealed partial class MainWindow : Window
     private void ExtendIntoTitleBar()
     {
         ExtendsContentIntoTitleBar = true;
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Agents", "rightagent.ico");
+        if (File.Exists(iconPath))
+        {
+            AppWindow.SetIcon(iconPath);
+        }
+
         var titleBar = AppWindow.TitleBar;
         titleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
         SetTitleBar(AppTitleBar);

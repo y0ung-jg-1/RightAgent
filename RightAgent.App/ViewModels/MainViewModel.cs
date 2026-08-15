@@ -113,7 +113,7 @@ public sealed class MainViewModel : BindableBase
 
     public bool ShowAgentList => !IsDirectMode && !IsEmpty;
 
-    public IReadOnlyList<AgentItemViewModel> EnabledAgents => [.. Agents.Where(agent => agent.Enabled)];
+    public ObservableCollection<OptionItem> EnabledAgentOptions { get; } = [];
 
     public AgentItemViewModel? SelectedDirectAgent => IsDirectMode ? FindAgent(DirectAgentId) : null;
 
@@ -484,7 +484,7 @@ public sealed class MainViewModel : BindableBase
         if (args.PropertyName is nameof(AgentItemViewModel.Name) or nameof(AgentItemViewModel.Enabled))
         {
             OnPropertyChanged(nameof(Agents));
-            OnPropertyChanged(nameof(EnabledAgents));
+            RefreshEnabledAgentOptions();
         }
 
         if (args.PropertyName is nameof(AgentItemViewModel.Name)
@@ -697,11 +697,60 @@ public sealed class MainViewModel : BindableBase
     private void NotifyState()
     {
         OnPropertyChanged(nameof(Agents));
-        OnPropertyChanged(nameof(EnabledAgents));
+        RefreshEnabledAgentOptions();
         OnPropertyChanged(nameof(IsEmpty));
-        NotifyMenuModePresentation();
         RefreshPreview();
         RefreshValidation();
+    }
+
+    private void RefreshEnabledAgentOptions()
+    {
+        var enabled = Agents.Where(agent => agent.Enabled).ToList();
+        for (var index = EnabledAgentOptions.Count - 1; index >= 0; --index)
+        {
+            if (!enabled.Any(agent => agent.Id == EnabledAgentOptions[index].Key))
+            {
+                EnabledAgentOptions.RemoveAt(index);
+            }
+        }
+
+        for (var index = 0; index < enabled.Count; ++index)
+        {
+            var agent = enabled[index];
+            var existing = EnabledAgentOptions.FirstOrDefault(option => option.Key == agent.Id);
+            if (existing is null)
+            {
+                EnabledAgentOptions.Insert(index, new OptionItem(agent.Id, agent.Name));
+                continue;
+            }
+
+            existing.UpdateLabel(agent.Name);
+            var currentIndex = EnabledAgentOptions.IndexOf(existing);
+            if (currentIndex != index)
+            {
+                EnabledAgentOptions.Move(currentIndex, index);
+            }
+        }
+
+        EnsureDirectAgentId();
+        OnPropertyChanged(nameof(DirectAgentId));
+        NotifyMenuModePresentation();
+    }
+
+    private void EnsureDirectAgentId()
+    {
+        if (directAgentId is not null
+            && Agents.Any(agent => agent.Enabled
+                && agent.Id.Equals(directAgentId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        var next = Agents.FirstOrDefault(agent => agent.Enabled)?.Id;
+        if (!string.Equals(directAgentId, next, StringComparison.Ordinal))
+        {
+            directAgentId = next;
+        }
     }
 
     private void NotifyMenuModePresentation()
