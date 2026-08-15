@@ -484,29 +484,29 @@ public sealed class MainViewModel : BindableBase
 
     private void AgentPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(AgentItemViewModel.Name) or nameof(AgentItemViewModel.Enabled))
+        var property = args.PropertyName;
+        var affectsList = property is nameof(AgentItemViewModel.Name) or nameof(AgentItemViewModel.Enabled);
+        if (affectsList)
         {
             OnPropertyChanged(nameof(Agents));
             RefreshEnabledAgentOptions();
         }
 
-        if (args.PropertyName is nameof(AgentItemViewModel.Name)
-            or nameof(AgentItemViewModel.Enabled)
-            or nameof(AgentItemViewModel.IconPath)
-            or nameof(AgentItemViewModel.ActionType)
-            or nameof(AgentItemViewModel.ActionValue)
-            or nameof(AgentItemViewModel.HasNameError)
-            or nameof(AgentItemViewModel.HasActionError))
+        if (affectsList
+            || property is nameof(AgentItemViewModel.IconPath)
+                or nameof(AgentItemViewModel.ActionType)
+                or nameof(AgentItemViewModel.ActionValue)
+                or nameof(AgentItemViewModel.HasNameError)
+                or nameof(AgentItemViewModel.HasActionError))
         {
             RefreshPreview();
             RefreshValidation();
         }
 
-        if (args.PropertyName is nameof(AgentItemViewModel.Name)
-            or nameof(AgentItemViewModel.Enabled)
-            or nameof(AgentItemViewModel.IconPath)
-            or nameof(AgentItemViewModel.ActionType)
-            or nameof(AgentItemViewModel.ActionValue))
+        if (affectsList
+            || property is nameof(AgentItemViewModel.IconPath)
+                or nameof(AgentItemViewModel.ActionType)
+                or nameof(AgentItemViewModel.ActionValue))
         {
             ScheduleAutoSave();
         }

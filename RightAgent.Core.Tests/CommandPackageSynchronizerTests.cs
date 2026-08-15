@@ -210,6 +210,36 @@ public sealed class CommandPackageSynchronizerTests
         Assert.NotNull(handle);
     }
 
+    [Fact]
+    public void InstallRecordRoundTripsAndDetectsMissingApp()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            var record = new InstallRecord
+            {
+                PackageName = SettingsContract.ReleasePackageName,
+                Publisher = SettingsContract.ReleasePublisher,
+                AppPath = Path.Combine(root, "missing", "RightAgent.App.exe"),
+                Version = "1.1.4.0"
+            };
+            record.Save(root);
+
+            var loaded = InstallRecord.TryLoad(root);
+            Assert.NotNull(loaded);
+            Assert.Equal(SettingsContract.ReleasePackageName, loaded!.PackageName);
+            Assert.Equal(SettingsContract.ReleasePublisher, loaded.Publisher);
+            Assert.Equal(record.AppPath, loaded.AppPath);
+            Assert.Equal("1.1.4.0", loaded.Version);
+            Assert.False(loaded.AppExists);
+            Assert.Empty(Directory.GetFiles(root, "*.tmp-*"));
+        }
+        finally
+        {
+            DeleteTempRoot(root);
+        }
+    }
+
     private static RightAgentSettings TwoAgentMultiDirect() => new()
     {
         MenuMode = SettingsContract.MultiDirectMenu,

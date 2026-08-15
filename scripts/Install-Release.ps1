@@ -14,6 +14,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Release package identity; every Appx query and manifest check below must
+# agree with the settings app's install record.
+$mainPackageName = 'RightAgent'
+$publisher = 'CN=RightAgent'
+
 function Write-RightAgentInstallationProgress {
     param(
         [Parameter(Mandatory)]
@@ -151,13 +156,32 @@ function Get-RightAgentMainPackage {
         Select-Object -First 1
 }
 
+function Get-RightAgentCommandPackages {
+    param(
+        [Parameter(Mandatory)]
+        [string]$CommandPackageName,
+
+        [Parameter(Mandatory)]
+        [string]$Publisher,
+
+        [version]$Version
+    )
+
+    $packages = @(Get-AppxPackage -Name $CommandPackageName -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ceq $CommandPackageName -and $_.Publisher -ceq $Publisher })
+    if ($null -ne $Version) {
+        $packages = @($packages | Where-Object { [version]$_.Version -eq $Version })
+    }
+    return , $packages
+}
+
 function Get-RightAgentSettingsPath {
     $unpackagedSettings = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent\settings.json'
     if (Test-Path -LiteralPath $unpackagedSettings -PathType Leaf) {
         return $unpackagedSettings
     }
 
-    $mainPackage = Get-RightAgentMainPackage -MainPackageName 'RightAgent' -Publisher 'CN=RightAgent'
+    $mainPackage = Get-RightAgentMainPackage -MainPackageName $mainPackageName -Publisher $publisher
     if ($mainPackage) {
         $packagedSettings = Join-Path $env:LOCALAPPDATA "Packages\$($mainPackage.PackageFamilyName)\LocalState\settings.json"
         if (Test-Path -LiteralPath $packagedSettings -PathType Leaf) {
@@ -190,17 +214,14 @@ function Stop-RightAgentProcesses {
 }
 
 function Remove-RightAgentRegisteredPackages {
-    $publisher = 'CN=RightAgent'
     for ($slot = 0; $slot -lt 16; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
-        $installed = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq $publisher })
-        foreach ($package in $installed) {
+        foreach ($package in (Get-RightAgentCommandPackages -CommandPackageName $commandPackageName -Publisher $publisher)) {
             $package | Remove-AppxPackage -ErrorAction Stop
         }
     }
 
-    $legacyMain = Get-RightAgentMainPackage -MainPackageName 'RightAgent' -Publisher $publisher
+    $legacyMain = Get-RightAgentMainPackage -MainPackageName $mainPackageName -Publisher $publisher
     if ($legacyMain) {
         $legacyMain | Remove-AppxPackage -ErrorAction Stop
     }
@@ -229,7 +250,7 @@ function Remove-RightAgentTrustedCertificate {
         if ($thumbprint) {
             $_.Thumbprint -eq $thumbprint
         } else {
-            $_.Subject -ceq 'CN=RightAgent'
+            $_.Subject -ceq $publisher
         }
     })
     if ($certs.Count -eq 0) {
@@ -330,12 +351,11 @@ public static class RightAgentShellNotify {
 
 function Stop-RightAgentComSurrogates {
     $installedRightAgentPackages = @(
-        Get-AppxPackage -Name 'RightAgent' -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ceq 'RightAgent' -and $_.Publisher -ceq 'CN=RightAgent' }
+        Get-RightAgentMainPackage -MainPackageName $mainPackageName -Publisher $publisher
         Get-AppxPackage -Name 'RightAgent.Command*' -ErrorAction SilentlyContinue |
             Where-Object {
                 $_.Name -match '^RightAgent\.Command(0[0-9]|1[0-5])$' -and
-                $_.Publisher -ceq 'CN=RightAgent'
+                $_.Publisher -ceq $publisher
             }
     )
     if (-not (Get-Command -Name 'Get-CimInstance' -CommandType Cmdlet -ErrorAction SilentlyContinue)) {
@@ -417,17 +437,7 @@ try {
         return
     }
 
-    if (-not (Get-PSDrive -Name 'Cert' -ErrorAction SilentlyContinue)) {
-        $securityModulePath = Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1'
-        if (Test-Path -LiteralPath $securityModulePath -PathType Leaf) {
-            Import-Module -Name $securityModulePath -ErrorAction Stop
-        } else {
-            Import-Module -Name 'Microsoft.PowerShell.Security' -ErrorAction Stop
-        }
-    }
-    if (-not (Get-PSDrive -Name 'Cert' -ErrorAction SilentlyContinue)) {
-        throw 'The Cert: drive is unavailable after loading Microsoft.PowerShell.Security.'
-    }
+    Initialize-RightAgentCertificateDrive
     $pkiModulePath = Join-Path $PSHOME 'Modules\PKI\PKI.psd1'
     if (Test-Path -LiteralPath $pkiModulePath -PathType Leaf) {
         Import-Module -Name $pkiModulePath -ErrorAction Stop
@@ -499,7 +509,7 @@ try {
     })
 
     $expectedCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
-    if ($expectedCertificate.Subject -cne 'CN=RightAgent') {
+    if ($expectedCertificate.Subject -cne $publisher) {
         throw "Unexpected release certificate subject: $($expectedCertificate.Subject)"
     }
     if ($expectedCertificate.NotBefore -gt (Get-Date) -or $expectedCertificate.NotAfter -le (Get-Date)) {
@@ -535,7 +545,7 @@ try {
         if ($commandPackagesBySlot.ContainsKey($slotText)) {
             throw "Duplicate RightAgent command package slot $slotText."
         }
-        if ([string]$commandIdentity.Publisher -cne 'CN=RightAgent' -or
+        if ([string]$commandIdentity.Publisher -cne $publisher -or
             [version]([string]$commandIdentity.Version) -ne $packageVersion -or
             [string]$commandIdentity.ProcessorArchitecture -cne 'x64') {
             throw "RightAgent command package $slotText does not match the main package identity."
@@ -626,8 +636,6 @@ try {
         return
     }
 
-    $mainPackageName = 'RightAgent'
-    $publisher = 'CN=RightAgent'
     $dataDirectory = Join-Path (Get-RightAgentUserLocalAppData) 'RightAgent'
     $targetExecutable = Join-Path $TargetDirectory 'RightAgent.App.exe'
 
@@ -688,13 +696,7 @@ try {
     $slotSpan = if ($requiredSlots -gt 0) { [int][Math]::Floor(40 / $requiredSlots) } else { 0 }
     for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
-        $sameVersionCommand = $null -ne (Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.Name -ceq $commandPackageName -and
-                $_.Publisher -ceq $publisher -and
-                [version]$_.Version -eq $packageVersion
-            } |
-            Select-Object -First 1)
+        $sameVersionCommand = (Get-RightAgentCommandPackages -CommandPackageName $commandPackageName -Publisher $publisher -Version $packageVersion).Count -gt 0
         $basePercent = 50 + ($slotSpan * $slot)
         if ($sameVersionCommand) {
             Write-RightAgentInstallationProgress -PercentComplete ([Math]::Min(90, $basePercent + $slotSpan))
@@ -709,9 +711,7 @@ try {
 
     for ($slot = $requiredSlots; $slot -lt 16; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
-        $extraPackages = @(Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq $publisher })
-        foreach ($extraPackage in $extraPackages) {
+        foreach ($extraPackage in (Get-RightAgentCommandPackages -CommandPackageName $commandPackageName -Publisher $publisher)) {
             $extraPackage | Remove-AppxPackage -ErrorAction Stop
         }
     }
@@ -729,12 +729,7 @@ try {
     }
     for ($slot = 0; $slot -lt $requiredSlots; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
-        $installedCommand = Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.Name -ceq $commandPackageName -and
-                $_.Publisher -ceq $publisher -and
-                [version]$_.Version -eq $packageVersion
-            } |
+        $installedCommand = Get-RightAgentCommandPackages -CommandPackageName $commandPackageName -Publisher $publisher -Version $packageVersion |
             Select-Object -First 1
         if (-not $installedCommand) {
             throw "RightAgent installation verification failed for package '$commandPackageName' version $packageVersion."
@@ -742,8 +737,7 @@ try {
     }
     for ($slot = $requiredSlots; $slot -lt 16; ++$slot) {
         $commandPackageName = "RightAgent.Command$($slot.ToString('D2'))"
-        $unexpected = Get-AppxPackage -Name $commandPackageName -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ceq $commandPackageName -and $_.Publisher -ceq $publisher } |
+        $unexpected = Get-RightAgentCommandPackages -CommandPackageName $commandPackageName -Publisher $publisher |
             Select-Object -First 1
         if ($unexpected) {
             throw "RightAgent left unused command package '$commandPackageName' registered."

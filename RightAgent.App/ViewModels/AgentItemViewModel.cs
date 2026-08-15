@@ -86,9 +86,10 @@ public sealed class AgentItemViewModel : BindableBase
         {
             if (IconPath.StartsWith("local:", StringComparison.OrdinalIgnoreCase))
             {
+                var localState = AppPaths.GetLocalStateDirectory();
                 var relative = IconPath["local:".Length..].Replace('/', Path.DirectorySeparatorChar);
-                var fullPath = Path.GetFullPath(Path.Combine(AppPaths.GetLocalStateDirectory(), relative));
-                var root = Path.GetFullPath(AppPaths.GetLocalStateDirectory());
+                var fullPath = Path.GetFullPath(Path.Combine(localState, relative));
+                var root = Path.GetFullPath(localState);
                 if (fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase) && File.Exists(fullPath))
                 {
                     return new Uri(fullPath).AbsoluteUri + "?v=" + iconRevision;

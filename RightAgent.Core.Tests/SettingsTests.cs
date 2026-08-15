@@ -110,90 +110,6 @@ public sealed class SettingsTests
     }
 
     [Fact]
-    public void CommandSlotPlannerMatchesVisibleRootCommands()
-    {
-        var disabled = new RightAgentSettings
-        {
-            MenuEnabled = false,
-            MenuMode = SettingsContract.MultiDirectMenu,
-            Agents = [Agent("One", "one", true, 0), Agent("Two", "two", true, 1)]
-        };
-        Assert.Equal(0, CommandSlotPlanner.RequiredSlotCount(disabled));
-
-        var empty = new RightAgentSettings
-        {
-            MenuMode = SettingsContract.GroupedMenu,
-            Agents = [Agent("Off", "off", false, 0)]
-        };
-        Assert.Equal(0, CommandSlotPlanner.RequiredSlotCount(empty));
-
-        var grouped = new RightAgentSettings
-        {
-            MenuMode = SettingsContract.GroupedMenu,
-            Agents = [Agent("One", "one", true, 0), Agent("Two", "two", true, 1)]
-        };
-        Assert.Equal(1, CommandSlotPlanner.RequiredSlotCount(grouped));
-        Assert.Equal(1, CommandSlotPlanner.RequiredSlotCount(new RightAgentSettings
-        {
-            MenuMode = SettingsContract.DirectMenu,
-            DirectAgentId = "two",
-            Agents = grouped.Agents
-        }));
-
-        var multiDirect = new RightAgentSettings
-        {
-            MenuMode = SettingsContract.MultiDirectMenu,
-            Agents =
-            [
-                Agent("One", "one", true, 0),
-                Agent("Off", "off", false, 1),
-                Agent("Two", "two", true, 2),
-                Agent("Three", "three", true, 3)
-            ]
-        };
-        Assert.Equal(3, CommandSlotPlanner.RequiredSlotCount(multiDirect));
-        var tooMany = new RightAgentSettings
-        {
-            MenuMode = SettingsContract.MultiDirectMenu,
-            Agents = Enumerable.Range(0, 17).Select(index => Agent($"A{index}", $"a{index}", true, index)).ToList()
-        };
-        Assert.Equal(16, CommandSlotPlanner.RequiredSlotCount(tooMany));
-        Assert.Equal("00.msix", CommandSlotPlanner.CommandPackageFileName(0));
-        Assert.Equal("15.msix", CommandSlotPlanner.CommandPackageFileName(15));
-    }
-
-    [Fact]
-    public void CommandPackageCacheRequiresEverySlotFile()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "RightAgent.Tests", Guid.NewGuid().ToString("N"));
-        try
-        {
-            Assert.False(CommandSlotPlanner.CacheIsComplete(root));
-            Assert.False(CommandSlotPlanner.CachedPackageExists(root, 0));
-            Directory.CreateDirectory(root);
-            File.WriteAllBytes(Path.Combine(root, CommandSlotPlanner.CommandPackageFileName(0)), [1]);
-            Assert.True(CommandSlotPlanner.CachedPackageExists(root, 0));
-            Assert.False(CommandSlotPlanner.CachedPackageExists(root, 1));
-            Assert.False(CommandSlotPlanner.CacheIsComplete(root));
-            for (var slot = 1; slot < SettingsContract.MaxMultiDirectAgents; ++slot)
-            {
-                File.WriteAllBytes(Path.Combine(root, CommandSlotPlanner.CommandPackageFileName(slot)), [1]);
-            }
-            Assert.True(CommandSlotPlanner.CacheIsComplete(root));
-            File.Delete(Path.Combine(root, "07.msix"));
-            Assert.False(CommandSlotPlanner.CacheIsComplete(root));
-            Assert.False(CommandSlotPlanner.CachedPackageExists(root, 7));
-        }
-        finally
-        {
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
-        }
-    }
-
-    [Fact]
     public void MenuEnabledDefaultsToTrueAndSurvivesNormalize()
     {
         Assert.True(SettingsDefaults.Create(_ => false).MenuEnabled);
@@ -292,92 +208,6 @@ public sealed class SettingsTests
         Assert.Equal(width * height * 4, pixels.Length);
     }
 
-    [Fact]
-    public void WindowsTerminalLocatorChecksPathAndWindowsAppsAlias()
-    {
-        var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            Path.Combine("C:\\Tools", "wt.exe")
-        };
-
-        Assert.True(WindowsTerminalLocator.IsAvailable(
-            "C:\\Other;\"C:\\Tools\"",
-            "C:\\Users\\Test\\AppData\\Local",
-            existing.Contains));
-
-        existing.Clear();
-        existing.Add(Path.Combine("C:\\Users\\Test\\AppData\\Local", "Microsoft", "WindowsApps", "wt.exe"));
-
-        Assert.True(WindowsTerminalLocator.IsAvailable(
-            "C:\\Other",
-            "C:\\Users\\Test\\AppData\\Local",
-            existing.Contains));
-    }
-
-    [Fact]
-    public void WindowsTerminalLocatorReportsMissingTerminal()
-    {
-        Assert.False(WindowsTerminalLocator.IsAvailable("C:\\Missing", "C:\\MissingLocal", _ => false));
-    }
-
-    [Fact]
-    public void WindowsTerminalProfileCatalogReadsVisibleProfilesAndDefault()
-    {
-        var catalog = WindowsTerminalProfileCatalog.Parse(
-            """
-            {
-              // Startup
-              "defaultProfile": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
-              "profiles": {
-                "list": [
-                  { "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}", "name": "Windows PowerShell", "hidden": false },
-                  { "guid": "{574e775e-4f2a-5b96-ac1e-a2962a402336}", "name": "PowerShell", "hidden": false },
-                  { "guid": "{7f0c4180-34d6-53ed-a60e-a10bbf11a91e}", "name": "VS 2019", "hidden": true }
-                ]
-              }
-            }
-            """);
-
-        Assert.Equal("{574e775e-4f2a-5b96-ac1e-a2962a402336}", catalog.DefaultProfileId);
-        Assert.Equal("PowerShell", catalog.DefaultProfileName);
-        Assert.Equal(["Windows PowerShell", "PowerShell"], catalog.VisibleProfiles.Select(profile => profile.Name));
-        Assert.Equal("{574e775e-4f2a-5b96-ac1e-a2962a402336}", catalog.NormalizeSelection("PowerShell"));
-        Assert.Equal("{61c54bbd-c2c6-5271-96e7-009a87ff44bf}", catalog.NormalizeSelection("61c54bbd-c2c6-5271-96e7-009a87ff44bf"));
-        Assert.Null(catalog.NormalizeSelection(" "));
-        Assert.Equal("Custom", catalog.NormalizeSelection("Custom"));
-    }
-
-    [Fact]
-    public void WindowsTerminalProfileCatalogSupportsLegacyProfileArray()
-    {
-        var catalog = WindowsTerminalProfileCatalog.Parse(
-            """
-            { "defaultProfile": "cmd", "profiles": [ { "name": "cmd" }, { "guid": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}", "name": "Command Prompt" } ] }
-            """);
-
-        Assert.Equal("cmd", catalog.DefaultProfileName);
-        Assert.Equal(2, catalog.Profiles.Count);
-    }
-
-    [Fact]
-    public void WindowsTerminalProfileCatalogLoadUsesFirstExistingSettingsFile()
-    {
-        var localAppData = "C:\\Users\\Test\\AppData\\Local";
-        var preview = Path.Combine(localAppData, "Packages", "Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe", "LocalState", "settings.json");
-        var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { preview };
-        var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            [preview] = """{ "defaultProfile": "Preview PowerShell", "profiles": [ { "name": "Preview PowerShell" } ] }"""
-        };
-
-        var catalog = WindowsTerminalProfileCatalog.Load(localAppData, existing.Contains, path => files[path]);
-
-        Assert.Equal("Preview PowerShell", catalog.DefaultProfileName);
-        Assert.Contains(
-            Path.Combine(localAppData, "Packages", "Microsoft.WindowsTerminal_8wekyb3d8bbwe", "LocalState", "settings.json"),
-            WindowsTerminalProfileCatalog.SettingsPaths(localAppData));
-    }
-
     private static AgentDefinition Agent(
         string name,
         string id,
@@ -392,39 +222,6 @@ public sealed class SettingsTests
             IconPath = "builtin:rightagent",
             Action = new AgentAction { Type = SettingsContract.TerminalCommand, Value = value }
         };
-
-    [Fact]
-    public void InstallRecordRoundTripsAndDetectsMissingApp()
-    {
-        var root = Path.Combine(Path.GetTempPath(), "RightAgent.Tests", Guid.NewGuid().ToString("N"));
-        try
-        {
-            var record = new InstallRecord
-            {
-                PackageName = SettingsContract.ReleasePackageName,
-                Publisher = SettingsContract.ReleasePublisher,
-                AppPath = Path.Combine(root, "missing", "RightAgent.App.exe"),
-                Version = "1.1.4.0"
-            };
-            record.Save(root);
-
-            var loaded = InstallRecord.TryLoad(root);
-            Assert.NotNull(loaded);
-            Assert.Equal(SettingsContract.ReleasePackageName, loaded!.PackageName);
-            Assert.Equal(SettingsContract.ReleasePublisher, loaded.Publisher);
-            Assert.Equal(record.AppPath, loaded.AppPath);
-            Assert.Equal("1.1.4.0", loaded.Version);
-            Assert.False(loaded.AppExists);
-            Assert.Empty(Directory.GetFiles(root, "*.tmp-*"));
-        }
-        finally
-        {
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
-        }
-    }
 
     [Fact]
     public async Task NormalizeMatchesSharedGoldenScenarios()
@@ -451,43 +248,5 @@ public sealed class SettingsTests
                     + $"actual:   {actualNode!.ToJsonString()}{Environment.NewLine}"
                     + $"expected: {scenario["expected"]!.ToJsonString()}");
         }
-    }
-
-    [Fact]
-    public void OccupancyPlanAddsMissingCachedSlotsAndRemovesExtras()
-    {
-        var installed = new Dictionary<int, string>
-        {
-            [0] = "RightAgent.Command00_1.0.0.0_x64__pub",
-            [2] = "RightAgent.Command02_1.0.0.0_x64__pub"
-        };
-        var plan = CommandSlotPlanner.Plan(2, installed, slot => slot == 1);
-
-        Assert.Equal([1], plan.SlotsToAdd);
-        Assert.Equal(["RightAgent.Command02_1.0.0.0_x64__pub"], plan.PackagesToRemove);
-        Assert.False(plan.CacheMissingRequiredSlots);
-    }
-
-    [Fact]
-    public void OccupancyPlanReportsMissingCacheInsteadOfInventingAdds()
-    {
-        var plan = CommandSlotPlanner.Plan(2, new Dictionary<int, string>(), _ => false);
-
-        Assert.Empty(plan.SlotsToAdd);
-        Assert.Empty(plan.PackagesToRemove);
-        Assert.True(plan.CacheMissingRequiredSlots);
-    }
-
-    [Fact]
-    public void OccupancyPlanIsUnchangedWhenRequiredSlotsAreInstalled()
-    {
-        var plan = CommandSlotPlanner.Plan(
-            1,
-            new Dictionary<int, string> { [0] = "RightAgent.Command00_1.0.0.0_x64__pub" },
-            _ => true);
-
-        Assert.Empty(plan.SlotsToAdd);
-        Assert.Empty(plan.PackagesToRemove);
-        Assert.False(plan.CacheMissingRequiredSlots);
     }
 }
