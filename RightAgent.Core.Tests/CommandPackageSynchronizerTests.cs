@@ -49,6 +49,7 @@ public sealed class CommandPackageSynchronizerTests
             Assert.Empty(deployment.AddedPackages);
             Assert.Empty(deployment.RemovedPackages);
             Assert.Equal(0, deployment.NotifyCalls);
+            Assert.Equal(1, deployment.AcquireCalls);
         }
         finally
         {
@@ -70,7 +71,7 @@ public sealed class CommandPackageSynchronizerTests
 
             Assert.Equal(CommandPackageSyncResult.Skipped, result);
             Assert.False(File.Exists(Path.Combine(root, "command-slots.refreshed")));
-            Assert.Equal(0, deployment.AcquireCalls);
+            Assert.Equal(1, deployment.AcquireCalls);
         }
         finally
         {
@@ -192,6 +193,38 @@ public sealed class CommandPackageSynchronizerTests
     }
 
     [Fact]
+    public async Task OverlappingRunsLeaveInstalledSlotsMatchingTheStamp()
+    {
+        var root = CreateTempRoot();
+        try
+        {
+            WriteInstallRecord(root);
+            WriteCachedPackages(root, 0, 1);
+            var deployment = new LiveDeployment
+            {
+                AddDelay = TimeSpan.FromMilliseconds(150)
+            };
+            var synchronizer = new CommandPackageSynchronizer(deployment);
+
+            var twoSlots = synchronizer.RunAsync(TwoAgentMultiDirect(), root);
+            await Task.Delay(40);
+            var oneSlot = synchronizer.RunAsync(OneAgentGrouped(), root);
+            await Task.WhenAll(twoSlots, oneSlot);
+
+            var installed = deployment.Snapshot();
+            Assert.Contains(installed.Count, (int[])[1, 2]);
+            Assert.Equal(Enumerable.Range(0, installed.Count), installed.Keys.OrderBy(slot => slot));
+            Assert.Equal(
+                installed.Count.ToString(),
+                File.ReadAllText(Path.Combine(root, "command-slots.refreshed")).Trim());
+        }
+        finally
+        {
+            DeleteTempRoot(root);
+        }
+    }
+
+    [Fact]
     public void AbandonedMutexIsStillAcquired()
     {
         var name = @"Local\RightAgent.Tests.Abandoned." + Guid.NewGuid().ToString("N");
@@ -239,6 +272,24 @@ public sealed class CommandPackageSynchronizerTests
             DeleteTempRoot(root);
         }
     }
+
+    private static RightAgentSettings OneAgentGrouped() => new()
+    {
+        MenuMode = SettingsContract.GroupedMenu,
+        MenuEnabled = true,
+        DirectAgentId = "a",
+        Agents =
+        [
+            new AgentDefinition
+            {
+                Id = "a",
+                Name = "A",
+                Enabled = true,
+                Sort = 0,
+                Action = new AgentAction { Type = SettingsContract.TerminalCommand, Value = "cmd-a" }
+            }
+        ]
+    };
 
     private static RightAgentSettings TwoAgentMultiDirect() => new()
     {
@@ -373,6 +424,90 @@ public sealed class CommandPackageSynchronizerTests
             public void Dispose()
             {
                 Disposed = true;
+            }
+        }
+    }
+
+    private sealed class LiveDeployment : ICommandPackageDeployment
+    {
+        private readonly object installationGate = new();
+        private readonly object installedLock = new();
+        private readonly Dictionary<int, string> installed = new();
+
+        public TimeSpan AddDelay { get; set; }
+
+        public Dictionary<int, string> Snapshot()
+        {
+            lock (installedLock)
+            {
+                return new Dictionary<int, string>(installed);
+            }
+        }
+
+        public bool TryGetCurrentPackageIdentity(out string mainPackageName, out string publisher)
+        {
+            mainPackageName = SettingsContract.ReleasePackageName;
+            publisher = SettingsContract.ReleasePublisher;
+            return true;
+        }
+
+        public Dictionary<int, string> FindInstalledCommandSlots(string mainPackageName, string publisher)
+        {
+            return Snapshot();
+        }
+
+        public IDisposable? TryAcquireInstallationMutex(TimeSpan timeout)
+        {
+            if (!Monitor.TryEnter(installationGate, timeout))
+            {
+                return null;
+            }
+
+            return new GateReleaser(installationGate);
+        }
+
+        public void AddPackage(string packagePath, CancellationToken cancellationToken)
+        {
+            if (AddDelay > TimeSpan.Zero)
+            {
+                Thread.Sleep(AddDelay);
+            }
+
+            var slot = int.Parse(
+                Path.GetFileNameWithoutExtension(packagePath),
+                System.Globalization.CultureInfo.InvariantCulture);
+            lock (installedLock)
+            {
+                installed[slot] = "RightAgent.Command" + slot.ToString("D2") + "_1.0.0.0_x64__pub";
+            }
+        }
+
+        public void RemovePackage(string packageFullName, CancellationToken cancellationToken)
+        {
+            lock (installedLock)
+            {
+                foreach (var entry in installed)
+                {
+                    if (entry.Value != packageFullName)
+                    {
+                        continue;
+                    }
+
+                    installed.Remove(entry.Key);
+                    return;
+                }
+            }
+        }
+
+        public void NotifyShellAssociationsChanged()
+        {
+        }
+
+        private sealed class GateReleaser(object gate) : IDisposable
+        {
+            public void Dispose()
+            {
+                Monitor.Exit(gate);
             }
         }
     }

@@ -71,37 +71,41 @@ public sealed class CommandPackageSynchronizer
 
         var cacheDirectory = Path.Combine(localStateDirectory, CommandSlotPlanner.CommandPackageCacheDirectoryName);
         var requiredSlots = CommandSlotPlanner.RequiredSlotCount(settings);
-        var installed = deployment.FindInstalledCommandSlots(mainPackageName, publisher);
-        var plan = CommandSlotPlanner.Plan(
-            requiredSlots,
-            installed,
-            slot => CommandSlotPlanner.CachedPackageExists(cacheDirectory, slot));
         var stampPath = Path.Combine(localStateDirectory, "command-slots.refreshed");
-        var stampMatches = File.Exists(stampPath)
-            && string.Equals(File.ReadAllText(stampPath).Trim(), requiredSlots.ToString(), StringComparison.Ordinal);
-        if (plan.SlotsToAdd.Count == 0 && plan.PackagesToRemove.Count == 0)
-        {
-            if (plan.CacheMissingRequiredSlots)
-            {
-                return CommandPackageSyncResult.Skipped;
-            }
 
-            if (!stampMatches)
-            {
-                File.WriteAllText(stampPath, requiredSlots.ToString());
-            }
-
-            return CommandPackageSyncResult.Unchanged;
-        }
-
+        // List/plan/apply must share one mutex so a later snapshot cannot write
+        // a stamp from a stale list while an earlier add/remove still runs.
         var mutexHandle = deployment.TryAcquireInstallationMutex(InstallationMutexTimeout);
         if (mutexHandle is null)
         {
             return CommandPackageSyncResult.Skipped;
         }
 
+        var applied = false;
         using (mutexHandle)
         {
+            var installed = deployment.FindInstalledCommandSlots(mainPackageName, publisher);
+            var plan = CommandSlotPlanner.Plan(
+                requiredSlots,
+                installed,
+                slot => CommandSlotPlanner.CachedPackageExists(cacheDirectory, slot));
+            var stampMatches = File.Exists(stampPath)
+                && string.Equals(File.ReadAllText(stampPath).Trim(), requiredSlots.ToString(), StringComparison.Ordinal);
+            if (plan.SlotsToAdd.Count == 0 && plan.PackagesToRemove.Count == 0)
+            {
+                if (plan.CacheMissingRequiredSlots)
+                {
+                    return CommandPackageSyncResult.Skipped;
+                }
+
+                if (!stampMatches)
+                {
+                    File.WriteAllText(stampPath, requiredSlots.ToString());
+                }
+
+                return CommandPackageSyncResult.Unchanged;
+            }
+
             foreach (var slot in plan.SlotsToAdd)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -114,15 +118,21 @@ public sealed class CommandPackageSynchronizer
                 cancellationToken.ThrowIfCancellationRequested();
                 deployment.RemovePackage(fullName, cancellationToken);
             }
+
+            applied = true;
+            var installedAfter = deployment.FindInstalledCommandSlots(mainPackageName, publisher);
+            var requiredInstalled = Enumerable.Range(0, requiredSlots).Count(slot => installedAfter.ContainsKey(slot));
+            if (requiredInstalled >= requiredSlots)
+            {
+                File.WriteAllText(stampPath, requiredSlots.ToString());
+            }
         }
 
-        deployment.NotifyShellAssociationsChanged();
-        var installedAfter = deployment.FindInstalledCommandSlots(mainPackageName, publisher);
-        var requiredInstalled = Enumerable.Range(0, requiredSlots).Count(slot => installedAfter.ContainsKey(slot));
-        if (requiredInstalled >= requiredSlots)
+        if (applied)
         {
-            File.WriteAllText(stampPath, requiredSlots.ToString());
+            deployment.NotifyShellAssociationsChanged();
         }
+
         return CommandPackageSyncResult.Refreshed;
     }
 

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
+using Microsoft.UI.Dispatching;
 using RightAgent.App.Services;
 using RightAgent.Core;
 
@@ -29,18 +30,23 @@ public sealed class MainViewModel : BindableBase
     private bool hasValidationErrors;
     private CancellationTokenSource? autoSaveCts;
     private readonly SemaphoreSlim saveLock = new(1, 1);
-    // Captured on the UI thread that constructed the view model; persist-side
-    // callbacks marshal their binding cascade back through it.
+    private readonly SemaphoreSlim occupancyLock = new(1, 1);
+    private int occupancyGeneration;
+    // Production WinUI has no SynchronizationContext; tests may install one.
+    private readonly DispatcherQueue? uiQueue = TryGetDispatcherQueue();
     private readonly SynchronizationContext? uiContext = SynchronizationContext.Current;
 
     private readonly Func<RightAgentSettings, string, CancellationToken, Task<CommandPackageSyncResult>> synchronizePackages;
+    private readonly Func<WindowsTerminalProfileCatalog> loadTerminalCatalog;
 
     public MainViewModel(
         string localStateDirectory,
-        Func<RightAgentSettings, string, CancellationToken, Task<CommandPackageSyncResult>>? synchronizePackages = null)
+        Func<RightAgentSettings, string, CancellationToken, Task<CommandPackageSyncResult>>? synchronizePackages = null,
+        Func<WindowsTerminalProfileCatalog>? loadTerminalCatalog = null)
     {
         store = new SettingsStore(localStateDirectory);
         this.synchronizePackages = synchronizePackages ?? CommandPackageSynchronizer.SynchronizeAsync;
+        this.loadTerminalCatalog = loadTerminalCatalog ?? (() => WindowsTerminalProfileCatalog.Load());
         RefreshLocalization();
     }
 
@@ -170,25 +176,40 @@ public sealed class MainViewModel : BindableBase
             return;
         }
 
+        NotifyDirectAgentChanged();
         if (scheduleSave)
         {
-            NotifyDirectAgentChanged();
             ScheduleAutoSave();
+        }
+    }
+
+    private static DispatcherQueue? TryGetDispatcherQueue()
+    {
+        try
+        {
+            return DispatcherQueue.GetForCurrentThread();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private void PostToUi(Action action)
+    {
+        if (uiContext is not null && !ReferenceEquals(SynchronizationContext.Current, uiContext))
+        {
+            uiContext.Post(_ => action(), null);
             return;
         }
 
-        // Persist-side repair runs on a worker after ConfigureAwait(false):
-        // marshal the binding cascade back to the UI thread and never
-        // re-enter the save machinery, which would cancel the in-flight
-        // save's own token and schedule a redundant write of the same state.
-        if (uiContext is { } context)
+        if (uiQueue is not null && !uiQueue.HasThreadAccess)
         {
-            context.Post(_ => NotifyDirectAgentChanged(), null);
+            _ = uiQueue.TryEnqueue(() => action());
+            return;
         }
-        else
-        {
-            NotifyDirectAgentChanged();
-        }
+
+        action();
     }
 
     private void NotifyDirectAgentChanged()
@@ -343,32 +364,29 @@ public sealed class MainViewModel : BindableBase
         await saveLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            normalized = await PersistAsync(cancellationToken).ConfigureAwait(false);
-            if (!synchronizeOccupancy)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (HasValidationErrors)
             {
-                return normalized;
+                return null;
             }
+
+            normalized = await PersistAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
             saveLock.Release();
         }
 
-        try
+        // SetProperty and the preview collection must not run on this worker.
+        // Do not wait for the dispatcher here: the UI thread may be awaiting
+        // this save (window close) and would deadlock.
+        PostToUi(() => ApplyDirectAgentId(normalized.DirectAgentId, allowClear: true, scheduleSave: false));
+
+        if (synchronizeOccupancy)
         {
-            await synchronizePackages(
-                normalized,
-                store.LocalStateDirectory,
-                cancellationToken).ConfigureAwait(false);
+            await SynchronizeOccupancyInBackgroundAsync(normalized).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            // JSON is already on disk. Occupancy is repaired on the next successful load.
-        }
+
         return normalized;
     }
 
@@ -388,8 +406,14 @@ public sealed class MainViewModel : BindableBase
 
     private void ScheduleAutoSave()
     {
-        if (!IsLoaded || HasValidationErrors)
+        if (!IsLoaded)
         {
+            return;
+        }
+
+        if (HasValidationErrors)
+        {
+            autoSaveCts?.Cancel();
             return;
         }
 
@@ -422,8 +446,7 @@ public sealed class MainViewModel : BindableBase
     private async Task<RightAgentSettings> PersistAsync(CancellationToken cancellationToken)
     {
         var normalized = SettingsValidator.Normalize(BuildCurrentSettings());
-        await store.SaveAsync(normalized, cancellationToken);
-        ApplyDirectAgentId(normalized.DirectAgentId, allowClear: true, scheduleSave: false);
+        await store.SaveAsync(normalized, cancellationToken).ConfigureAwait(false);
         return normalized;
     }
 
@@ -443,9 +466,24 @@ public sealed class MainViewModel : BindableBase
 
     private async Task SynchronizeOccupancyInBackgroundAsync(RightAgentSettings settings)
     {
+        var generation = Interlocked.Increment(ref occupancyGeneration);
         try
         {
-            await synchronizePackages(settings, store.LocalStateDirectory, CancellationToken.None);
+            await occupancyLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                if (generation != Volatile.Read(ref occupancyGeneration))
+                {
+                    return;
+                }
+
+                await synchronizePackages(settings, store.LocalStateDirectory, CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                occupancyLock.Release();
+            }
         }
         catch (Exception)
         {
@@ -653,7 +691,7 @@ public sealed class MainViewModel : BindableBase
 
     private void RefreshTerminalProfileOptions()
     {
-        var catalog = WindowsTerminalProfileCatalog.Load();
+        var catalog = loadTerminalCatalog();
         var selected = catalog.NormalizeSelection(terminalProfile) ?? string.Empty;
         if (!string.Equals(terminalProfile, selected, StringComparison.Ordinal))
         {

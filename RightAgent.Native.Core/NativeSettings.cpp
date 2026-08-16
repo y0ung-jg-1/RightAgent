@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <appmodel.h>
 #include <shlobj.h>
+#include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Data.Json.h>
 
@@ -395,14 +396,32 @@ namespace
 
     bool IsValidHttpUrl(const std::wstring& value)
     {
-        const auto lower = ToLower(Trim(value));
+        const auto trimmed = Trim(value);
+        const auto lower = ToLower(trimmed);
         if (!lower.starts_with(L"https://") && !lower.starts_with(L"http://"))
         {
             return false;
         }
-        // The managed validator rejects URLs that System.Uri cannot parse;
-        // embedded whitespace covers the same failure class here.
-        return lower.find_first_of(L" \t\r\n\f\v") == std::wstring::npos;
+        if (lower.find_first_of(L" \t\r\n\f\v") != std::wstring::npos)
+        {
+            return false;
+        }
+        // WinRT Uri accepts an unclosed IPv6 literal; the managed writer does not.
+        if (trimmed.find(L'[') != std::wstring::npos && trimmed.find(L']') == std::wstring::npos)
+        {
+            return false;
+        }
+
+        try
+        {
+            const winrt::Windows::Foundation::Uri uri{ trimmed };
+            const auto scheme = ToLower(std::wstring(uri.SchemeName()));
+            return scheme == L"http" || scheme == L"https";
+        }
+        catch (const winrt::hresult_error&)
+        {
+            return false;
+        }
     }
 
     MenuMode ParseMenuMode(std::wstring value)
@@ -440,6 +459,10 @@ namespace
             while (!relative.empty() && relative.front() == L'/')
             {
                 relative.erase(relative.begin());
+            }
+            if (relative.empty())
+            {
+                return L"builtin:rightagent";
             }
             const std::filesystem::path relativePath(relative);
             if (!relativePath.is_absolute())

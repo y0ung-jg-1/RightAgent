@@ -176,7 +176,9 @@
           { "id": "icon-leading", "name": "Leading", "enabled": true, "sort": 6, "iconPath": "local:/Icons/leading.ico", "action": { "type": "terminalCommand", "value": "c6" } },
           { "id": "icon-absolute", "name": "Absolute", "enabled": true, "sort": 7, "iconPath": "C:/abs.ico", "action": { "type": "terminalCommand", "value": "c7" } },
           { "id": "icon-empty", "name": "Empty", "enabled": true, "sort": 8, "iconPath": "", "action": { "type": "terminalCommand", "value": "c8" } },
-          { "id": "icon-blank", "name": "Blank", "enabled": true, "sort": 9, "iconPath": "   ", "action": { "type": "terminalCommand", "value": "c9" } }
+          { "id": "icon-blank", "name": "Blank", "enabled": true, "sort": 9, "iconPath": "   ", "action": { "type": "terminalCommand", "value": "c9" } },
+          { "id": "icon-local-empty", "name": "LocalEmpty", "enabled": true, "sort": 10, "iconPath": "local:", "action": { "type": "terminalCommand", "value": "c10" } },
+          { "id": "icon-local-slash", "name": "LocalSlash", "enabled": true, "sort": 11, "iconPath": "local:/", "action": { "type": "terminalCommand", "value": "c11" } }
         ]
       },
       "expected": {
@@ -196,7 +198,9 @@
           { "id": "icon-leading", "name": "Leading", "enabled": true, "sort": 6, "iconPath": "local:Icons/leading.ico", "action": { "type": "terminalCommand", "value": "c6" } },
           { "id": "icon-absolute", "name": "Absolute", "enabled": true, "sort": 7, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c7" } },
           { "id": "icon-empty", "name": "Empty", "enabled": true, "sort": 8, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c8" } },
-          { "id": "icon-blank", "name": "Blank", "enabled": true, "sort": 9, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c9" } }
+          { "id": "icon-blank", "name": "Blank", "enabled": true, "sort": 9, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c9" } },
+          { "id": "icon-local-empty", "name": "LocalEmpty", "enabled": true, "sort": 10, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c10" } },
+          { "id": "icon-local-slash", "name": "LocalSlash", "enabled": true, "sort": 11, "iconPath": "builtin:rightagent", "action": { "type": "terminalCommand", "value": "c11" } }
         ]
       }
     },
@@ -212,7 +216,9 @@
           { "id": "url-js", "name": "Js", "enabled": true, "sort": 4, "action": { "type": "url", "value": "javascript:alert(1)" } },
           { "id": "url-slash", "name": "Slash", "enabled": true, "sort": 5, "action": { "type": "url", "value": "http:/missing-slash" } },
           { "id": "url-space", "name": "Space", "enabled": true, "sort": 6, "action": { "type": "url", "value": "https://two words.example" } },
-          { "id": "url-empty", "name": "Empty", "enabled": true, "sort": 7, "action": { "type": "url", "value": "   " } }
+          { "id": "url-empty", "name": "Empty", "enabled": true, "sort": 7, "action": { "type": "url", "value": "   " } },
+          { "id": "url-port", "name": "Port", "enabled": true, "sort": 8, "action": { "type": "url", "value": "https://example.com:99999" } },
+          { "id": "url-ipv6", "name": "Ipv6", "enabled": true, "sort": 9, "action": { "type": "url", "value": "https://[::1" } }
         ]
       },
       "expected": {
@@ -230,7 +236,9 @@
           { "id": "url-js", "name": "Js", "enabled": false, "sort": 4, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "javascript:alert(1)" } },
           { "id": "url-slash", "name": "Slash", "enabled": false, "sort": 5, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "http:/missing-slash" } },
           { "id": "url-space", "name": "Space", "enabled": false, "sort": 6, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "https://two words.example" } },
-          { "id": "url-empty", "name": "Empty", "enabled": false, "sort": 7, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "" } }
+          { "id": "url-empty", "name": "Empty", "enabled": false, "sort": 7, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "" } },
+          { "id": "url-port", "name": "Port", "enabled": false, "sort": 8, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "https://example.com:99999" } },
+          { "id": "url-ipv6", "name": "Ipv6", "enabled": false, "sort": 9, "iconPath": "builtin:rightagent", "action": { "type": "url", "value": "https://[::1" } }
         ]
       }
     },
