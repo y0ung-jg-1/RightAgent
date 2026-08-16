@@ -100,23 +100,37 @@ public sealed class MainViewModelTests
         var root = CreateTempRoot();
         var previous = SynchronizationContext.Current;
         var context = new CapturingSynchronizationContext();
-        SynchronizationContext.SetSynchronizationContext(context);
         try
         {
-            var (_, viewModel, recorder) = await LoadRepairHostAsync(root);
+            // The context must be current only while the view model captures it;
+            // every later Post on it then has to come from PostToUi, so the
+            // count pins the repair itself and not incidental await continuations.
+            var (_, viewModel, recorder) = await LoadRepairHostAsync(
+                root,
+                (directory, sync) =>
+                {
+                    SynchronizationContext.SetSynchronizationContext(context);
+                    try
+                    {
+                        return CreateViewModel(directory, sync);
+                    }
+                    finally
+                    {
+                        SynchronizationContext.SetSynchronizationContext(previous);
+                    }
+                });
 
             viewModel.Agents[0].Enabled = false;
             viewModel.Agents.Single(agent => agent.Id == "b").ActionValue = "   ";
 
             await viewModel.FlushAutoSaveAsync();
 
-            Assert.True(context.PostCount > 0);
+            Assert.Equal(1, context.PostCount);
             Assert.Null(viewModel.DirectAgentId);
             Assert.Equal(2, recorder.Calls.Count);
         }
         finally
         {
-            SynchronizationContext.SetSynchronizationContext(previous);
             DeleteTempRoot(root);
         }
     }
@@ -186,7 +200,8 @@ public sealed class MainViewModelTests
         new(root, recorder.Invoke, () => WindowsTerminalProfileCatalog.Empty);
 
     private static async Task<(SettingsStore Store, MainViewModel ViewModel, RecordingSync Recorder)> LoadRepairHostAsync(
-        string root)
+        string root,
+        Func<string, RecordingSync, MainViewModel>? createViewModel = null)
     {
         var settings = SeedSettings(menuEnabled: false);
         settings.Agents.Add(new AgentDefinition
@@ -201,7 +216,7 @@ public sealed class MainViewModelTests
         var store = new SettingsStore(root);
         await store.SaveAsync(settings);
         var recorder = new RecordingSync();
-        var viewModel = CreateViewModel(root, recorder);
+        var viewModel = createViewModel?.Invoke(root, recorder) ?? CreateViewModel(root, recorder);
         await viewModel.LoadAsync();
         Assert.Single(recorder.Calls);
         return (store, viewModel, recorder);
@@ -308,5 +323,10 @@ public sealed class MainViewModelTests
             PostCount++;
             d(state);
         }
+
+        // The repair must never be Sent: the UI thread can be awaiting the save
+        // when the window closes, and a blocking marshal would deadlock there.
+        public override void Send(SendOrPostCallback d, object? state) =>
+            throw new InvalidOperationException("PostToUi must Post the repair, not Send it.");
     }
 }

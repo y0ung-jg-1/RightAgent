@@ -32,7 +32,9 @@ public sealed class MainViewModel : BindableBase
     private readonly SemaphoreSlim saveLock = new(1, 1);
     private readonly SemaphoreSlim occupancyLock = new(1, 1);
     private int occupancyGeneration;
-    // Production WinUI has no SynchronizationContext; tests may install one.
+    // The generated App entry point installs a DispatcherQueueSynchronizationContext
+    // on the UI thread, so production marshals through uiContext; uiQueue is the
+    // fallback for hosts that run a dispatcher without installing a context.
     private readonly DispatcherQueue? uiQueue = TryGetDispatcherQueue();
     private readonly SynchronizationContext? uiContext = SynchronizationContext.Current;
 
