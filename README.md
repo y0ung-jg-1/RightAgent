@@ -6,7 +6,7 @@
 
 **把 AI 编程助手装进 Windows 11 的右键菜单。**
 
-当前版本：v1.3.0 · [MIT 许可证](LICENSE)
+当前版本：v1.3.1 · [MIT 许可证](LICENSE)
 
 ```text
 使用 RightAgent 打开  >
@@ -46,7 +46,7 @@ RightAgent 没有托盘进程、后台服务、遥测或自动更新；关闭设
 
 ## 安装
 
-请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.3.0-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。公开安装器是本机版，需要管理员批准，设置应用装到 `%ProgramFiles%\RightAgent`。安装器界面跟随 Windows 显示语言（中文 / 英文）。首次安装会把项目公共证书导入“本地计算机\受信任的人”，设置写在 `%LOCALAPPDATA%\RightAgent`，并只注册当前菜单需要的命令包。为避免 Windows 11 把多个直达命令归组，Setup 内部包含 16 个隐藏命令包，但用户仍只需下载一个 EXE，开始菜单也只显示一个 RightAgent。发布包不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
+请从[官方 GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest)下载 `RightAgent-1.3.1-x64-Setup.exe` 与同名 `.sha256` 文件，核对 SHA-256 后双击安装。公开安装器是本机版，需要管理员批准，设置应用装到 `%ProgramFiles%\RightAgent`。安装器界面跟随 Windows 显示语言（中文 / 英文）。首次安装会把项目公共证书导入“本地计算机\受信任的人”，设置写在 `%LOCALAPPDATA%\RightAgent`，并只注册当前菜单需要的命令包。为避免 Windows 11 把多个直达命令归组，Setup 内部包含 16 个隐藏命令包，但用户仍只需下载一个 EXE，开始菜单也只显示一个 RightAgent。发布包不包含私钥。完整步骤与安全说明见[侧载安装说明](docs/SIDELOAD_INSTALL.md)。
 
 ### 从源码开发
 

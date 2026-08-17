@@ -6,7 +6,7 @@
 
 **AI coding agents in your Windows 11 right-click menu.**
 
-Current version: v1.3.0 · [MIT License](LICENSE)
+Current version: v1.3.1 · [MIT License](LICENSE)
 
 ```text
 Open with RightAgent  >
@@ -46,7 +46,7 @@ RightAgent has no tray process, background service, telemetry, or automatic upda
 
 ## Installation
 
-Download `RightAgent-1.3.0-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The public installer is per-machine: it requests administrator approval and places the settings app in `%ProgramFiles%\RightAgent`. The Setup UI follows the Windows display language (Chinese or English). First install trusts the project public certificate in Local Computer\Trusted People, writes settings to `%LOCALAPPDATA%\RightAgent`, and registers only the command packages required by the current menu. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. The private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
+Download `RightAgent-1.3.1-x64-Setup.exe` and its matching `.sha256` file from the [official GitHub Release](https://github.com/y0ung-jg-1/RightAgent/releases/latest). Verify the SHA-256 and double-click Setup. The public installer is per-machine: it requests administrator approval and places the settings app in `%ProgramFiles%\RightAgent`. The Setup UI follows the Windows display language (Chinese or English). First install trusts the project public certificate in Local Computer\Trusted People, writes settings to `%LOCALAPPDATA%\RightAgent`, and registers only the command packages required by the current menu. To prevent Windows 11 from grouping multiple direct commands, Setup internally carries 16 hidden command packages; users still download one EXE and see only one RightAgent entry in Start. The private key is never distributed. See the [sideload installation guide](docs/SIDELOAD_INSTALL.en.md) for complete steps and security details.
 
 ### Build and install from source
 

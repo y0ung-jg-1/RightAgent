@@ -771,7 +771,7 @@ public sealed class MainViewModel : BindableBase
         {
             var assemblyVersion = typeof(App).Assembly.GetName().Version;
             return assemblyVersion is null
-                ? "1.3.0"
+                ? "1.3.1"
                 : $"{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
         }
     }
